@@ -1,5 +1,5 @@
 import { env } from "./src/env.ts";
-import { getDb } from "./src/db/index.ts";
+import { getDb, closeDb } from "./src/db/index.ts";
 import {
   loadAllConfigs,
   getCachedConfigs,
@@ -92,6 +92,8 @@ const server = Bun.serve({
     "/:ns/:pipeline": pipelinePage,
     "/:ns/:pipeline/config": configPage,
     "/:ns/:pipeline/runs/:runId": runPage,
+
+    "/health": () => Response.json({ status: "ok" }),
 
     "/api/configs": async () => {
       const configs = await getConfigs();
@@ -371,9 +373,22 @@ const server = Bun.serve({
 
 logger.info({ env: env.NODE_ENV, port: server.port, dataDir: env.DATA_DIR }, "server started");
 
-function shutdown() {
+let shuttingDown = false;
+
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
   logger.info("server shutting down");
+
   shutdownAll();
+  server.stop();
+
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
+
+  closeDb();
+
+  logger.info("shutdown complete");
   process.exit(0);
 }
 

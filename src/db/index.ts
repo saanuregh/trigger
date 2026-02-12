@@ -23,6 +23,13 @@ export function getDb(): Database {
   return db;
 }
 
+export function closeDb(): void {
+  if (db) {
+    db.close();
+    logger.info("database closed");
+  }
+}
+
 function migrate(db: Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS pipeline_runs (
