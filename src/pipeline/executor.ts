@@ -174,7 +174,7 @@ async function runSteps({
       const resolvedConfig = resolveConfig(def.config, { params, vars });
       const logFile = join(logDir, `${def.id}.log`);
 
-      const fileDest = pino.destination({ dest: logFile, sync: true });
+      const fileDest = pino.destination({ dest: logFile, sync: false, minLength: 4096 });
       const sseSink = new Writable({
         decodeStrings: false,
         write(data, _enc, cb) {
