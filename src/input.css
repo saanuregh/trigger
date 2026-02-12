@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-out: fade-out 0.2s ease-out forwards;
+  --animate-slide-up: slide-up 0.25s ease-out;
+  --animate-scale-in: scale-in 0.15s ease-out;
+  --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Skeleton shimmer effect */
+.skeleton {
+  background: linear-gradient(90deg, theme(--color-gray-800) 25%, theme(--color-gray-700) 50%, theme(--color-gray-800) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: theme(--radius-md);
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Trigger</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2360a5fa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><path d='M12 3v6m0 6v6M3 12h6m6 0h6'/><circle cx='12' cy='12' r='10'/></svg>" />
+  <link rel="stylesheet" href="../src/input.css" />
+</head>
+<body class="bg-gray-950 text-gray-100 h-screen" style="background:#030712">
+  <div id="root">
+    <div class="flex flex-col h-screen">
+      <header class="bg-gray-900 border-b border-gray-800 px-4 h-11 flex items-center shrink-0 shadow-md shadow-black/10">
+        <nav class="flex items-center gap-1.5 text-sm">
+          <a href="/" class="inline-flex items-center gap-1.5 font-bold tracking-wide text-white no-underline">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+            Trigger
+          </a>
+        </nav>
+      </header>
+      <div class="flex flex-1 overflow-hidden">
+        <main class="flex-1 overflow-y-auto p-6">
+          <div class="skeleton h-6 w-32 mb-4"></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2"><div class="skeleton h-5 w-36"></div><div class="skeleton h-4 w-20"></div></div>
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2"><div class="skeleton h-5 w-36"></div><div class="skeleton h-4 w-20"></div></div>
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2"><div class="skeleton h-5 w-36"></div><div class="skeleton h-4 w-20"></div></div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="../src/client/home.tsx"></script>
+</body>
+</html>

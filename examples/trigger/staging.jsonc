@@ -1,0 +1,103 @@
+{
+  // "$schema": "https://trigger.internal/api/config/schema",
+  "namespace": "staging",
+  "display_name": "Staging",
+  "aws_region": "ap-south-1",
+
+  "vars": {
+    "cluster": "acme-staging",
+    "subnets": ["subnet-abc123", "subnet-def456"],
+    "security_groups": ["sg-web-001"],
+  },
+
+  "pipelines": [
+    // ── Deploy to staging ───────────────────────────────────
+    {
+      "id": "deploy",
+      "name": "Deploy to Staging",
+      "description": "Build from any branch, run migrations, and restart staging services.",
+      "params": [
+        { "name": "branch", "label": "Branch", "type": "string", "required": true, "placeholder": "feature/my-branch" },
+        { "name": "skip_migration", "label": "Skip DB migration", "type": "boolean", "default": false },
+      ],
+      "steps": [
+        {
+          "id": "build", "name": "Build", "action": "codebuild",
+          "config": {
+            "project_name": "acme-api-build-staging",
+            "source_version": "{{param.branch}}",
+            "env_vars": {
+              "DEPLOY_ENV": "{{param.branch}}",
+              "DB_PASSWORD": { "value": "staging/db-password", "type": "SECRETS_MANAGER" },
+            },
+          },
+        },
+        {
+          "id": "migrate", "name": "Run migration: bun run db:migrate", "action": "ecs-task",
+          "config": {
+            "cluster": "{{vars.cluster}}",
+            "task_definition": "acme-api-migrate-staging",
+            "container_name": "migrate",
+            "command": ["bun", "run", "db:migrate"],
+            "subnets": "{{vars.subnets}}",
+            "security_groups": "{{vars.security_groups}}",
+            "timeout": 300,
+          },
+        },
+        {
+          "id": "restart", "name": "Restart Services", "action": "ecs-restart",
+          "config": { "cluster": "{{vars.cluster}}", "services": ["api-service", "worker-service"], "timeout": 600 },
+        },
+      ],
+    },
+
+    // ── Run one-off task ────────────────────────────────────
+    {
+      "id": "run-task",
+      "name": "Run One-Off Task",
+      "description": "Run an arbitrary command on the staging cluster.",
+      "params": [
+        {
+          "name": "task", "label": "Task", "type": "select",
+          "options": [
+            { "label": "DB Seed", "value": "db:seed" },
+            { "label": "DB Reset", "value": "db:reset" },
+            { "label": "Cache Warm", "value": "cache:warm" },
+          ],
+        },
+      ],
+      "steps": [
+        {
+          "id": "run", "name": "Run Task", "action": "ecs-task",
+          "config": {
+            "cluster": "{{vars.cluster}}",
+            "task_definition": "acme-api-task-staging",
+            "container_name": "api",
+            "command": ["bun", "run", "{{param.task}}"],
+            "subnets": "{{vars.subnets}}",
+            "security_groups": "{{vars.security_groups}}",
+            "timeout": 300,
+          },
+        },
+      ],
+    },
+
+    // ── Promote staging to production ───────────────────────
+    {
+      "id": "promote",
+      "name": "Promote to Production",
+      "description": "Trigger the production deploy pipeline from staging.",
+      "confirm": true,
+      "steps": [
+        {
+          "id": "trigger-prod", "name": "Trigger Production Deploy", "action": "trigger-pipeline",
+          "config": {
+            "namespace": "production",
+            "pipeline_id": "deploy-api",
+            "params": { "branch": "main" },
+          },
+        },
+      ],
+    },
+  ],
+}
