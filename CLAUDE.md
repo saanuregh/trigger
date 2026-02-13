@@ -30,7 +30,6 @@ Dockerfile                    # Container image build
 bunfig.toml                   # Bun config (dev Tailwind plugin)
 tsconfig.json                 # TypeScript config (strict, noEmit)
 mise.toml                     # Toolchain versions (Bun 1.3)
-playwright.config.ts          # E2E test config
 .env.example                  # Env var reference
 public/                       # HTML page shells (each loads one React entry point)
 src/
@@ -114,9 +113,7 @@ Pipeline configs are YAML files. Key features:
 
 ## Testing
 
-- `bunx playwright test` — run E2E tests (Chromium only).
-- Test config in `playwright.config.ts`.
-- No unit test framework configured — project relies on TypeScript strict mode + E2E.
+- No test framework configured — project relies on TypeScript strict mode (`bun run typecheck`).
 
 ## Docker
 
