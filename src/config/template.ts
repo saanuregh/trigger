@@ -43,7 +43,7 @@ function resolveExpression(expr: string, ctx: ResolveContext): unknown {
 
   if (ref.fallback !== undefined) {
     const val = ctx.params[ref.name];
-    return (val === undefined || val === "") ? ref.fallback : val;
+    return val === undefined || val === "" ? ref.fallback : val;
   }
 
   const val = ctx.params[ref.name];

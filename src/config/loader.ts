@@ -1,9 +1,9 @@
 import { env } from "../env.ts";
-import { resolveNamespaces, type NamespaceSource } from "./namespace.ts";
-import type { NamespaceConfig, PipelineConfig } from "./types.ts";
-import { errorMessage } from "../types.ts";
 import { logger } from "../logger.ts";
+import { errorMessage } from "../types.ts";
+import { type NamespaceSource, resolveNamespaces } from "./namespace.ts";
 import { pipelineConfigSchema } from "./schema.ts";
+import type { NamespaceConfig, PipelineConfig } from "./types.ts";
 
 const REFRESH_TTL_MS = 60_000;
 
@@ -37,7 +37,7 @@ export async function loadAllConfigs(force = false): Promise<NamespaceConfig[]> 
     return errorConfig(source, msg);
   });
 
-  const ok = cachedConfigs.filter(c => !c._error).length;
+  const ok = cachedConfigs.filter((c) => !c._error).length;
   const failed = cachedConfigs.length - ok;
   logger.info({ loaded: ok, failed, total: cachedConfigs.length }, "configs loaded");
 
@@ -50,7 +50,7 @@ export function getCachedConfigs(): NamespaceConfig[] | null {
 
 export async function refreshNamespace(ns: string): Promise<NamespaceConfig[]> {
   const lastTime = lastRefreshed.get(ns) ?? 0;
-  if (Date.now() - lastTime < REFRESH_TTL_MS && cachedConfigs?.find(c => c.namespace === ns && !c._error)) {
+  if (Date.now() - lastTime < REFRESH_TTL_MS && cachedConfigs?.find((c) => c.namespace === ns && !c._error)) {
     return cachedConfigs!;
   }
 
@@ -90,7 +90,9 @@ async function fetchConfigText(config: string): Promise<string> {
     const res = await fetch(url, { headers });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      throw new Error(`Failed to fetch config from ${config}: HTTP ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 200)}` : ""}`);
+      throw new Error(
+        `Failed to fetch config from ${config}: HTTP ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 200)}` : ""}`,
+      );
     }
     return res.text();
   }

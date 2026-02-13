@@ -20,13 +20,14 @@ export interface AuthSession {
 const encoder = new TextEncoder();
 
 async function hmacSign(data: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw", encoder.encode(env.OIDC_CLIENT_SECRET),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-  );
+  const key = await crypto.subtle.importKey("raw", encoder.encode(env.OIDC_CLIENT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, [
+    "sign",
+  ]);
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
   return btoa(String.fromCharCode(...new Uint8Array(sig)))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 async function hmacVerify(data: string, signature: string): Promise<boolean> {
@@ -42,8 +43,7 @@ export async function signSession(user: { email: string; name: string; groups: s
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_S,
   };
 
-  const payloadB64 = btoa(JSON.stringify(payload))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const signature = await hmacSign(payloadB64);
   return `${payloadB64}.${signature}`;
 }
@@ -55,7 +55,7 @@ export async function verifySession(cookie: string): Promise<AuthSession | null>
   const payloadB64 = cookie.slice(0, dotIndex);
   const signature = cookie.slice(dotIndex + 1);
 
-  if (!await hmacVerify(payloadB64, signature)) return null;
+  if (!(await hmacVerify(payloadB64, signature))) return null;
 
   try {
     const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));

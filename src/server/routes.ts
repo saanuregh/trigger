@@ -1,38 +1,24 @@
-import {
-  loadAllConfigs,
-  getCachedConfigs,
-  refreshNamespace,
-} from "../config/loader.ts";
-import {
-  executePipeline,
-  cancelPipeline,
-  PipelineError,
-} from "../pipeline/executor.ts";
-import * as db from "../db/queries.ts";
-import { subscribe } from "../events.ts";
-import { logger } from "../logger.ts";
-import { env } from "../env.ts";
-import type { NamespaceConfig } from "../config/types.ts";
-import { TERMINAL_STATUSES, errorMessage } from "../types.ts";
-import type {
-  LogLine,
-  NamespaceConfigSummary,
-  PaginatedResponse,
-  RunRow,
-} from "../types.ts";
 import { z } from "zod";
-import { pipelineConfigSchema } from "../config/schema.ts";
-import { getAuthUrl, exchangeCode, getOIDCConfig } from "../auth/oidc.ts";
-import { signSession, sessionCookieHeader, clearSessionCookie } from "../auth/session.ts";
-import { authed, canAccessPipeline, canAccessNamespace, filterAccessibleConfigs } from "../auth/access.ts";
-import type { AuthSession } from "../auth/session.ts";
-
+import configPage from "../../public/config.html";
 import homepage from "../../public/index.html";
+import loginPage from "../../public/login.html";
 import namespacePage from "../../public/namespace.html";
 import pipelinePage from "../../public/pipeline.html";
-import configPage from "../../public/config.html";
 import runPage from "../../public/run.html";
-import loginPage from "../../public/login.html";
+import { authed, canAccessNamespace, canAccessPipeline, filterAccessibleConfigs } from "../auth/access.ts";
+import { exchangeCode, getAuthUrl, getOIDCConfig } from "../auth/oidc.ts";
+import type { AuthSession } from "../auth/session.ts";
+import { clearSessionCookie, sessionCookieHeader, signSession } from "../auth/session.ts";
+import { getCachedConfigs, loadAllConfigs, refreshNamespace } from "../config/loader.ts";
+import { pipelineConfigSchema } from "../config/schema.ts";
+import type { NamespaceConfig } from "../config/types.ts";
+import * as db from "../db/queries.ts";
+import { env } from "../env.ts";
+import { subscribe } from "../events.ts";
+import { logger } from "../logger.ts";
+import { cancelPipeline, executePipeline, PipelineError } from "../pipeline/executor.ts";
+import type { LogLine, NamespaceConfigSummary, PaginatedResponse, RunRow } from "../types.ts";
+import { errorMessage, TERMINAL_STATUSES } from "../types.ts";
 
 const configJsonSchema = z.toJSONSchema(pipelineConfigSchema);
 
@@ -64,7 +50,11 @@ function findNsConfig(configs: NamespaceConfig[], ns: string) {
   return configs.find((c) => c.namespace === ns);
 }
 
-function checkPipelineAccess(session: AuthSession, nsConfig: NamespaceConfig | undefined, pipeline: NamespaceConfig["pipelines"][number] | undefined): Response | null {
+function checkPipelineAccess(
+  session: AuthSession,
+  nsConfig: NamespaceConfig | undefined,
+  pipeline: NamespaceConfig["pipelines"][number] | undefined,
+): Response | null {
   if (!nsConfig) return Response.json({ error: "Namespace not found" }, { status: 404 });
   if (!pipeline) return Response.json({ error: "Pipeline not found" }, { status: 404 });
   if (!canAccessPipeline(session, nsConfig, pipeline)) {
@@ -141,7 +131,10 @@ export const routes = {
     let savedState = "";
     for (const part of cookies.split(";")) {
       const [key, ...rest] = part.trim().split("=");
-      if (key === OAUTH_STATE_COOKIE) { savedState = rest.join("="); break; }
+      if (key === OAUTH_STATE_COOKIE) {
+        savedState = rest.join("=");
+        break;
+      }
     }
 
     if (savedState !== state) {
@@ -152,7 +145,7 @@ export const routes = {
       const redirectUri = `${url.origin}/auth/callback`;
       const user = await exchangeCode(code, redirectUri);
       const sessionCookie = await signSession(user);
-      const returnUrl = JSON.parse(atob(state)).returnUrl as string ?? "/";
+      const returnUrl = (JSON.parse(atob(state)).returnUrl as string) ?? "/";
 
       logger.info({ email: user.email, groups: user.groups }, "user authenticated");
 
@@ -177,7 +170,7 @@ export const routes = {
   }),
 
   "/api/auth/logout": {
-    POST: async (req: RouteRequest) => {
+    POST: async (_req: RouteRequest) => {
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: {
@@ -200,10 +193,7 @@ export const routes = {
     const pipeline_id = url.searchParams.get("pipeline_id") || undefined;
     const status = url.searchParams.get("status") || undefined;
     const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
-    const per_page = Math.min(
-      100,
-      Math.max(1, Number(url.searchParams.get("per_page")) || 20),
-    );
+    const per_page = Math.min(100, Math.max(1, Number(url.searchParams.get("per_page")) || 20));
 
     // If filtering by namespace, check access
     if (namespace) {
@@ -233,8 +223,7 @@ export const routes = {
   "/api/runs/:runId": authed(async (req, session) => {
     const { runId } = req.params;
     const run = db.getRun(runId!);
-    if (!run)
-      return Response.json({ error: "Run not found" }, { status: 404 });
+    if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
 
     // Check namespace access
     const configs = await getConfigs();
@@ -272,7 +261,17 @@ export const routes = {
         try {
           lines.push(JSON.parse(raw));
         } catch {
-          lines.push({ level: "info", time: "", msg: raw, runId: runId!, stepId: step.step_id, step: step.step_name, action: step.action, stepIndex: 0, totalSteps: 0 });
+          lines.push({
+            level: "info",
+            time: "",
+            msg: raw,
+            runId: runId!,
+            stepId: step.step_id,
+            step: step.step_name,
+            action: step.action,
+            stepIndex: 0,
+            totalSteps: 0,
+          });
         }
         if (lines.length >= MAX_LOG_LINES) break;
       }
@@ -343,7 +342,10 @@ export const routes = {
           dryRun: body.dryRun ?? false,
           triggeredBy: session.email || undefined,
         });
-        logger.info({ namespace: ns, pipelineId: id, runId, dryRun: body.dryRun ?? false, triggeredBy: session.email }, "pipeline triggered");
+        logger.info(
+          { namespace: ns, pipelineId: id, runId, dryRun: body.dryRun ?? false, triggeredBy: session.email },
+          "pipeline triggered",
+        );
         return Response.json({ runId });
       } catch (err) {
         const msg = errorMessage(err);
@@ -374,10 +376,7 @@ export const routes = {
       const cancelled = cancelPipeline(runId!);
       if (!cancelled) {
         logger.warn({ runId }, "cancel requested for inactive run");
-        return Response.json(
-          { error: "Run not found or not active" },
-          { status: 404 },
-        );
+        return Response.json({ error: "Run not found or not active" }, { status: 404 });
       }
       logger.info({ runId, cancelledBy: session.email }, "pipeline cancellation requested");
       return Response.json({ ok: true });
@@ -423,18 +422,26 @@ export const routes = {
         const encoder = new TextEncoder();
 
         function send(event: string, data: object) {
-          try { controller.enqueue(encoder.encode(sseFormat(event, data))); }
-          catch { ac.abort(); }
+          try {
+            controller.enqueue(encoder.encode(sseFormat(event, data)));
+          } catch {
+            ac.abort();
+          }
         }
 
         function closeStream() {
           ac.abort();
-          try { controller.close(); } catch {}
+          try {
+            controller.close();
+          } catch {}
         }
 
         const heartbeatTimer = setInterval(() => {
-          try { controller.enqueue(encoder.encode(": keepalive\n\n")); }
-          catch { ac.abort(); }
+          try {
+            controller.enqueue(encoder.encode(": keepalive\n\n"));
+          } catch {
+            ac.abort();
+          }
         }, 30_000);
 
         const unsubscribe = subscribe(runId!, (message) => {
@@ -448,10 +455,14 @@ export const routes = {
           }
         });
 
-        ac.signal.addEventListener("abort", () => {
-          unsubscribe();
-          clearInterval(heartbeatTimer);
-        }, { once: true });
+        ac.signal.addEventListener(
+          "abort",
+          () => {
+            unsubscribe();
+            clearInterval(heartbeatTimer);
+          },
+          { once: true },
+        );
 
         // Race condition guard: run may have finished between initial check and subscribe
         const freshRun = db.getRun(runId!);

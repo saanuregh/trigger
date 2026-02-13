@@ -11,6 +11,9 @@ Use Bun for everything. Bun auto-loads `.env`.
 
 > **Note:** `bun run start` uses `cd dist` because Bun resolves bundled HTML asset paths relative to CWD, not the script location.
 - `bun run typecheck` — type-check (`bunx tsc --noEmit`)
+- `bun run lint` — lint check via Biome (`bunx biome check .`)
+- `bun run lint:fix` — auto-fix lint + format (`bunx biome check --write .`)
+- `bun run format` — format only (`bunx biome format --write .`)
 
 ## Architecture
 
@@ -113,7 +116,7 @@ Pipeline configs are YAML files. Key features:
 
 ## Testing
 
-- No test framework configured — project relies on TypeScript strict mode (`bun run typecheck`).
+- No test framework configured — project relies on TypeScript strict mode (`bun run typecheck`) and Biome lint (`bun run lint`).
 
 ## Docker
 

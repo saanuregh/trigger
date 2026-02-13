@@ -1,13 +1,13 @@
 import {
+  BatchGetBuildsCommand,
   CodeBuildClient,
+  type EnvironmentVariable,
   StartBuildCommand,
   StopBuildCommand,
-  BatchGetBuildsCommand,
-  type EnvironmentVariable,
 } from "@aws-sdk/client-codebuild";
 import type { CodeBuildActionConfig } from "../../config/types.ts";
-import type { ActionContext } from "../types.ts";
 import { errorMessage } from "../../types.ts";
+import type { ActionContext } from "../types.ts";
 import { lazyClient, pollUntil, streamLogs } from "./aws-utils.ts";
 
 const getCodeBuildClient = lazyClient((region) => new CodeBuildClient({ region }));
@@ -15,10 +15,8 @@ const getCodeBuildClient = lazyClient((region) => new CodeBuildClient({ region }
 export async function executeCodeBuild(config: CodeBuildActionConfig, ctx: ActionContext) {
   ctx.log("starting codebuild project", { project: config.project_name });
 
-  const envVars: EnvironmentVariable[] = Object.entries(config.env_vars ?? {}).map(
-    ([name, v]) => typeof v === "string"
-      ? { name, value: v, type: "PLAINTEXT" as const }
-      : { name, value: v.value, type: v.type },
+  const envVars: EnvironmentVariable[] = Object.entries(config.env_vars ?? {}).map(([name, v]) =>
+    typeof v === "string" ? { name, value: v, type: "PLAINTEXT" as const } : { name, value: v.value, type: v.type },
   );
 
   const startResult = await getCodeBuildClient(ctx.region).send(
@@ -59,10 +57,7 @@ export async function executeCodeBuild(config: CodeBuildActionConfig, ctx: Actio
       signal: ctx.signal,
       timeoutMessage: `Build exceeded ${timeoutMinutes}m timeout`,
       async poll() {
-        const resp = await getCodeBuildClient(ctx.region).send(
-          new BatchGetBuildsCommand({ ids: [buildId] }),
-          { abortSignal: ctx.signal },
-        );
+        const resp = await getCodeBuildClient(ctx.region).send(new BatchGetBuildsCommand({ ids: [buildId] }), { abortSignal: ctx.signal });
         return resp.builds?.[0] ?? null;
       },
       async check(build) {
@@ -83,7 +78,7 @@ export async function executeCodeBuild(config: CodeBuildActionConfig, ctx: Actio
           return { done: true, output: { buildId, status: "SUCCEEDED" } };
         }
         if (status === "FAILED" || status === "FAULT" || status === "TIMED_OUT" || status === "STOPPED") {
-          return { error: build.phases?.find(p => p.phaseStatus === "FAILED")?.contexts?.[0]?.message ?? `build ${status}` };
+          return { error: build.phases?.find((p) => p.phaseStatus === "FAILED")?.contexts?.[0]?.message ?? `build ${status}` };
         }
         return "continue";
       },

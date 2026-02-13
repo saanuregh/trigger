@@ -18,7 +18,7 @@ export async function fetchOIDCConfig(): Promise<OIDCConfig> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status} ${res.statusText}`);
 
-  const data = await res.json() as Record<string, unknown>;
+  const data = (await res.json()) as Record<string, unknown>;
   cachedConfig = {
     authorization_endpoint: data.authorization_endpoint as string,
     token_endpoint: data.token_endpoint as string,
@@ -75,20 +75,18 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<O
     throw new Error(`Token exchange failed: ${res.status} ${body}`);
   }
 
-  const tokens = await res.json() as { id_token?: string; access_token?: string };
+  const tokens = (await res.json()) as { id_token?: string; access_token?: string };
 
   // Decode ID token (JWT) — no signature verification needed since we got it
   // directly from the token endpoint over HTTPS (standard OIDC practice for
   // confidential clients using the authorization code flow).
   if (!tokens.id_token) throw new Error("No id_token in token response");
 
-  const payload = JSON.parse(
-    Buffer.from(tokens.id_token.split(".")[1]!, "base64url").toString(),
-  ) as Record<string, unknown>;
+  const payload = JSON.parse(Buffer.from(tokens.id_token.split(".")[1]!, "base64url").toString()) as Record<string, unknown>;
 
   return {
     email: (payload.email as string) ?? "",
     name: (payload.name as string) ?? (payload.preferred_username as string) ?? "",
-    groups: Array.isArray(payload.groups) ? payload.groups as string[] : [],
+    groups: Array.isArray(payload.groups) ? (payload.groups as string[]) : [],
   };
 }

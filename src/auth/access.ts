@@ -1,7 +1,7 @@
-import { env } from "../env.ts";
-import { getSession, type AuthSession } from "./session.ts";
-import type { NamespaceConfig } from "../config/types.ts";
 import type { PipelineDef } from "../config/schema.ts";
+import type { NamespaceConfig } from "../config/types.ts";
+import { env } from "../env.ts";
+import { type AuthSession, getSession } from "./session.ts";
 
 type AuthedHandler = (req: Request & { params: Record<string, string> }, session: AuthSession) => Response | Promise<Response>;
 
@@ -39,7 +39,7 @@ function getPipelineAccess(pipeline: PipelineDef): AccessConfig | undefined {
 }
 
 function hasGroupOverlap(userGroups: string[], allowedGroups: string[]): boolean {
-  return userGroups.some(g => allowedGroups.includes(g));
+  return userGroups.some((g) => allowedGroups.includes(g));
 }
 
 export function canAccessNamespace(session: AuthSession, nsConfig: NamespaceConfig): boolean {
@@ -68,10 +68,10 @@ export function filterAccessibleConfigs(configs: NamespaceConfig[], session: Aut
   if (session.isSuperAdmin) return configs;
 
   return configs
-    .filter(ns => canAccessNamespace(session, ns))
-    .map(ns => {
-      const accessiblePipelines = ns.pipelines.filter(p => canAccessPipeline(session, ns, p));
+    .filter((ns) => canAccessNamespace(session, ns))
+    .map((ns) => {
+      const accessiblePipelines = ns.pipelines.filter((p) => canAccessPipeline(session, ns, p));
       return { ...ns, pipelines: accessiblePipelines };
     })
-    .filter(ns => ns.pipelines.length > 0 || !getNamespaceAccess(ns)?.groups);
+    .filter((ns) => ns.pipelines.length > 0 || !getNamespaceAccess(ns)?.groups);
 }

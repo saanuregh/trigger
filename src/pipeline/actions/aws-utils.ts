@@ -1,7 +1,4 @@
-import {
-  CloudWatchLogsClient,
-  GetLogEventsCommand,
-} from "@aws-sdk/client-cloudwatch-logs";
+import { CloudWatchLogsClient, GetLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
 import { ECSClient } from "@aws-sdk/client-ecs";
 import { errorMessage } from "../../types.ts";
 import type { ActionContext } from "../types.ts";
@@ -10,7 +7,10 @@ export function lazyClient<T>(factory: (region: string) => T): (region: string) 
   const cache = new Map<string, T>();
   return (region) => {
     let client = cache.get(region);
-    if (!client) { client = factory(region); cache.set(region, client); }
+    if (!client) {
+      client = factory(region);
+      cache.set(region, client);
+    }
     return client;
   };
 }
@@ -20,18 +20,21 @@ export const getEcsClient = lazyClient((region) => new ECSClient({ region }));
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) return Promise.reject(new Error("Aborted"));
-  if (!signal) return new Promise(resolve => setTimeout(resolve, ms));
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
   return new Promise((resolve, reject) => {
-    const onAbort = () => { clearTimeout(timer); reject(new Error("Aborted")); };
-    const timer = setTimeout(() => { signal.removeEventListener("abort", onAbort); resolve(); }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new Error("Aborted"));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
     signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 
-export type PollResult =
-  | "continue"
-  | { done: true; output?: Record<string, unknown> }
-  | { error: string };
+export type PollResult = "continue" | { done: true; output?: Record<string, unknown> } | { error: string };
 
 export async function pollUntil<T>(opts: {
   deadline: number;

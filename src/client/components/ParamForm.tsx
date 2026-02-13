@@ -1,9 +1,9 @@
+import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { errorMessage, type ParamDef, type PipelineDefSummary } from "../../types.ts";
-import { AlertCircle } from "lucide-react";
+import { handleUnauthorized } from "../utils.ts";
 import { Button } from "./Button.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
-import { handleUnauthorized } from "../utils.ts";
 
 function defaultParams(params: ParamDef[]): Record<string, string | boolean> {
   const defaults: Record<string, string | boolean> = {};
@@ -20,15 +20,7 @@ function defaultParams(params: ParamDef[]): Record<string, string | boolean> {
 const inputBase =
   "w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors";
 
-function ParamField({
-  param,
-  value,
-  onChange,
-}: {
-  param: ParamDef;
-  value: string | boolean;
-  onChange: (value: string | boolean) => void;
-}) {
+function ParamField({ param, value, onChange }: { param: ParamDef; value: string | boolean; onChange: (value: string | boolean) => void }) {
   if (param.type === "boolean") {
     return (
       <label className="inline-flex items-center gap-2.5 text-sm cursor-pointer group">
@@ -47,13 +39,11 @@ function ParamField({
     return (
       <div>
         <label className="block text-sm text-gray-400 mb-1.5 font-medium">{param.label}</label>
-        <select
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          className={inputBase}
-        >
+        <select value={value as string} onChange={(e) => onChange(e.target.value)} className={inputBase}>
           {param.options.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
           ))}
         </select>
       </div>
@@ -84,9 +74,7 @@ interface ParamFormProps {
 }
 
 export function ParamForm({ pipeline, ns, onRunStarted }: ParamFormProps) {
-  const [params, setParams] = useState<Record<string, string | boolean>>(
-    () => defaultParams(pipeline.params ?? []),
-  );
+  const [params, setParams] = useState<Record<string, string | boolean>>(() => defaultParams(pipeline.params ?? []));
   const [dryRun, setDryRun] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -155,9 +143,7 @@ export function ParamForm({ pipeline, ns, onRunStarted }: ParamFormProps) {
             />
             <span className="group-hover:text-gray-300 transition-colors">Dry run</span>
           </label>
-          {pipeline.confirm && !dryRun && (
-            <span className="text-xs text-yellow-500">Requires confirmation</span>
-          )}
+          {pipeline.confirm && !dryRun && <span className="text-xs text-yellow-500">Requires confirmation</span>}
         </div>
 
         {error && (

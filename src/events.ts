@@ -1,5 +1,5 @@
-import { errorMessage } from "./types.ts";
 import { logger } from "./logger.ts";
+import { errorMessage } from "./types.ts";
 
 type Listener = (message: Record<string, unknown>) => void;
 
@@ -9,9 +9,7 @@ const topicListeners = new Map<string, Set<Listener>>();
 const globalListeners = new Set<Listener>();
 
 export function publish(topic: string, message: Record<string, unknown>) {
-  const listeners = topic === "global"
-    ? globalListeners
-    : topicListeners.get(topic);
+  const listeners = topic === "global" ? globalListeners : topicListeners.get(topic);
 
   if (!listeners) return;
 

@@ -1,13 +1,20 @@
-import {
-  RunTaskCommand,
-  DescribeTasksCommand,
-} from "@aws-sdk/client-ecs";
+import { DescribeTasksCommand, RunTaskCommand } from "@aws-sdk/client-ecs";
 import type { EcsTaskActionConfig } from "../../config/types.ts";
 import type { ActionContext } from "../types.ts";
 import { getEcsClient, pollUntil, streamLogs } from "./aws-utils.ts";
 
 export async function executeEcsTask(config: EcsTaskActionConfig, ctx: ActionContext) {
-  const { cluster, task_definition, container_name, command, subnets, security_groups, launch_type = "FARGATE", assign_public_ip = false, timeout = 600 } = config;
+  const {
+    cluster,
+    task_definition,
+    container_name,
+    command,
+    subnets,
+    security_groups,
+    launch_type = "FARGATE",
+    assign_public_ip = false,
+    timeout = 600,
+  } = config;
 
   ctx.log("running ecs task", { taskDefinition: task_definition, container: container_name, command: command.join(" ") });
 
@@ -16,9 +23,7 @@ export async function executeEcsTask(config: EcsTaskActionConfig, ctx: ActionCon
       cluster,
       taskDefinition: task_definition,
       overrides: {
-        containerOverrides: [
-          { name: container_name, command },
-        ],
+        containerOverrides: [{ name: container_name, command }],
       },
       launchType: launch_type,
       networkConfiguration: {
@@ -50,10 +55,9 @@ export async function executeEcsTask(config: EcsTaskActionConfig, ctx: ActionCon
     signal: ctx.signal,
     timeoutMessage: `Timeout waiting for ECS task after ${timeout}s`,
     async poll() {
-      const resp = await getEcsClient(ctx.region).send(
-        new DescribeTasksCommand({ cluster, tasks: [taskArn] }),
-        { abortSignal: ctx.signal },
-      );
+      const resp = await getEcsClient(ctx.region).send(new DescribeTasksCommand({ cluster, tasks: [taskArn] }), {
+        abortSignal: ctx.signal,
+      });
       return resp.tasks?.[0] ?? null;
     },
     async check(task) {

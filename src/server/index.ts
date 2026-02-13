@@ -1,10 +1,10 @@
-import { env } from "../env.ts";
-import { getDb, closeDb } from "../db/index.ts";
-import { loadAllConfigs } from "../config/loader.ts";
-import { shutdownAll, recoverStaleRuns } from "../pipeline/executor.ts";
-import { logger } from "../logger.ts";
-import { routes, fetch, error } from "./routes.ts";
 import { fetchOIDCConfig } from "../auth/oidc.ts";
+import { loadAllConfigs } from "../config/loader.ts";
+import { closeDb, getDb } from "../db/index.ts";
+import { env } from "../env.ts";
+import { logger } from "../logger.ts";
+import { recoverStaleRuns, shutdownAll } from "../pipeline/executor.ts";
+import { error, fetch, routes } from "./routes.ts";
 
 export function startServer() {
   getDb();

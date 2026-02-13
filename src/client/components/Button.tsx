@@ -1,5 +1,5 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ButtonSize = "sm" | "md" | "icon";
@@ -24,16 +24,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
-export function Button({
-  variant = "secondary",
-  size = "sm",
-  icon,
-  loading,
-  className = "",
-  children,
-  disabled,
-  ...props
-}: ButtonProps) {
+export function Button({ variant = "secondary", size = "sm", icon, loading, className = "", children, disabled, ...props }: ButtonProps) {
   const isDisabled = disabled || loading;
   const iconEl = loading ? <Loader2 size={14} className="animate-spin" /> : icon;
 

@@ -1,7 +1,4 @@
-import {
-  UpdateServiceCommand,
-  DescribeServicesCommand,
-} from "@aws-sdk/client-ecs";
+import { DescribeServicesCommand, UpdateServiceCommand } from "@aws-sdk/client-ecs";
 import type { EcsRestartActionConfig } from "../../config/types.ts";
 import type { ActionContext } from "../types.ts";
 import { getEcsClient, pollUntil } from "./aws-utils.ts";
@@ -31,14 +28,11 @@ export async function executeEcsRestart(config: EcsRestartActionConfig, ctx: Act
     signal: ctx.signal,
     timeoutMessage: `Timeout waiting for services to stabilize after ${timeout}s`,
     async poll() {
-      return getEcsClient(ctx.region).send(
-        new DescribeServicesCommand({ cluster, services }),
-        { abortSignal: ctx.signal },
-      );
+      return getEcsClient(ctx.region).send(new DescribeServicesCommand({ cluster, services }), { abortSignal: ctx.signal });
     },
     check(resp) {
       const allStable = resp.services?.every((svc) => {
-        const primary = svc.deployments?.find(d => d.status === "PRIMARY");
+        const primary = svc.deployments?.find((d) => d.status === "PRIMARY");
         return primary && primary.runningCount === primary.desiredCount && svc.deployments?.length === 1;
       });
 
@@ -50,7 +44,7 @@ export async function executeEcsRestart(config: EcsRestartActionConfig, ctx: Act
     },
     onProgress(resp) {
       for (const svc of resp.services ?? []) {
-        const primary = svc.deployments?.find(d => d.status === "PRIMARY");
+        const primary = svc.deployments?.find((d) => d.status === "PRIMARY");
         ctx.log("service status poll", {
           service: svc.serviceName,
           running: primary?.runningCount,

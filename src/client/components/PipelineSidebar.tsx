@@ -11,16 +11,10 @@ const inactiveStyle = `${base} text-gray-400 hover:text-white hover:bg-gray-800 
 export function PipelineSidebar({ ns, pipelineId, active }: PipelineSidebarProps) {
   return (
     <nav className="space-y-1">
-      <a
-        href={`/${ns}/${pipelineId}`}
-        className={active === "runs" ? activeStyle : inactiveStyle}
-      >
+      <a href={`/${ns}/${pipelineId}`} className={active === "runs" ? activeStyle : inactiveStyle}>
         Runs
       </a>
-      <a
-        href={`/${ns}/${pipelineId}/config`}
-        className={active === "config" ? activeStyle : inactiveStyle}
-      >
+      <a href={`/${ns}/${pipelineId}/config`} className={active === "config" ? activeStyle : inactiveStyle}>
         Config
       </a>
     </nav>

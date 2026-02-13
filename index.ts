@@ -1,4 +1,4 @@
-import { parseArgs } from "util";
+import { parseArgs } from "node:util";
 
 const { positionals } = parseArgs({
   args: Bun.argv.slice(2),
@@ -20,7 +20,7 @@ switch (command) {
     const { pipelineConfigSchema } = await import("./src/config/schema.ts");
     const outputPath = positionals[1] ?? "schema/pipeline-config.schema.json";
     const schema = z.toJSONSchema(pipelineConfigSchema);
-    await Bun.write(outputPath, JSON.stringify(schema, null, 2) + "\n");
+    await Bun.write(outputPath, `${JSON.stringify(schema, null, 2)}\n`);
     console.log(`Schema written to ${outputPath}`);
     break;
   }

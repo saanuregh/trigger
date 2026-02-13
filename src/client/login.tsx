@@ -1,5 +1,5 @@
+import { LogIn, Workflow } from "lucide-react";
 import { createRoot } from "react-dom/client";
-import { Workflow, LogIn } from "lucide-react";
 
 function LoginPage() {
   const params = new URLSearchParams(location.search);

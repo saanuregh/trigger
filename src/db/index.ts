@@ -1,8 +1,8 @@
 import { Database } from "bun:sqlite";
-import { env } from "../env.ts";
-import { errorMessage } from "../types.ts";
-import { logger } from "../logger.ts";
 import { mkdirSync } from "node:fs";
+import { env } from "../env.ts";
+import { logger } from "../logger.ts";
+import { errorMessage } from "../types.ts";
 
 let db: Database;
 

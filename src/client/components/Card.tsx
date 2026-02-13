@@ -1,4 +1,4 @@
-import type { HTMLAttributes, AnchorHTMLAttributes } from "react";
+import type { AnchorHTMLAttributes, HTMLAttributes } from "react";
 
 const base = "bg-gray-900 border border-gray-800 rounded-lg shadow-sm shadow-black/20";
 const interactive = "hover:border-gray-600 hover:shadow-md hover:shadow-black/30 transition-all duration-150";

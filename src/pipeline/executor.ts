@@ -1,24 +1,27 @@
 import { mkdirSync } from "node:fs";
-import { Writable } from "node:stream";
 import { join } from "node:path";
+import { Writable } from "node:stream";
 import pino from "pino";
-import { env } from "../env.ts";
 import { loadAllConfigs } from "../config/loader.ts";
-import type { ActionName, StepDef } from "../config/types.ts";
-import { errorMessage, type ParamValues } from "../types.ts";
 import { resolveConfig } from "../config/template.ts";
-import type { ActivePipeline, ActionContext, ActionHandler } from "./types.ts";
+import type { ActionName, StepDef } from "../config/types.ts";
 import * as db from "../db/queries.ts";
+import { env } from "../env.ts";
 import { publish } from "../events.ts";
-import { logger, stepLoggerOpts, type Logger } from "../logger.ts";
+import { type Logger, logger, stepLoggerOpts } from "../logger.ts";
+import { errorMessage, type ParamValues } from "../types.ts";
 import { executeCloudflare } from "./actions/cloudflare.ts";
 import { executeCodeBuild } from "./actions/codebuild.ts";
 import { executeEcsRestart } from "./actions/ecs-restart.ts";
 import { executeEcsTask } from "./actions/ecs-task.ts";
 import { executeTriggerPipeline, registerExecutor } from "./actions/trigger-pipeline.ts";
+import type { ActionContext, ActionHandler, ActivePipeline } from "./types.ts";
 
 export class PipelineError extends Error {
-  constructor(message: string, public readonly statusCode: number) {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
     super(message);
   }
 }
@@ -49,10 +52,10 @@ export async function executePipeline(
     }
 
     const configs = await loadAllConfigs();
-    const nsConfig = configs.find(c => c.namespace === namespace);
+    const nsConfig = configs.find((c) => c.namespace === namespace);
     if (!nsConfig) throw new PipelineError(`Namespace not found: ${namespace}`, 404);
 
-    const pipeline = nsConfig.pipelines.find(p => p.id === pipelineId);
+    const pipeline = nsConfig.pipelines.find((p) => p.id === pipelineId);
     if (!pipeline) throw new PipelineError(`Pipeline not found: ${pipelineId} in namespace ${namespace}`, 404);
 
     db.createRun({
@@ -98,7 +101,14 @@ export async function executePipeline(
     mkdirSync(logDir, { recursive: true });
 
     runSteps({
-      runId, key, log, stepRecords, abort, logDir, dryRun, params,
+      runId,
+      key,
+      log,
+      stepRecords,
+      abort,
+      logDir,
+      dryRun,
+      params,
       callStack: options?.parentCallStack ?? [key],
       vars: nsConfig.vars,
       region: nsConfig.aws_region,
@@ -166,25 +176,27 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
       cb();
     },
   });
-  const stepLog = pino(
-    stepLoggerOpts,
-    pino.multistream([{ stream: fileDest }, { stream: sseSink }]),
-  ).child({ runId, stepId: def.id, step: def.name, action: def.action, stepIndex, totalSteps });
+  const stepLog = pino(stepLoggerOpts, pino.multistream([{ stream: fileDest }, { stream: sseSink }])).child({
+    runId,
+    stepId: def.id,
+    step: def.name,
+    action: def.action,
+    stepIndex,
+    totalSteps,
+  });
 
   return {
     stepLog,
-    flush() { fileDest.flushSync(); fileDest.end(); },
-    log: (msg: string, fields?: Record<string, unknown>) => fields ? stepLog.info(fields, msg) : stepLog.info(msg),
-    warn: (msg: string, fields?: Record<string, unknown>) => fields ? stepLog.warn(fields, msg) : stepLog.warn(msg),
+    flush() {
+      fileDest.flushSync();
+      fileDest.end();
+    },
+    log: (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog.info(fields, msg) : stepLog.info(msg)),
+    warn: (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog.warn(fields, msg) : stepLog.warn(msg)),
   };
 }
 
-async function executeStep(
-  opts: RunStepsOptions,
-  dbId: string,
-  def: StepDef,
-  stepIndex: number,
-): Promise<StepResult> {
+async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, stepIndex: number): Promise<StepResult> {
   const { runId, log, logDir, dryRun, params, vars, region, abort, callStack, stepRecords } = opts;
   const resolvedConfig = resolveConfig(def.config, { params, vars });
   const logFile = join(logDir, `${def.id}.log`);
@@ -202,8 +214,14 @@ async function executeStep(
       if (Math.random() < 0.05) throw new Error("simulated dry run failure");
     } else {
       const ctx: ActionContext = {
-        runId, stepId: def.id, region, signal: abort.signal,
-        log: sl.log, warn: sl.warn, callStack, triggeredBy: opts.triggeredBy,
+        runId,
+        stepId: def.id,
+        region,
+        signal: abort.signal,
+        log: sl.log,
+        warn: sl.warn,
+        callStack,
+        triggeredBy: opts.triggeredBy,
       };
       const handler = actionHandlers[def.action] as ActionHandler;
       const result = await handler(resolvedConfig as never, ctx);

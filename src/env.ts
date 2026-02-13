@@ -21,7 +21,9 @@ export const env = {
   CLOUDFLARE_API_TOKEN: optional("CLOUDFLARE_API_TOKEN", ""),
   CLOUDFLARE_ZONE_ID: optional("CLOUDFLARE_ZONE_ID", ""),
   GITHUB_TOKEN: optional("GITHUB_TOKEN", ""),
-  TRIGGER_NAMESPACES: required("TRIGGER_NAMESPACES").split(",").map(s => s.trim()),
+  TRIGGER_NAMESPACES: required("TRIGGER_NAMESPACES")
+    .split(",")
+    .map((s) => s.trim()),
   namespaceConfig(ns: string) {
     return required(`TRIGGER_${ns.toUpperCase()}_CONFIG`);
   },
@@ -30,6 +32,11 @@ export const env = {
   OIDC_ISSUER,
   OIDC_CLIENT_ID: optional("OIDC_CLIENT_ID", ""),
   OIDC_CLIENT_SECRET: optional("OIDC_CLIENT_SECRET", ""),
-  TRIGGER_ADMINS: optional("TRIGGER_ADMINS", "").split(",").map(s => s.trim()).filter(Boolean),
-  get authEnabled() { return OIDC_ISSUER !== ""; },
+  TRIGGER_ADMINS: optional("TRIGGER_ADMINS", "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+  get authEnabled() {
+    return OIDC_ISSUER !== "";
+  },
 } as const;

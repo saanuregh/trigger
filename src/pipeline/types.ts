@@ -1,4 +1,4 @@
-import type { ActionName, ActionConfigMap } from "../config/types.ts";
+import type { ActionConfigMap, ActionName } from "../config/types.ts";
 
 export interface ActionContext {
   runId: string;
