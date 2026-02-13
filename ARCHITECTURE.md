@@ -41,7 +41,7 @@ Trigger is a single-process Bun application that serves a web UI, exposes JSON A
 
 ## Server (src/server/)
 
-Server lifecycle lives in `src/server/index.ts`, route handlers in `src/server/routes.ts`. A single `Bun.serve()` call with a flat `routes` map. No framework — route handlers are plain functions that return `Response` objects.
+Server lifecycle lives in `src/server/index.ts`. Route handlers are organized into domain-based controllers under `src/server/controllers/` (auth, pipelines, runs, config), with `src/server/routes.ts` as a thin route map that imports and wires them. A single `Bun.serve()` call with a flat `routes` map. No framework — route handlers are plain functions that return `Response` objects.
 
 **Route types:**
 
