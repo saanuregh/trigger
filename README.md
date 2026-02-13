@@ -1,11 +1,12 @@
 # Trigger
 
-Trigger and monitor deployment pipelines. Declarative JSONC pipeline configs fetched from GitHub repos at runtime, with a web UI for triggering runs and streaming logs in real time.
+Trigger and monitor deployment pipelines. Declarative YAML pipeline configs fetched from GitHub repos at runtime, with a web UI for triggering runs and streaming logs in real time.
 
 ## Stack
 
 - **Runtime:** [Bun](https://bun.sh) 1.3+
-- **Server:** Raw `Bun.serve()` with route-map API (no framework)
+- **CLI:** `index.ts` dispatches subcommands (`start`, `schema`) via `util.parseArgs`
+- **Server:** Raw `Bun.serve()` with route-map API (no framework) in `src/server/`
 - **Frontend:** React 19 (client-side MPA), SWR, Tailwind CSS 4, Lucide icons
 - **Database:** SQLite via `bun:sqlite` (WAL mode)
 - **Real-time:** Server-Sent Events (SSE)
@@ -32,7 +33,7 @@ bun run dev       # server with hot reload + Tailwind (via bun-plugin-tailwind)
 
 ```bash
 bun run build     # bundle server + client assets into dist/
-bun run start     # cd dist && bun index.js
+bun run start     # cd dist && bun index.js start
 ```
 
 Or via Docker:
@@ -48,13 +49,13 @@ All config is via environment variables. See `.env.example` for the full list.
 
 ### Namespaces
 
-Each namespace points to a JSONC config file — either a GitHub file URL or a local path:
+Each namespace points to a YAML config file — either a GitHub file URL or a local path:
 
 ```
 TRIGGER_NAMESPACES=production,staging
 
-TRIGGER_PRODUCTION_CONFIG=https://github.com/acme-corp/infra-config/blob/main/trigger/production.jsonc
-TRIGGER_STAGING_CONFIG=https://github.com/acme-corp/infra-config/blob/staging/trigger/staging.jsonc
+TRIGGER_PRODUCTION_CONFIG=https://github.com/saanuregh/trigger/blob/main/examples/production.yaml
+TRIGGER_STAGING_CONFIG=https://github.com/saanuregh/trigger/blob/main/examples/staging.yaml
 ```
 
 GitHub URLs are converted to `raw.githubusercontent.com` URLs at fetch time. A `GITHUB_TOKEN` is needed for private repos.
@@ -65,40 +66,39 @@ No built-in authentication. The app is designed to run behind a VPN or in a priv
 
 ### Pipeline config files
 
-Config files are JSONC. See `examples/trigger/` for full working examples. A config declares a namespace with shared vars and one or more pipelines:
+Config files are YAML. See `examples/` for full working examples. A config declares a namespace with shared vars and one or more pipelines:
 
-```jsonc
-{
-  "namespace": "production",
-  "display_name": "Production",
-  "aws_region": "ap-south-1",
+```yaml
+namespace: production
+display_name: Production
+aws_region: ap-south-1
 
-  "vars": {
-    "cluster": "prod-cluster",
-    "subnets": ["subnet-abc", "subnet-def"],
-  },
+vars:
+  cluster: prod-cluster
+  subnets: [subnet-abc, subnet-def]
 
-  "pipelines": [
-    {
-      "id": "deploy-api",
-      "name": "Deploy API",
-      "confirm": true,
-      "params": [
-        { "name": "branch", "label": "Branch", "type": "string", "default": "main" },
-      ],
-      "steps": [
-        {
-          "id": "build", "name": "Build", "action": "codebuild",
-          "config": { "project_name": "api-build", "source_version": "{{param.branch|main}}" },
-        },
-        {
-          "id": "restart", "name": "Restart", "action": "ecs-restart",
-          "config": { "cluster": "{{vars.cluster}}", "services": ["api-service"] },
-        },
-      ],
-    },
-  ],
-}
+pipelines:
+  - id: deploy-api
+    name: Deploy API
+    confirm: true
+    params:
+      - name: branch
+        label: Branch
+        type: string
+        default: main
+    steps:
+      - id: build
+        name: Build
+        action: codebuild
+        config:
+          project_name: api-build
+          source_version: "{{param.branch|main}}"
+      - id: restart
+        name: Restart
+        action: ecs-restart
+        config:
+          cluster: "{{vars.cluster}}"
+          services: [api-service]
 ```
 
 Key config features:
@@ -118,8 +118,26 @@ Key config features:
 | `cloudflare-purge` | Purge Cloudflare cache by URL list or purge everything |
 | `trigger-pipeline` | Trigger another pipeline (with circular dependency detection) |
 
+## JSON Schema
+
+A JSON Schema for pipeline config files is auto-generated from the Zod schemas:
+
+```bash
+bun run schema    # writes schema/pipeline-config.schema.json
+```
+
+The schema is also served at `/api/config/schema`. Use it for editor validation in YAML config files:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/saanuregh/trigger/main/schema/pipeline-config.schema.json
+```
+
 ## Type-checking
 
 ```bash
 bun run typecheck
 ```
+
+## License
+
+[MIT](LICENSE)

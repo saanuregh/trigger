@@ -6,23 +6,25 @@ Use Bun for everything. Bun auto-loads `.env`.
 
 - `bun run dev` — server with hot reload (Tailwind processed via `bun-plugin-tailwind`)
 - `bun run build` — production bundle into `dist/`
-- `bun run start` — `cd dist && bun index.js`
+- `bun run start` — `cd dist && bun index.js start`
+- `bun run schema` — generate JSON Schema to `schema/pipeline-config.schema.json`
 
 > **Note:** `bun run start` uses `cd dist` because Bun resolves bundled HTML asset paths relative to CWD, not the script location.
 - `bun run typecheck` — type-check (`bunx tsc --noEmit`)
 
 ## Architecture
 
-- **Server:** Raw `Bun.serve()` with `routes` API (no framework). Entry point: `index.ts`. HTML page shells served via Bun's fullstack bundler.
+- **CLI:** `index.ts` is a CLI dispatcher (`start`, `schema` subcommands) using `util.parseArgs`. Server code lives in `src/server/`.
+- **Server:** Raw `Bun.serve()` with `routes` API (no framework). Server lifecycle in `src/server/index.ts`, route handlers in `src/server/routes.ts`. HTML page shells served via Bun's fullstack bundler.
 - **Frontend:** Client-side React 19 MPA. No SSR — components fetch JSON APIs on mount via SWR. Pages are separate HTML shells in `public/` with React entry points in `src/client/`.
 - **Database:** `bun:sqlite` with WAL mode. Schema in `src/db/index.ts`, queries in `src/db/queries.ts`.
 - **Real-time:** SSE via raw `ReadableStream` on server, `EventSource` on client. In-memory pub/sub in `src/events.ts`. Browser notifications (Web Notifications API) fire on pipeline completion.
-- **Config:** Declarative JSONC pipeline configs fetched from GitHub raw content API (single HTTP request per file). Local paths also supported. Validated at load time via Zod schemas (`src/config/schema.ts`) with cross-field template reference validation. Template strings resolved at execution time.
+- **Config:** Declarative YAML pipeline configs fetched from GitHub raw content API (single HTTP request per file). Local paths also supported. Validated at load time via Zod schemas (`src/config/schema.ts`) with cross-field template reference validation. Template strings resolved at execution time.
 
 ## File structure
 
 ```
-index.ts                      # Bun.serve() routes, SSE, startup
+index.ts                      # CLI dispatcher (start, schema subcommands)
 build.ts                      # Production build script
 Dockerfile                    # Container image build
 bunfig.toml                   # Bun config (dev Tailwind plugin)
@@ -32,6 +34,9 @@ playwright.config.ts          # E2E test config
 .env.example                  # Env var reference
 public/                       # HTML page shells (each loads one React entry point)
 src/
+  server/
+    index.ts                  # startServer(): Bun.serve lifecycle, startup, shutdown
+    routes.ts                 # All route handlers, SSE, helpers
   types.ts                    # Shared types (imported by server + client)
   env.ts                      # Env var access
   events.ts                   # In-memory pub/sub event bus
@@ -40,7 +45,7 @@ src/
     schema.ts                 # Zod schemas + inferred types (single source of truth)
     types.ts                  # Re-exports from schema.ts + resolved action config types
     namespace.ts              # Env → namespace source resolution
-    loader.ts                 # Fetch, parse, validate JSONC configs
+    loader.ts                 # Fetch, parse, validate YAML configs
     template.ts               # {{param.X}}, {{vars.X}}, $switch resolution
   db/
     index.ts                  # SQLite init, migrations
@@ -64,7 +69,9 @@ src/
     config.tsx                # Pipeline config viewer
     utils.ts                  # Client-side utilities
     components/               # Reusable React components
-examples/trigger/             # Example JSONC config files
+examples/                     # Example YAML config files
+schema/
+  pipeline-config.schema.json # Auto-generated JSON Schema (bun run schema)
 ```
 
 ## Key conventions
@@ -86,11 +93,12 @@ examples/trigger/             # Example JSONC config files
 
 ## Config format
 
-Pipeline configs are JSONC files. Key features:
+Pipeline configs are YAML files. Key features:
 - **Vars:** `vars` object for shared constants, referenced as `{{vars.name}}`.
 - **Params:** `{{param.name}}` resolves to runtime parameter values. `{{param.name|default}}` provides a fallback.
+- **Quoting:** `{{...}}` template strings must be quoted in YAML (`{` is YAML flow mapping syntax).
 - **Type preservation:** A full-string template like `"{{vars.subnets}}"` preserves the resolved type (array stays array).
-- **`$switch`:** Conditional config — `{ "$switch": "param_name", "cases": { ... }, "default": { ... } }`.
+- **`$switch`:** Conditional config — `$switch: param_name` with `cases:` and `default:`.
 - **Schema:** Validated at load time via Zod. JSON Schema auto-generated at `/api/config/schema` via `z.toJSONSchema()`.
 - **Template validation:** `{{vars.X}}` and `{{param.X}}` references are cross-validated at load time — typos caught immediately.
 

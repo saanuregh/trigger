@@ -14,7 +14,7 @@ Trigger is a single-process Bun application that serves a web UI, exposes JSON A
 └───────┼──────────────┼──────────────┼────────────────┼──────────┘
         │              │              │                │
 ┌───────┴──────────────┴──────────────┴────────────────┴──────────┐
-│  Bun.serve()  (index.ts)                                        │
+│  Bun.serve()  (src/server/)                                     │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │ Route map: HTML shells, JSON APIs, SSE endpoint          │   │
 │  └──────────────────────────────────────────────────────────┘   │
@@ -32,9 +32,16 @@ Trigger is a single-process Bun application that serves a web UI, exposes JSON A
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Server (index.ts)
+## CLI (index.ts)
 
-A single `Bun.serve()` call with a flat `routes` map. No framework — route handlers are plain functions that return `Response` objects.
+`index.ts` is a CLI dispatcher using `util.parseArgs` with two subcommands:
+
+- **`start`** — starts the server (the default action in production)
+- **`schema`** — generates `schema/pipeline-config.schema.json` from the Zod schemas and exits
+
+## Server (src/server/)
+
+Server lifecycle lives in `src/server/index.ts`, route handlers in `src/server/routes.ts`. A single `Bun.serve()` call with a flat `routes` map. No framework — route handlers are plain functions that return `Response` objects.
 
 **Route types:**
 
@@ -73,13 +80,13 @@ The HTML shells include inline skeleton markup that matches the final layout, so
 ```
 Env vars                          GitHub / local FS
 TRIGGER_NAMESPACES=prod,staging      ┌───────────┐
-TRIGGER_PROD_CONFIG=https://...  ──▶ │ loader.ts │ ──▶ JSONC.parse ──▶ Zod validate ──▶ NamespaceConfig[]
+TRIGGER_PROD_CONFIG=https://...  ──▶ │ loader.ts │ ──▶ YAML.parse ──▶ Zod validate ──▶ NamespaceConfig[]
 TRIGGER_STAGING_CONFIG=./local   ──▶ └───────────┘
 ```
 
 1. `src/config/namespace.ts` reads env vars to build a `NamespaceSource[]` list.
 2. `src/config/loader.ts` fetches each config — GitHub URLs are converted to `raw.githubusercontent.com` URLs (single HTTP GET per file, no git clone). Local paths are read with `Bun.file()`.
-3. The JSONC text is parsed and validated via Zod schemas (`src/config/schema.ts`). Template references (`{{vars.X}}`, `{{param.X}}`) are cross-validated at load time.
+3. The YAML text is parsed and validated via Zod schemas (`src/config/schema.ts`). Template references (`{{vars.X}}`, `{{param.X}}`) are cross-validated at load time.
 4. Configs are cached in memory with a 60s TTL before re-fetching. A `POST /api/config/refresh` endpoint forces a reload.
 5. Individual namespace failures are handled gracefully — the namespace appears in the UI with an error badge, but other namespaces still work.
 
@@ -182,4 +189,4 @@ Migrations are auto-applied at startup. New columns (like `dry_run`) are added v
 - Target: `bun` (server bundle).
 - Plugins: `bun-plugin-tailwind` (required explicitly for production — the `bunfig.toml` `[serve.static]` config only applies to the dev server).
 - Output: `dist/`.
-- Production run: `cd dist && bun index.js` (Bun resolves bundled HTML assets relative to CWD).
+- Production run: `cd dist && bun index.js start` (Bun resolves bundled HTML assets relative to CWD).

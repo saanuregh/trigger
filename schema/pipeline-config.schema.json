@@ -1,0 +1,482 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "aws_region": {
+      "type": "string"
+    },
+    "vars": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "pipelines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean"
+          },
+          "timeout": {
+            "type": "number"
+          },
+          "params": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "string"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "default": {
+                      "type": "string"
+                    },
+                    "placeholder": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "label",
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "boolean"
+                    },
+                    "default": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "label",
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "select"
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "default": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "label",
+                    "type",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "codebuild",
+                    "ecs-restart",
+                    "ecs-task",
+                    "cloudflare-purge",
+                    "trigger-pipeline"
+                  ]
+                },
+                "config": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "project_name": {
+                          "type": "string"
+                        },
+                        "source_version": {
+                          "type": "string"
+                        },
+                        "env_vars": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "value": {
+                                        "type": "string"
+                                      },
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "PLAINTEXT",
+                                          "PARAMETER_STORE",
+                                          "SECRETS_MANAGER"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "type"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "project_name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "cluster": {
+                          "type": "string"
+                        },
+                        "services": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        },
+                        "timeout": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "cluster",
+                        "services"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "cluster": {
+                          "type": "string"
+                        },
+                        "task_definition": {
+                          "type": "string"
+                        },
+                        "container_name": {
+                          "type": "string"
+                        },
+                        "command": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        },
+                        "subnets": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        },
+                        "security_groups": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        },
+                        "launch_type": {
+                          "type": "string",
+                          "enum": [
+                            "FARGATE",
+                            "EC2"
+                          ]
+                        },
+                        "assign_public_ip": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        },
+                        "timeout": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        },
+                        "log_group": {
+                          "type": "string"
+                        },
+                        "log_stream_prefix": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "cluster",
+                        "task_definition",
+                        "container_name",
+                        "command",
+                        "subnets",
+                        "security_groups"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "urls": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        },
+                        "purge_everything": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "\\{\\{.+?\\}\\}"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "namespace": {
+                          "type": "string"
+                        },
+                        "pipeline_id": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "namespace",
+                        "pipeline_id"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "$switch": {
+                          "type": "string"
+                        },
+                        "cases": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "default": {}
+                      },
+                      "required": [
+                        "$switch"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "action",
+                "config"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "steps"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "namespace",
+    "display_name",
+    "aws_region",
+    "pipelines"
+  ],
+  "additionalProperties": false
+}
