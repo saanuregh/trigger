@@ -75,6 +75,20 @@ type RouteRequest = Request & { params: Record<string, string> };
 
 const MAX_LOG_LINES = 50_000;
 
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+} as const;
+
+function sseFormat(event: string, data: object): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function terminalSSEResponse(status: string): Response {
+  return new Response(sseFormat("run", { status }), { headers: SSE_HEADERS });
+}
+
 export const routes = {
   "/": homepage,
   "/:ns": namespacePage,
@@ -251,93 +265,60 @@ export const routes = {
       return new Response("Run not found", { status: 404 });
     }
 
-    if (TERMINAL_STATUSES.has(run.status)) {
-      const encoder = new TextEncoder();
-      const body = encoder.encode(
-        `event: run\ndata: ${JSON.stringify({ status: run.status })}\n\n`,
-      );
-      return new Response(body, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-        },
-      });
-    }
+    if (TERMINAL_STATUSES.has(run.status)) return terminalSSEResponse(run.status);
 
     logger.info({ runId, status: run.status }, "SSE client connected");
-    let cleanup: (() => void) | null = null;
+    const ac = new AbortController();
 
     const stream = new ReadableStream({
       start(controller) {
         const encoder = new TextEncoder();
 
         function send(event: string, data: object) {
-          try {
-            controller.enqueue(
-              encoder.encode(
-                `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
-              ),
-            );
-          } catch {
-            cleanup?.();
-          }
+          try { controller.enqueue(encoder.encode(sseFormat(event, data))); }
+          catch { ac.abort(); }
+        }
+
+        function closeStream() {
+          ac.abort();
+          try { controller.close(); } catch {}
         }
 
         const heartbeatTimer = setInterval(() => {
-          try {
-            controller.enqueue(encoder.encode(": keepalive\n\n"));
-          } catch {
-            cleanup?.();
-          }
+          try { controller.enqueue(encoder.encode(": keepalive\n\n")); }
+          catch { ac.abort(); }
         }, 30_000);
 
         const unsubscribe = subscribe(runId!, (message) => {
           const { type, ...payload } = message;
 
-          if (type === "log") {
-            send("log", payload);
-          } else if (type === "step:status") {
-            send("step", payload);
-          } else if (type === "run:status") {
+          if (type === "log") send("log", payload);
+          else if (type === "step:status") send("step", payload);
+          else if (type === "run:status") {
             send("run", { status: payload.status });
-
-            if (TERMINAL_STATUSES.has(payload.status as string)) {
-              cleanup?.();
-              try {
-                controller.close();
-              } catch {}
-            }
+            if (TERMINAL_STATUSES.has(payload.status as string)) closeStream();
           }
         });
 
-        cleanup = () => {
+        ac.signal.addEventListener("abort", () => {
           unsubscribe();
           clearInterval(heartbeatTimer);
-          cleanup = null;
-        };
+        }, { once: true });
 
+        // Race condition guard: run may have finished between initial check and subscribe
         const freshRun = db.getRun(runId!);
         if (freshRun && TERMINAL_STATUSES.has(freshRun.status)) {
           send("run", { status: freshRun.status });
-          cleanup?.();
-          try {
-            controller.close();
-          } catch {}
+          closeStream();
         }
       },
       cancel() {
         logger.info({ runId }, "SSE client disconnected");
-        cleanup?.();
+        ac.abort();
       },
     });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    return new Response(stream, { headers: SSE_HEADERS });
   },
 };
 

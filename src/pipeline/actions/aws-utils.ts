@@ -28,6 +28,38 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+export type PollResult =
+  | "continue"
+  | { done: true; output?: Record<string, unknown> }
+  | { error: string };
+
+export async function pollUntil<T>(opts: {
+  deadline: number;
+  intervalMs: number;
+  signal: AbortSignal;
+  poll: () => Promise<T>;
+  check: (result: T) => PollResult | Promise<PollResult>;
+  onProgress?: (result: T) => void | Promise<void>;
+  timeoutMessage: string;
+}): Promise<{ output?: Record<string, unknown> }> {
+  while (!opts.signal.aborted && Date.now() < opts.deadline) {
+    await sleep(opts.intervalMs, opts.signal);
+
+    const result = await opts.poll();
+    const status = await opts.check(result);
+
+    if (status === "continue") {
+      await opts.onProgress?.(result);
+      continue;
+    }
+    if ("error" in status) throw new Error(status.error);
+    return { output: status.output };
+  }
+
+  if (opts.signal.aborted) throw new Error("Aborted");
+  throw new Error(opts.timeoutMessage);
+}
+
 export async function streamLogs(
   groupName: string,
   streamName: string,

@@ -8,7 +8,7 @@ import {
 import type { CodeBuildActionConfig } from "../../config/types.ts";
 import type { ActionContext } from "../types.ts";
 import { errorMessage } from "../../types.ts";
-import { lazyClient, sleep, streamLogs } from "./aws-utils.ts";
+import { lazyClient, pollUntil, streamLogs } from "./aws-utils.ts";
 
 const getCodeBuildClient = lazyClient((region) => new CodeBuildClient({ region }));
 
@@ -49,52 +49,49 @@ export async function executeCodeBuild(config: CodeBuildActionConfig, ctx: Actio
   ctx.signal.addEventListener("abort", onAbort, { once: true });
 
   try {
-    return await pollBuild(buildId, deadline, timeoutMinutes, ctx);
+    let logNextToken: string | undefined;
+    let logGroupName: string | undefined;
+    let logStreamName: string | undefined;
+
+    return await pollUntil({
+      deadline,
+      intervalMs: 5000,
+      signal: ctx.signal,
+      timeoutMessage: `Build exceeded ${timeoutMinutes}m timeout`,
+      async poll() {
+        const resp = await getCodeBuildClient(ctx.region).send(
+          new BatchGetBuildsCommand({ ids: [buildId] }),
+          { abortSignal: ctx.signal },
+        );
+        return resp.builds?.[0] ?? null;
+      },
+      async check(build) {
+        if (!build) return { error: "Build not found" };
+
+        if (!logGroupName && build.logs?.groupName) {
+          logGroupName = build.logs.groupName;
+          logStreamName = build.logs.streamName;
+          ctx.log("log stream discovered", { logGroup: logGroupName, logStream: logStreamName });
+        }
+        if (logGroupName && logStreamName) {
+          logNextToken = await streamLogs(logGroupName, logStreamName, logNextToken, ctx);
+        }
+
+        const status = build.buildStatus;
+        if (status === "SUCCEEDED") {
+          ctx.log("build completed successfully");
+          return { done: true, output: { buildId, status: "SUCCEEDED" } };
+        }
+        if (status === "FAILED" || status === "FAULT" || status === "TIMED_OUT" || status === "STOPPED") {
+          return { error: build.phases?.find(p => p.phaseStatus === "FAILED")?.contexts?.[0]?.message ?? `build ${status}` };
+        }
+        return "continue";
+      },
+      onProgress(build) {
+        ctx.log("build in progress", { phase: build?.currentPhase ?? "UNKNOWN" });
+      },
+    });
   } finally {
     ctx.signal.removeEventListener("abort", onAbort);
   }
-}
-
-async function pollBuild(buildId: string, deadline: number, timeoutMinutes: number, ctx: ActionContext) {
-  let logNextToken: string | undefined;
-  let logGroupName: string | undefined;
-  let logStreamName: string | undefined;
-
-  while (!ctx.signal.aborted && Date.now() < deadline) {
-    await sleep(5000, ctx.signal);
-
-    const buildsResp = await getCodeBuildClient(ctx.region).send(
-      new BatchGetBuildsCommand({ ids: [buildId] }),
-      { abortSignal: ctx.signal },
-    );
-    const build = buildsResp.builds?.[0];
-    if (!build) throw new Error("Build not found");
-
-    if (!logGroupName && build.logs?.groupName) {
-      logGroupName = build.logs.groupName;
-      logStreamName = build.logs.streamName;
-      ctx.log("log stream discovered", { logGroup: logGroupName, logStream: logStreamName });
-    }
-
-    if (logGroupName && logStreamName) {
-      logNextToken = await streamLogs(logGroupName, logStreamName, logNextToken, ctx);
-    }
-
-    const phase = build.currentPhase ?? "UNKNOWN";
-    const status = build.buildStatus;
-
-    if (status === "SUCCEEDED") {
-      ctx.log("build completed successfully");
-      return { output: { buildId, status: "SUCCEEDED" } };
-    }
-
-    if (status === "FAILED" || status === "FAULT" || status === "TIMED_OUT" || status === "STOPPED") {
-      throw new Error(build.phases?.find(p => p.phaseStatus === "FAILED")?.contexts?.[0]?.message ?? `build ${status}`);
-    }
-
-    ctx.log("build in progress", { phase });
-  }
-
-  if (ctx.signal.aborted) throw new Error("Build cancelled");
-  throw new Error(`Build exceeded ${timeoutMinutes}m timeout`);
 }

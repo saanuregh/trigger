@@ -79,11 +79,11 @@ export function getStepsForRun(runId: string): StepRow[] {
 export function markStaleSteps(runId: string): void {
   const now = new Date().toISOString();
   getDb().run(
-    `UPDATE pipeline_steps SET status = 'failed', error = 'Interrupted', finished_at = COALESCE(finished_at, ?) WHERE run_id = ? AND status = 'running'`,
-    [now, runId],
-  );
-  getDb().run(
-    `UPDATE pipeline_steps SET status = 'skipped', finished_at = COALESCE(finished_at, ?) WHERE run_id = ? AND status = 'pending'`,
+    `UPDATE pipeline_steps SET
+       status = CASE WHEN status = 'running' THEN 'failed' ELSE 'skipped' END,
+       error = CASE WHEN status = 'running' THEN 'Interrupted' ELSE error END,
+       finished_at = COALESCE(finished_at, ?)
+     WHERE run_id = ? AND status IN ('running', 'pending')`,
     [now, runId],
   );
 }

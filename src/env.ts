@@ -8,16 +8,18 @@ function optional(name: string, fallback: string): string {
   return Bun.env[name] ?? fallback;
 }
 
-export const env = {
-  get NODE_ENV() { return optional("NODE_ENV", "development"); },
-  get development() { return env.NODE_ENV !== "production"; },
-  get PORT() { return Number(optional("PORT", "3000")); },
-  get DATA_DIR() { return optional("DATA_DIR", "./data"); },
+const NODE_ENV = optional("NODE_ENV", "development");
 
-  get CLOUDFLARE_API_TOKEN() { return optional("CLOUDFLARE_API_TOKEN", ""); },
-  get CLOUDFLARE_ZONE_ID() { return optional("CLOUDFLARE_ZONE_ID", ""); },
-  get GITHUB_TOKEN() { return optional("GITHUB_TOKEN", ""); },
-  get TRIGGER_NAMESPACES() { return required("TRIGGER_NAMESPACES").split(",").map(s => s.trim()); },
+export const env = {
+  NODE_ENV,
+  development: NODE_ENV !== "production",
+  PORT: Number(optional("PORT", "3000")),
+  DATA_DIR: optional("DATA_DIR", "./data"),
+
+  CLOUDFLARE_API_TOKEN: optional("CLOUDFLARE_API_TOKEN", ""),
+  CLOUDFLARE_ZONE_ID: optional("CLOUDFLARE_ZONE_ID", ""),
+  GITHUB_TOKEN: optional("GITHUB_TOKEN", ""),
+  TRIGGER_NAMESPACES: required("TRIGGER_NAMESPACES").split(",").map(s => s.trim()),
   namespaceConfig(ns: string) {
     return required(`TRIGGER_${ns.toUpperCase()}_CONFIG`);
   },

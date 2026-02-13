@@ -1,5 +1,5 @@
 import type { ParamValues } from "../types.ts";
-import type { PipelineDef as _PipelineDef } from "./schema.ts";
+import type { PipelineDef } from "./schema.ts";
 
 export type { PipelineConfig, PipelineDef, StepDef, ActionName } from "./schema.ts";
 
@@ -53,7 +53,7 @@ export interface NamespaceConfig {
   display_name: string;
   aws_region: string;
   vars: Record<string, unknown>;
-  pipelines: _PipelineDef[];
+  pipelines: PipelineDef[];
   _source: {
     config: string;
     loaded_at: string;

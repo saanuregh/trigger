@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TEMPLATE_RE, parseTemplateRef, type TemplateRef } from "./template.ts";
 
 const templateString = z.string().regex(/\{\{.+?\}\}/);
 const stringOrTemplate = z.string();
@@ -141,22 +142,14 @@ export const pipelineConfigSchema = z.object({
   }
 });
 
-const TEMPLATE_REF_RE = /\{\{(.+?)\}\}/g;
-
-function extractTemplateRefs(value: unknown): Array<{ type: "vars" | "param"; name: string }> {
-  const refs: Array<{ type: "vars" | "param"; name: string }> = [];
+function extractTemplateRefs(value: unknown): TemplateRef[] {
+  const refs: TemplateRef[] = [];
 
   function walk(v: unknown) {
     if (typeof v === "string") {
-      for (const match of v.matchAll(TEMPLATE_REF_RE)) {
-        const expr = match[1]!.trim();
-        if (expr.startsWith("vars.")) {
-          refs.push({ type: "vars", name: expr.slice(5) });
-        } else if (expr.startsWith("param.")) {
-          const rest = expr.slice(6);
-          const pipeIdx = rest.indexOf("|");
-          refs.push({ type: "param", name: pipeIdx !== -1 ? rest.slice(0, pipeIdx).trim() : rest });
-        }
+      for (const match of v.matchAll(TEMPLATE_RE)) {
+        const ref = parseTemplateRef(match[1]!);
+        if (ref) refs.push(ref);
       }
     } else if (Array.isArray(v)) {
       v.forEach(walk);
