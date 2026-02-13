@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useState, useEffect, type ReactNode } from "react";
-import { CheckCircle2, XCircle, Info, X } from "lucide-react";
+import { CheckCircle2, Info, X, XCircle } from "lucide-react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -64,10 +64,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               <Icon size={16} className={iconColor} />
               <span className="flex-1">{t.message}</span>
-              <button
-                onClick={() => dismiss(t.id)}
-                className="text-gray-500 hover:text-gray-300 transition-colors"
-              >
+              <button type="button" onClick={() => dismiss(t.id)} className="text-gray-500 hover:text-gray-300 transition-colors">
                 <X size={14} />
               </button>
             </div>

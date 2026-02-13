@@ -1,4 +1,4 @@
-import { Circle, Loader2, CheckCircle2, XCircle, Ban, MinusCircle } from "lucide-react";
+import { Ban, CheckCircle2, Circle, Loader2, MinusCircle, XCircle } from "lucide-react";
 
 const statusConfig: Record<string, { bg: string; icon: typeof Circle; iconClass?: string }> = {
   pending: { bg: "bg-gray-700 text-gray-300", icon: Circle },
@@ -16,9 +16,7 @@ export function StatusBadge({ status }: { status: string }) {
   const Icon = config.icon;
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg}`}
-    >
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg}`}>
       <Icon size={12} className={config.iconClass} />
       {status}
     </span>

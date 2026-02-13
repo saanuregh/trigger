@@ -1,5 +1,5 @@
-import { env } from "../../env.ts";
 import type { CloudflarePurgeActionConfig } from "../../config/types.ts";
+import { env } from "../../env.ts";
 import type { ActionContext } from "../types.ts";
 
 export async function executeCloudflare(config: CloudflarePurgeActionConfig, ctx: ActionContext) {
@@ -18,27 +18,24 @@ export async function executeCloudflare(config: CloudflarePurgeActionConfig, ctx
     throw new Error("Cloudflare purge: must specify urls or purge_everything");
   }
 
-  const resp = await fetch(
-    `https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID}/purge_cache`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: ctx.signal,
+  const resp = await fetch(`https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID}/purge_cache`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(body),
+    signal: ctx.signal,
+  });
 
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`Cloudflare purge failed: ${resp.status} ${text}`);
   }
 
-  const result = await resp.json() as { success: boolean; errors?: { message: string }[] };
+  const result = (await resp.json()) as { success: boolean; errors?: { message: string }[] };
   if (!result.success) {
-    throw new Error(result.errors?.map(e => e.message).join(", ") ?? "cloudflare purge failed");
+    throw new Error(result.errors?.map((e) => e.message).join(", ") ?? "cloudflare purge failed");
   }
 
   ctx.log("cache purge completed");

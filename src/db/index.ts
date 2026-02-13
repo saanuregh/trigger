@@ -1,8 +1,8 @@
 import { Database } from "bun:sqlite";
-import { env } from "../env.ts";
-import { errorMessage } from "../types.ts";
-import { logger } from "../logger.ts";
 import { mkdirSync } from "node:fs";
+import { env } from "../env.ts";
+import { logger } from "../logger.ts";
+import { errorMessage } from "../types.ts";
 
 let db: Database;
 
@@ -72,5 +72,16 @@ function migrate(db: Database) {
       logger.error({ error: msg }, "migration: failed to add dry_run column");
     }
   }
+
+  try {
+    db.exec("ALTER TABLE pipeline_runs ADD COLUMN triggered_by TEXT");
+    logger.info("migration: added triggered_by column to pipeline_runs");
+  } catch (err) {
+    const msg = errorMessage(err);
+    if (!msg.includes("duplicate column")) {
+      logger.error({ error: msg }, "migration: failed to add triggered_by column");
+    }
+  }
+
   db.exec(`CREATE INDEX IF NOT EXISTS idx_runs_ns_pipeline_started ON pipeline_runs(namespace, pipeline_id, started_at DESC)`);
 }

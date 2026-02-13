@@ -1,11 +1,12 @@
+import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 import useSWR from "swr";
-import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import type { ParamDef } from "../types.ts";
-import { Layout } from "./components/Layout.tsx";
 import { Card } from "./components/Card.tsx";
+import { Layout } from "./components/Layout.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
-import { useNsDisplayName, renderPage } from "./swr.tsx";
+import { useRoute } from "./router.tsx";
+import { useNsDisplayName } from "./swr.tsx";
 
 interface StepConfig {
   id: string;
@@ -41,9 +42,15 @@ function TemplateString({ value }: { value: string }) {
     <span>
       "
       {parts.map((part, i) =>
-        TEMPLATE_TEST_RE.test(part)
-          ? <span key={i} className="text-purple-400 font-medium">{part}</span>
-          : <span key={i} className="text-green-400">{part}</span>
+        TEMPLATE_TEST_RE.test(part) ? (
+          <span key={i} className="text-purple-400 font-medium">
+            {part}
+          </span>
+        ) : (
+          <span key={i} className="text-green-400">
+            {part}
+          </span>
+        ),
       )}
       "
     </span>
@@ -89,6 +96,7 @@ function CopyButton({ text }: { text: string }) {
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
       className="inline-flex items-center text-gray-600 hover:text-gray-400 transition-colors p-0.5"
       title="Copy value"
@@ -106,23 +114,21 @@ function ConfigValue({ value }: { value: unknown }) {
   if (Array.isArray(value)) {
     return (
       <span className="text-gray-300">
-        [{value.map((v, i) => (
+        [
+        {value.map((v, i) => (
           <span key={i}>
             {i > 0 && ", "}
             <ConfigValue value={v} />
           </span>
-        ))}]
+        ))}
+        ]
       </span>
     );
   }
   if (typeof value === "object") {
     const obj = value as Record<string, unknown>;
     if ("$switch" in obj) return <SwitchView value={obj} />;
-    return (
-      <pre className="text-gray-300 text-xs bg-gray-800 rounded p-2 mt-1">
-        {JSON.stringify(value, null, 2)}
-      </pre>
-    );
+    return <pre className="text-gray-300 text-xs bg-gray-800 rounded p-2 mt-1">{JSON.stringify(value, null, 2)}</pre>;
   }
   return <span className="text-green-400">"{String(value)}"</span>;
 }
@@ -133,13 +139,15 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
   return (
     <Card>
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-2 p-4 text-left hover:bg-gray-800/30 transition-colors rounded-lg"
       >
-        {expanded
-          ? <ChevronDown size={14} className="text-gray-500 shrink-0" />
-          : <ChevronRight size={14} className="text-gray-500 shrink-0" />
-        }
+        {expanded ? (
+          <ChevronDown size={14} className="text-gray-500 shrink-0" />
+        ) : (
+          <ChevronRight size={14} className="text-gray-500 shrink-0" />
+        )}
         <span className="text-xs text-gray-600 w-5 text-right">{index + 1}.</span>
         <span className="text-sm font-medium text-gray-200">{step.name}</span>
         <span className={`text-[11px] px-1.5 py-0.5 rounded font-mono ${actionColors[step.action] ?? defaultActionColor}`}>
@@ -165,10 +173,8 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
   );
 }
 
-function ConfigPage() {
-  const segments = location.pathname.split("/");
-  const ns = segments[1]!;
-  const pipelineId = segments[2]!;
+export function ConfigPage() {
+  const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
   const nsDisplayName = useNsDisplayName(ns);
   const { data: config, error } = useSWR<PipelineConfig>(`/api/pipelines/${ns}/${pipelineId}/config`);
@@ -202,9 +208,7 @@ function ConfigPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-lg font-semibold">{config.name}</h1>
-          {config.description && (
-            <p className="text-sm text-gray-400 mt-1">{config.description}</p>
-          )}
+          {config.description && <p className="text-sm text-gray-400 mt-1">{config.description}</p>}
         </div>
 
         {config.params && config.params.length > 0 && (
@@ -224,9 +228,7 @@ function ConfigPage() {
                   <tr key={p.name} className="border-b border-gray-800/50">
                     <td className="py-2 text-gray-200">{p.label}</td>
                     <td className="py-2">
-                      <span className="text-xs bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded font-mono">
-                        {p.type}
-                      </span>
+                      <span className="text-xs bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded font-mono">{p.type}</span>
                     </td>
                     <td className="py-2">
                       <ConfigValue value={p.default} />
@@ -257,5 +259,3 @@ function ConfigPage() {
     </Layout>
   );
 }
-
-renderPage(ConfigPage);

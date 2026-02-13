@@ -1,5 +1,5 @@
-import { Button } from "./Button.tsx";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "./Button.tsx";
 
 interface PaginationProps {
   page: number;
@@ -36,12 +36,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         Page {page} of {totalPages}
       </span>
       <div className="flex items-center gap-1">
-        <Button
-          size="icon"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          icon={<ChevronLeft size={14} />}
-        />
+        <Button size="icon" onClick={() => onPageChange(page - 1)} disabled={page <= 1} icon={<ChevronLeft size={14} />} />
 
         {pages.map((p, i) =>
           p === "..." ? (
@@ -50,12 +45,11 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
             </span>
           ) : (
             <button
+              type="button"
               key={p}
               onClick={() => onPageChange(p)}
               className={`min-w-7 h-7 rounded-md text-xs font-medium transition-colors ${
-                p === page
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+                p === page ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
               {p}
@@ -63,12 +57,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
           ),
         )}
 
-        <Button
-          size="icon"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-          icon={<ChevronRight size={14} />}
-        />
+        <Button size="icon" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} icon={<ChevronRight size={14} />} />
       </div>
     </div>
   );

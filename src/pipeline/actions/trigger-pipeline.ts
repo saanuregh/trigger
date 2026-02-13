@@ -1,14 +1,14 @@
 import type { TriggerPipelineActionConfig } from "../../config/types.ts";
-import type { ActionContext } from "../types.ts";
-import { TERMINAL_STATUSES, type RunStatus } from "../../types.ts";
-import { subscribe } from "../../events.ts";
 import * as db from "../../db/queries.ts";
+import { subscribe } from "../../events.ts";
+import { type RunStatus, TERMINAL_STATUSES } from "../../types.ts";
+import type { ActionContext } from "../types.ts";
 
 type ExecutePipelineFn = (
   ns: string,
   pipelineId: string,
   params: Record<string, string | boolean>,
-  options: { signal: AbortSignal; parentCallStack?: string[] },
+  options: { signal: AbortSignal; parentCallStack?: string[]; triggeredBy?: string },
 ) => Promise<string>;
 
 let executePipelineFn: ExecutePipelineFn | null = null;
@@ -22,12 +22,18 @@ function waitForRun(runId: string, signal: AbortSignal, log: (msg: string, field
   if (run && TERMINAL_STATUSES.has(run.status)) return Promise.resolve(run.status);
 
   return new Promise<RunStatus>((resolve, reject) => {
-    const onAbort = () => { cleanup(); reject(new Error("Cancelled")); };
+    const onAbort = () => {
+      cleanup();
+      reject(new Error("Cancelled"));
+    };
 
     const unsubscribe = subscribe(runId, (msg) => {
       if (msg.type === "run:status") {
         const status = msg.status as RunStatus;
-        if (TERMINAL_STATUSES.has(status)) { cleanup(); resolve(status); }
+        if (TERMINAL_STATUSES.has(status)) {
+          cleanup();
+          resolve(status);
+        }
       } else if (msg.type === "step:status") {
         log("child step status changed", { childStep: msg.stepName as string, childStatus: msg.status as string });
       }
@@ -41,7 +47,10 @@ function waitForRun(runId: string, signal: AbortSignal, log: (msg: string, field
     signal.addEventListener("abort", onAbort, { once: true });
 
     const fresh = db.getRun(runId);
-    if (fresh && TERMINAL_STATUSES.has(fresh.status)) { cleanup(); resolve(fresh.status); }
+    if (fresh && TERMINAL_STATUSES.has(fresh.status)) {
+      cleanup();
+      resolve(fresh.status);
+    }
   });
 }
 
@@ -61,6 +70,7 @@ export async function executeTriggerPipeline(config: TriggerPipelineActionConfig
   const runId = await executePipelineFn(namespace, pipeline_id, params, {
     signal: ctx.signal,
     parentCallStack: [...callStack, key],
+    triggeredBy: ctx.triggeredBy,
   });
 
   ctx.log("child pipeline started, waiting for completion", { childRunId: runId });

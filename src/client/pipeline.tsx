@@ -1,17 +1,18 @@
-import { useState, useEffect } from "react";
-import useSWR from "swr";
 import { Clock } from "lucide-react";
-import type { PipelineDefSummary, RunRow, PaginatedResponse } from "../types.ts";
-import { Layout } from "./components/Layout.tsx";
-import { StatusBadge } from "./components/StatusBadge.tsx";
-import { ParamForm } from "./components/ParamForm.tsx";
-import { Pagination } from "./components/Pagination.tsx";
-import { PipelineSkeleton } from "./components/Skeleton.tsx";
-import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
+import { useEffect, useState } from "react";
+import useSWR from "swr";
+import type { PaginatedResponse, PipelineDefSummary, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
+import { Layout } from "./components/Layout.tsx";
+import { Pagination } from "./components/Pagination.tsx";
+import { ParamForm } from "./components/ParamForm.tsx";
+import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
+import { PipelineSkeleton } from "./components/Skeleton.tsx";
+import { StatusBadge } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
+import { Link, navigate, useRoute } from "./router.tsx";
+import { useNsDisplayName } from "./swr.tsx";
 import { formatDuration, formatTime } from "./utils.ts";
-import { useNsDisplayName, renderPage } from "./swr.tsx";
 
 const PER_PAGE = 20;
 
@@ -21,10 +22,8 @@ function runDuration(run: RunRow): string {
   return "-";
 }
 
-function PipelinePage() {
-  const segments = location.pathname.split("/");
-  const ns = segments[1]!;
-  const pipelineId = segments[2]!;
+export function PipelinePage() {
+  const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
   const nsDisplayName = useNsDisplayName(ns);
   const [page, setPage] = useState(1);
@@ -41,12 +40,14 @@ function PipelinePage() {
 
   useEffect(() => {
     if (pipeline) document.title = `${pipeline.name} — Trigger`;
-    return () => { document.title = "Trigger"; };
+    return () => {
+      document.title = "Trigger";
+    };
   }, [pipeline]);
 
   const handleRunStarted = (runId: string) => {
     toast("Pipeline run started", "success");
-    location.href = `/${ns}/${pipelineId}/runs/${runId}`;
+    navigate(`/${ns}/${pipelineId}/runs/${runId}`);
   };
 
   const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="runs" />;
@@ -68,25 +69,16 @@ function PipelinePage() {
   }
 
   return (
-    <Layout
-      breadcrumbs={[{ label: nsDisplayName, href: `/${ns}` }, { label: pipeline.name }]}
-      sidebar={sidebar}
-    >
+    <Layout breadcrumbs={[{ label: nsDisplayName, href: `/${ns}` }, { label: pipeline.name }]} sidebar={sidebar}>
       <div>
         <div className="mb-6 pb-6 border-b border-gray-800">
           <h1 className="text-lg font-semibold mb-1">{pipeline.name}</h1>
-          {pipeline.description && (
-            <p className="text-sm text-gray-400 mb-3">{pipeline.description}</p>
-          )}
+          {pipeline.description && <p className="text-sm text-gray-400 mb-3">{pipeline.description}</p>}
           <ParamForm pipeline={pipeline} ns={ns} onRunStarted={handleRunStarted} />
         </div>
 
         {!runsData ? null : runs.length === 0 ? (
-          <EmptyState
-            icon={<Clock size={36} />}
-            title="No runs yet"
-            description="Run this pipeline to see execution history."
-          />
+          <EmptyState icon={<Clock size={36} />} title="No runs yet" description="Run this pipeline to see execution history." />
         ) : (
           <>
             <table className="w-full text-sm">
@@ -107,12 +99,12 @@ function PipelinePage() {
                 {runs.map((run) => (
                   <tr key={run.id} className="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
                     <td className="py-2.5">
-                      <a
-                        href={`/${ns}/${pipelineId}/runs/${run.id}`}
+                      <Link
+                        to={`/${ns}/${pipelineId}/runs/${run.id}`}
                         className="text-blue-400 hover:text-blue-300 no-underline font-mono text-xs"
                       >
                         {run.id.slice(0, 8)}
-                      </a>
+                      </Link>
                       {run.dry_run === 1 && (
                         <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-900/60 text-purple-300">
                           DRY
@@ -125,9 +117,7 @@ function PipelinePage() {
                     <td className="py-2.5 text-gray-400">
                       <span title={run.started_at}>{formatTime(run.started_at)}</span>
                     </td>
-                    <td className="py-2.5 text-gray-400 font-mono text-xs">
-                      {runDuration(run)}
-                    </td>
+                    <td className="py-2.5 text-gray-400 font-mono text-xs">{runDuration(run)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -140,5 +130,3 @@ function PipelinePage() {
     </Layout>
   );
 }
-
-renderPage(PipelinePage);

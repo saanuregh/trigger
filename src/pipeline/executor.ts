@@ -1,24 +1,27 @@
 import { mkdirSync } from "node:fs";
-import { Writable } from "node:stream";
 import { join } from "node:path";
+import { Writable } from "node:stream";
 import pino from "pino";
-import { env } from "../env.ts";
 import { loadAllConfigs } from "../config/loader.ts";
-import type { ActionName, StepDef } from "../config/types.ts";
-import { errorMessage, type ParamValues } from "../types.ts";
 import { resolveConfig } from "../config/template.ts";
-import type { ActivePipeline, ActionContext } from "./types.ts";
+import type { ActionName, StepDef } from "../config/types.ts";
 import * as db from "../db/queries.ts";
+import { env } from "../env.ts";
 import { publish } from "../events.ts";
-import { logger, stepLoggerOpts, type Logger } from "../logger.ts";
+import { type Logger, logger, stepLoggerOpts } from "../logger.ts";
+import { errorMessage, type ParamValues } from "../types.ts";
 import { executeCloudflare } from "./actions/cloudflare.ts";
 import { executeCodeBuild } from "./actions/codebuild.ts";
 import { executeEcsRestart } from "./actions/ecs-restart.ts";
 import { executeEcsTask } from "./actions/ecs-task.ts";
 import { executeTriggerPipeline, registerExecutor } from "./actions/trigger-pipeline.ts";
+import type { ActionContext, ActionHandler, ActivePipeline } from "./types.ts";
 
 export class PipelineError extends Error {
-  constructor(message: string, public readonly statusCode: number) {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
     super(message);
   }
 }
@@ -30,7 +33,7 @@ export async function executePipeline(
   namespace: string,
   pipelineId: string,
   params: ParamValues,
-  options?: { signal?: AbortSignal; parentCallStack?: string[]; dryRun?: boolean },
+  options?: { signal?: AbortSignal; parentCallStack?: string[]; dryRun?: boolean; triggeredBy?: string },
 ): Promise<string> {
   const key = `${namespace}:${pipelineId}`;
   const dryRun = options?.dryRun ?? false;
@@ -49,10 +52,10 @@ export async function executePipeline(
     }
 
     const configs = await loadAllConfigs();
-    const nsConfig = configs.find(c => c.namespace === namespace);
+    const nsConfig = configs.find((c) => c.namespace === namespace);
     if (!nsConfig) throw new PipelineError(`Namespace not found: ${namespace}`, 404);
 
-    const pipeline = nsConfig.pipelines.find(p => p.id === pipelineId);
+    const pipeline = nsConfig.pipelines.find((p) => p.id === pipelineId);
     if (!pipeline) throw new PipelineError(`Pipeline not found: ${pipelineId} in namespace ${namespace}`, 404);
 
     db.createRun({
@@ -63,6 +66,7 @@ export async function executePipeline(
       params: JSON.stringify(params),
       started_at: new Date().toISOString(),
       dry_run: dryRun,
+      triggered_by: options?.triggeredBy,
     });
 
     const stepRecords = pipeline.steps.map((step) => {
@@ -97,11 +101,19 @@ export async function executePipeline(
     mkdirSync(logDir, { recursive: true });
 
     runSteps({
-      runId, key, log, stepRecords, abort, logDir, dryRun, params,
+      runId,
+      key,
+      log,
+      stepRecords,
+      abort,
+      logDir,
+      dryRun,
+      params,
       callStack: options?.parentCallStack ?? [key],
       vars: nsConfig.vars,
       region: nsConfig.aws_region,
       timeoutS: pipeline.timeout ?? DEFAULT_RUN_TIMEOUT_S,
+      triggeredBy: options?.triggeredBy,
     }).catch(() => {});
 
     return runId;
@@ -147,13 +159,106 @@ interface RunStepsOptions {
   vars: Record<string, unknown>;
   region: string;
   timeoutS: number;
+  triggeredBy?: string;
 }
 
-async function runSteps({
-  runId, key, log, stepRecords, abort, logDir, callStack, dryRun, params, vars, region, timeoutS,
-}: RunStepsOptions) {
+type StepResult = "success" | { failed: string } | "cancelled";
+
+function createStepLogger(runId: string, def: StepDef, logFile: string, stepIndex: number, totalSteps: number) {
+  const fileDest = pino.destination({ dest: logFile, sync: false, minLength: 4096 });
+  const sseSink = new Writable({
+    decodeStrings: false,
+    write(data, _enc, cb) {
+      try {
+        const str = typeof data === "string" ? data : data.toString();
+        publish(runId, { type: "log", ...JSON.parse(str) });
+      } catch {}
+      cb();
+    },
+  });
+  const stepLog = pino(stepLoggerOpts, pino.multistream([{ stream: fileDest }, { stream: sseSink }])).child({
+    runId,
+    stepId: def.id,
+    step: def.name,
+    action: def.action,
+    stepIndex,
+    totalSteps,
+  });
+
+  return {
+    stepLog,
+    flush() {
+      fileDest.flushSync();
+      fileDest.end();
+    },
+    log: (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog.info(fields, msg) : stepLog.info(msg)),
+    warn: (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog.warn(fields, msg) : stepLog.warn(msg)),
+  };
+}
+
+async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, stepIndex: number): Promise<StepResult> {
+  const { runId, log, logDir, dryRun, params, vars, region, abort, callStack, stepRecords } = opts;
+  const resolvedConfig = resolveConfig(def.config, { params, vars });
+  const logFile = join(logDir, `${def.id}.log`);
+  const sl = createStepLogger(runId, def, logFile, stepIndex, stepRecords.length);
+
+  db.updateStepStatus(dbId, "running", { log_file: logFile });
+  publishStepStatus(runId, log, def, "running");
+  sl.stepLog.info("step starting");
+
+  try {
+    if (dryRun) {
+      sl.stepLog.info("dry run, skipping action");
+      sl.stepLog.info({ resolvedConfig }, "dry run resolved config");
+      await new Promise((r) => setTimeout(r, 1000 + Math.random() * 3000));
+      if (Math.random() < 0.05) throw new Error("simulated dry run failure");
+    } else {
+      const ctx: ActionContext = {
+        runId,
+        stepId: def.id,
+        region,
+        signal: abort.signal,
+        log: sl.log,
+        warn: sl.warn,
+        callStack,
+        triggeredBy: opts.triggeredBy,
+      };
+      const handler = actionHandlers[def.action] as ActionHandler;
+      const result = await handler(resolvedConfig as never, ctx);
+      db.updateStepStatus(dbId, "success", {
+        output: result.output ? JSON.stringify(result.output) : undefined,
+      });
+      publishStepStatus(runId, log, def, "success");
+      sl.stepLog.info("step completed");
+      return "success";
+    }
+
+    db.updateStepStatus(dbId, "success");
+    publishStepStatus(runId, log, def, "success");
+    sl.stepLog.info("step completed");
+    return "success";
+  } catch (err) {
+    const msg = errorMessage(err);
+
+    if (abort.signal.aborted) {
+      sl.stepLog.info("step cancelled");
+      db.updateStepStatus(dbId, "skipped");
+      publishStepStatus(runId, log, def, "skipped");
+      return "cancelled";
+    }
+
+    sl.stepLog.error({ error: msg }, "step failed");
+    db.updateStepStatus(dbId, "failed", { error: msg });
+    publishStepStatus(runId, log, def, "failed");
+    return { failed: msg };
+  } finally {
+    sl.flush();
+  }
+}
+
+async function runSteps(opts: RunStepsOptions) {
+  const { runId, key, log, stepRecords, abort, dryRun, timeoutS } = opts;
   const startedAt = Date.now();
-  const totalSteps = stepRecords.length;
   const timeoutTimer = setTimeout(() => {
     if (!abort.signal.aborted) {
       log.error({ timeoutSec: timeoutS }, "run exceeded timeout, aborting");
@@ -163,94 +268,23 @@ async function runSteps({
 
   try {
     for (let i = 0; i < stepRecords.length; i++) {
-      const { dbId, def } = stepRecords[i]!;
-
       if (abort.signal.aborted) {
-        db.updateStepStatus(dbId, "skipped");
-        publishStepStatus(runId, log, def, "skipped");
-        continue;
+        skipRemainingSteps(runId, log, stepRecords, i);
+        break;
       }
 
-      const resolvedConfig = resolveConfig(def.config, { params, vars });
-      const logFile = join(logDir, `${def.id}.log`);
+      const { dbId, def } = stepRecords[i]!;
+      const result = await executeStep(opts, dbId, def, i + 1);
 
-      const fileDest = pino.destination({ dest: logFile, sync: false, minLength: 4096 });
-      const sseSink = new Writable({
-        decodeStrings: false,
-        write(data, _enc, cb) {
-          try {
-            const str = typeof data === "string" ? data : data.toString();
-            publish(runId, { type: "log", ...JSON.parse(str) });
-          } catch {}
-          cb();
-        },
-      });
-      const stepLog = pino(
-        stepLoggerOpts,
-        pino.multistream([{ stream: fileDest }, { stream: sseSink }]),
-      ).child({ runId, stepId: def.id, step: def.name, action: def.action, stepIndex: i + 1, totalSteps });
-
-      const logFn = (msg: string, fields?: Record<string, unknown>) => {
-        if (fields) stepLog.info(fields, msg);
-        else stepLog.info(msg);
-      };
-      const warnFn = (msg: string, fields?: Record<string, unknown>) => {
-        if (fields) stepLog.warn(fields, msg);
-        else stepLog.warn(msg);
-      };
-
-      db.updateStepStatus(dbId, "running", { log_file: logFile });
-      publishStepStatus(runId, log, def, "running");
-      stepLog.info("step starting");
-
-      try {
-        if (dryRun) {
-          stepLog.info("dry run, skipping action");
-          stepLog.info({ resolvedConfig }, "dry run resolved config");
-          await new Promise((r) => setTimeout(r, 1000 + Math.random() * 3000));
-          if (Math.random() < 0.05) throw new Error("simulated dry run failure");
-          db.updateStepStatus(dbId, "success");
-          publishStepStatus(runId, log, def, "success");
-        } else {
-          const ctx: ActionContext = {
-            runId,
-            stepId: def.id,
-            region,
-            signal: abort.signal,
-            log: logFn,
-            warn: warnFn,
-            callStack,
-          };
-
-          const result = await runAction(def.action, resolvedConfig, ctx);
-
-          db.updateStepStatus(dbId, "success", {
-            output: result.output ? JSON.stringify(result.output) : undefined,
-          });
-          publishStepStatus(runId, log, def, "success");
-        }
-        stepLog.info("step completed");
-      } catch (err) {
-        const msg = errorMessage(err);
-
-        if (abort.signal.aborted) {
-          stepLog.info("step cancelled");
-          db.updateStepStatus(dbId, "skipped");
-          publishStepStatus(runId, log, def, "skipped");
-          skipRemainingSteps(runId, log, stepRecords, i + 1);
-          finishRun(runId, log, "cancelled", { durationMs: Date.now() - startedAt });
-          return;
-        }
-
-        stepLog.error({ error: msg }, "step failed");
-        db.updateStepStatus(dbId, "failed", { error: msg });
-        publishStepStatus(runId, log, def, "failed");
+      if (result === "cancelled") {
         skipRemainingSteps(runId, log, stepRecords, i + 1);
-        finishRun(runId, log, "failed", { error: msg, durationMs: Date.now() - startedAt });
+        finishRun(runId, log, "cancelled", { durationMs: Date.now() - startedAt });
         return;
-      } finally {
-        fileDest.flushSync();
-        fileDest.end();
+      }
+      if (typeof result === "object") {
+        skipRemainingSteps(runId, log, stepRecords, i + 1);
+        finishRun(runId, log, "failed", { error: result.failed, durationMs: Date.now() - startedAt });
+        return;
       }
     }
 
@@ -266,17 +300,13 @@ async function runSteps({
   }
 }
 
-const actionHandlers: Record<ActionName, (config: any, ctx: ActionContext) => Promise<{ output?: Record<string, unknown> }>> = {
+const actionHandlers: { [K in ActionName]: ActionHandler<K> } = {
   codebuild: executeCodeBuild,
   "ecs-restart": executeEcsRestart,
   "ecs-task": executeEcsTask,
   "cloudflare-purge": executeCloudflare,
   "trigger-pipeline": executeTriggerPipeline,
 };
-
-function runAction(action: ActionName, config: unknown, ctx: ActionContext) {
-  return actionHandlers[action](config, ctx);
-}
 
 export function cancelPipeline(runId: string): boolean {
   for (const [, active] of activePipelines) {

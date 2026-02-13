@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import { ArrowDown, FileText, Search, X } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LogLine } from "../../types.ts";
 
 const levelColors: Record<string, string> = {
@@ -25,11 +25,13 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }): Re
         {"[\n"}
         {value.map((item, i) => (
           <span key={i}>
-            {indent}<JsonValue value={item} depth={depth + 1} />
+            {indent}
+            <JsonValue value={item} depth={depth + 1} />
             {i < value.length - 1 ? ",\n" : "\n"}
           </span>
         ))}
-        {closeIndent}{"]"}
+        {closeIndent}
+        {"]"}
       </>
     );
   }
@@ -42,11 +44,13 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }): Re
         {"{\n"}
         {entries.map(([k, v], i) => (
           <span key={k}>
-            {indent}<span className="text-purple-400">"{k}"</span>: <JsonValue value={v} depth={depth + 1} />
+            {indent}
+            <span className="text-purple-400">"{k}"</span>: <JsonValue value={v} depth={depth + 1} />
             {i < entries.length - 1 ? ",\n" : "\n"}
           </span>
         ))}
-        {closeIndent}{"}"}
+        {closeIndent}
+        {"}"}
       </>
     );
   }
@@ -91,9 +95,7 @@ export function LogViewer({ lines }: { lines: LogLine[] }) {
     const indexed = lines.map((entry, i) => ({ entry, num: i + 1 }));
     if (!search) return indexed;
     const lower = search.toLowerCase();
-    return indexed.filter(({ entry }) =>
-      JSON.stringify(entry).toLowerCase().includes(lower),
-    );
+    return indexed.filter(({ entry }) => JSON.stringify(entry).toLowerCase().includes(lower));
   }, [lines, search]);
 
   if (lines.length === 0) {
@@ -122,6 +124,7 @@ export function LogViewer({ lines }: { lines: LogLine[] }) {
           />
           {search && (
             <button
+              type="button"
               onClick={() => setSearch("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
             >
@@ -142,9 +145,7 @@ export function LogViewer({ lines }: { lines: LogLine[] }) {
               key={num}
               className={`flex gap-2 px-3 py-1.5 border-l-2 hover:bg-gray-800/30 ${levelColors[entry.level] ?? "border-l-transparent"}`}
             >
-              <span className="text-gray-700 select-none w-6 shrink-0 text-right pt-0.5">
-                {num}
-              </span>
+              <span className="text-gray-700 select-none w-6 shrink-0 text-right pt-0.5">{num}</span>
               <div className="text-gray-300 min-w-0 flex-1">
                 <JsonLine entry={entry} />
               </div>
@@ -154,6 +155,7 @@ export function LogViewer({ lines }: { lines: LogLine[] }) {
 
         {userScrolledUp && (
           <button
+            type="button"
             onClick={scrollToBottom}
             className="absolute bottom-3 right-3 bg-gray-800 border border-gray-700 rounded-full p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors shadow-lg shadow-black/30"
             title="Scroll to bottom"

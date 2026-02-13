@@ -5,38 +5,50 @@ export interface ResolveContext {
   vars: Record<string, unknown>;
 }
 
-const TEMPLATE_RE = /\{\{(.+?)\}\}/g;
+export const TEMPLATE_RE = /\{\{(.+?)\}\}/g;
 const FULL_TEMPLATE_RE = /^\{\{(.+?)\}\}$/;
 
-function resolveExpression(expr: string, ctx: ResolveContext): unknown {
+export interface TemplateRef {
+  type: "vars" | "param";
+  name: string;
+  fallback?: string;
+}
+
+export function parseTemplateRef(expr: string): TemplateRef | null {
   const trimmed = expr.trim();
-
   if (trimmed.startsWith("vars.")) {
-    const key = trimmed.slice(5);
-    if (!(key in ctx.vars)) {
-      throw new Error(`Undefined variable: ${trimmed}`);
-    }
-    return ctx.vars[key];
+    return { type: "vars", name: trimmed.slice(5) };
   }
-
   if (trimmed.startsWith("param.")) {
     const rest = trimmed.slice(6);
     const pipeIdx = rest.indexOf("|");
     if (pipeIdx !== -1) {
-      const name = rest.slice(0, pipeIdx).trim();
-      const fallback = rest.slice(pipeIdx + 1).trim();
-      const val = ctx.params[name];
-      if (val === undefined || val === "") return fallback;
-      return val;
+      return { type: "param", name: rest.slice(0, pipeIdx).trim(), fallback: rest.slice(pipeIdx + 1).trim() };
     }
-    const val = ctx.params[rest];
-    if (val === undefined) {
-      throw new Error(`Missing required parameter: ${rest}`);
-    }
-    return val;
+    return { type: "param", name: rest };
+  }
+  return null;
+}
+
+function resolveExpression(expr: string, ctx: ResolveContext): unknown {
+  const ref = parseTemplateRef(expr);
+  if (!ref) {
+    throw new Error(`Invalid template expression: {{${expr.trim()}}} — must start with "vars." or "param."`);
   }
 
-  throw new Error(`Invalid template expression: {{${trimmed}}} — must start with "vars." or "param."`);
+  if (ref.type === "vars") {
+    if (!(ref.name in ctx.vars)) throw new Error(`Undefined variable: vars.${ref.name}`);
+    return ctx.vars[ref.name];
+  }
+
+  if (ref.fallback !== undefined) {
+    const val = ctx.params[ref.name];
+    return val === undefined || val === "" ? ref.fallback : val;
+  }
+
+  const val = ctx.params[ref.name];
+  if (val === undefined) throw new Error(`Missing required parameter: ${ref.name}`);
+  return val;
 }
 
 export function resolveConfig(value: unknown, ctx: ResolveContext): unknown {

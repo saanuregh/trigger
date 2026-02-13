@@ -1,4 +1,4 @@
-import type { ActionName, ActionConfigMap } from "../config/types.ts";
+import type { ActionConfigMap, ActionName } from "../config/types.ts";
 
 export interface ActionContext {
   runId: string;
@@ -8,6 +8,7 @@ export interface ActionContext {
   log: (msg: string, fields?: Record<string, unknown>) => void;
   warn: (msg: string, fields?: Record<string, unknown>) => void;
   callStack?: string[];
+  triggeredBy?: string;
 }
 
 export type ActionHandler<A extends ActionName = ActionName> = (

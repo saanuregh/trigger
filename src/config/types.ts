@@ -1,7 +1,7 @@
 import type { ParamValues } from "../types.ts";
-import type { PipelineDef as _PipelineDef } from "./schema.ts";
+import type { PipelineDef } from "./schema.ts";
 
-export type { PipelineConfig, PipelineDef, StepDef, ActionName } from "./schema.ts";
+export type { ActionName, PipelineConfig, PipelineDef, StepDef } from "./schema.ts";
 
 export interface CodeBuildActionConfig {
   project_name: string;
@@ -41,11 +41,15 @@ export interface TriggerPipelineActionConfig {
 }
 
 export interface ActionConfigMap {
-  "codebuild": CodeBuildActionConfig;
+  codebuild: CodeBuildActionConfig;
   "ecs-restart": EcsRestartActionConfig;
   "ecs-task": EcsTaskActionConfig;
   "cloudflare-purge": CloudflarePurgeActionConfig;
   "trigger-pipeline": TriggerPipelineActionConfig;
+}
+
+export interface AccessConfig {
+  groups: string[];
 }
 
 export interface NamespaceConfig {
@@ -53,7 +57,8 @@ export interface NamespaceConfig {
   display_name: string;
   aws_region: string;
   vars: Record<string, unknown>;
-  pipelines: _PipelineDef[];
+  access?: AccessConfig;
+  pipelines: PipelineDef[];
   _source: {
     config: string;
     loaded_at: string;

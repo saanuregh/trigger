@@ -1,17 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { AlertCircle, Download, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
-import { Square, Download, AlertCircle } from "lucide-react";
-import type { RunRow, StepRow, LogLine } from "../types.ts";
+import type { LogLine, RunRow, StepRow } from "../types.ts";
 import { TERMINAL_STATUSES } from "../types.ts";
-import { Layout } from "./components/Layout.tsx";
-import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
-import { LogViewer } from "./components/LogViewer.tsx";
 import { Button } from "./components/Button.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
+import { Layout } from "./components/Layout.tsx";
+import { LogViewer } from "./components/LogViewer.tsx";
 import { RunSkeleton } from "./components/Skeleton.tsx";
+import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { formatTime, requestNotificationPermission, showRunNotification } from "./utils.ts";
-import { useNsDisplayName, renderPage } from "./swr.tsx";
+import { useRoute } from "./router.tsx";
+import { useNsDisplayName } from "./swr.tsx";
+import { formatTime, handleUnauthorized, requestNotificationPermission, showRunNotification } from "./utils.ts";
 
 const stepCircleStyles: Record<string, string> = {
   running: "border-blue-500/50 bg-blue-950/50 shadow-[0_0_8px_rgba(59,130,246,0.3)]",
@@ -19,7 +20,7 @@ const stepCircleStyles: Record<string, string> = {
   failed: "border-red-800/50 bg-red-950/30",
 };
 
-function RunPage() {
+export function RunPage() {
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [cancelling, setCancelling] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
@@ -36,23 +37,19 @@ function RunPage() {
     setLogs((prev) => prev.concat(batch));
   }, []);
 
-  const segments = location.pathname.split("/");
-  const ns = segments[1]!;
-  const pipelineId = segments[2]!;
-  const runId = segments[4]!;
+  const { ns, pipelineId, runId } = useRoute().params as { ns: string; pipelineId: string; runId: string };
 
   const nsDisplayName = useNsDisplayName(ns);
 
-  const { data, error, mutate } = useSWR<{ run: RunRow; steps: StepRow[] }>(
-    `/api/runs/${runId}`,
-    { revalidateOnFocus: false },
-  );
+  const { data, error, mutate } = useSWR<{ run: RunRow; steps: StepRow[] }>(`/api/runs/${runId}`, { revalidateOnFocus: false });
   const run = data?.run ?? null;
   const steps = data?.steps ?? [];
 
   useEffect(() => {
     if (run) document.title = `Run #${runId.slice(0, 8)} — ${run.pipeline_name} — Trigger`;
-    return () => { document.title = "Trigger"; };
+    return () => {
+      document.title = "Trigger";
+    };
   }, [run, runId]);
 
   useEffect(() => {
@@ -80,22 +77,18 @@ function RunPage() {
     es.addEventListener("step", (e) => {
       const stepData = JSON.parse(e.data) as { stepId: string; status: string };
       mutate(
-        (prev) => prev && {
-          ...prev,
-          steps: prev.steps.map((s) =>
-            s.step_id === stepData.stepId ? { ...s, status: stepData.status as StepRow["status"] } : s,
-          ),
-        },
+        (prev) =>
+          prev && {
+            ...prev,
+            steps: prev.steps.map((s) => (s.step_id === stepData.stepId ? { ...s, status: stepData.status as StepRow["status"] } : s)),
+          },
         { revalidate: false },
       );
     });
 
     es.addEventListener("run", (e) => {
       const { status } = JSON.parse(e.data) as { status: string };
-      mutate(
-        (prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } },
-        { revalidate: false },
-      );
+      mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } }, { revalidate: false });
       if (TERMINAL_STATUSES.has(status)) {
         showRunNotification(run.pipeline_name, status);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -121,6 +114,7 @@ function RunPage() {
     setShowStopConfirm(false);
     try {
       const res = await fetch(`/api/runs/${runId}/cancel`, { method: "POST" });
+      handleUnauthorized(res);
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Stop failed" }));
         toast(data.error ?? "Stop failed", "error");
@@ -186,6 +180,7 @@ function RunPage() {
             <h1 className="text-lg font-semibold">{run.pipeline_name}</h1>
             <p className="text-sm text-gray-500">
               {formatTime(run.started_at)}
+              {run.triggered_by && <span className="ml-2">by {run.triggered_by}</span>}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -196,19 +191,11 @@ function RunPage() {
             )}
             <StatusBadge status={run.status} />
             {isActive && (
-              <Button
-                variant="danger"
-                onClick={() => setShowStopConfirm(true)}
-                loading={cancelling}
-                icon={<Square size={12} />}
-              >
+              <Button variant="danger" onClick={() => setShowStopConfirm(true)} loading={cancelling} icon={<Square size={12} />}>
                 Stop
               </Button>
             )}
-            <Button
-              onClick={handleDownloadLogs}
-              icon={<Download size={14} />}
-            >
+            <Button onClick={handleDownloadLogs} icon={<Download size={14} />}>
               Download logs
             </Button>
           </div>
@@ -233,26 +220,16 @@ function RunPage() {
                   <div className={`relative z-10 flex items-center justify-center w-7 h-7 rounded-full border-2 ${circleStyle}`}>
                     <StepIcon status={step.status} size={14} />
                   </div>
-                  {!isLast && (
-                    <div className={`w-px flex-1 min-h-4 ${
-                      step.status === "success" ? "bg-green-800/50" : "bg-gray-800"
-                    }`} />
-                  )}
+                  {!isLast && <div className={`w-px flex-1 min-h-4 ${step.status === "success" ? "bg-green-800/50" : "bg-gray-800"}`} />}
                 </div>
 
                 <div className="pb-4 pt-1 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-medium ${
-                      step.status === "skipped" ? "text-gray-600" : "text-gray-200"
-                    }`}>
+                    <span className={`text-sm font-medium ${step.status === "skipped" ? "text-gray-600" : "text-gray-200"}`}>
                       {step.step_name}
                     </span>
-                    <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded font-mono">
-                      {step.action}
-                    </span>
-                    {step.status !== "pending" && step.status !== "skipped" && (
-                      <StatusBadge status={step.status} />
-                    )}
+                    <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded font-mono">{step.action}</span>
+                    {step.status !== "pending" && step.status !== "skipped" && <StatusBadge status={step.status} />}
                   </div>
                 </div>
               </div>
@@ -276,5 +253,3 @@ function RunPage() {
     </Layout>
   );
 }
-
-renderPage(RunPage);

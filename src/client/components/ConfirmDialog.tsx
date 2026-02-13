@@ -1,6 +1,6 @@
+import { AlertTriangle } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle } from "lucide-react";
 import { Button } from "./Button.tsx";
 
 interface ConfirmDialogProps {
@@ -36,17 +36,16 @@ export function ConfirmDialog({
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = ""; };
+      return () => {
+        document.body.style.overflow = "";
+      };
     }
   }, [open]);
 
   if (!open) return null;
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in"
-      onClick={onCancel}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         className="relative bg-gray-900 border border-gray-800 rounded-xl shadow-2xl shadow-black/50 p-6 max-w-md w-full mx-4 animate-scale-in"
@@ -68,12 +67,7 @@ export function ConfirmDialog({
           <Button onClick={onCancel} disabled={loading}>
             Cancel
           </Button>
-          <Button
-            autoFocus
-            variant={variant === "danger" ? "danger" : "primary"}
-            onClick={onConfirm}
-            loading={loading}
-          >
+          <Button autoFocus variant={variant === "danger" ? "danger" : "primary"} onClick={onConfirm} loading={loading}>
             {confirmLabel}
           </Button>
         </div>
