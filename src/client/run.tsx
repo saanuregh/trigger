@@ -10,7 +10,7 @@ import { Button } from "./components/Button.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
 import { RunSkeleton } from "./components/Skeleton.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { formatTime, requestNotificationPermission, showRunNotification } from "./utils.ts";
+import { formatTime, requestNotificationPermission, showRunNotification, handleUnauthorized } from "./utils.ts";
 import { useNsDisplayName, renderPage } from "./swr.tsx";
 
 const stepCircleStyles: Record<string, string> = {
@@ -121,6 +121,7 @@ function RunPage() {
     setShowStopConfirm(false);
     try {
       const res = await fetch(`/api/runs/${runId}/cancel`, { method: "POST" });
+      handleUnauthorized(res);
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Stop failed" }));
         toast(data.error ?? "Stop failed", "error");
@@ -186,6 +187,9 @@ function RunPage() {
             <h1 className="text-lg font-semibold">{run.pipeline_name}</h1>
             <p className="text-sm text-gray-500">
               {formatTime(run.started_at)}
+              {run.triggered_by && (
+                <span className="ml-2">by {run.triggered_by}</span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-3">

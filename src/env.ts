@@ -10,6 +10,8 @@ function optional(name: string, fallback: string): string {
 
 const NODE_ENV = optional("NODE_ENV", "development");
 
+const OIDC_ISSUER = optional("OIDC_ISSUER", "");
+
 export const env = {
   NODE_ENV,
   development: NODE_ENV !== "production",
@@ -23,4 +25,11 @@ export const env = {
   namespaceConfig(ns: string) {
     return required(`TRIGGER_${ns.toUpperCase()}_CONFIG`);
   },
+
+  // Auth (opt-in: set OIDC_ISSUER to enable)
+  OIDC_ISSUER,
+  OIDC_CLIENT_ID: optional("OIDC_CLIENT_ID", ""),
+  OIDC_CLIENT_SECRET: optional("OIDC_CLIENT_SECRET", ""),
+  TRIGGER_ADMINS: optional("TRIGGER_ADMINS", "").split(",").map(s => s.trim()).filter(Boolean),
+  get authEnabled() { return OIDC_ISSUER !== ""; },
 } as const;

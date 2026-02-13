@@ -30,7 +30,7 @@ export async function executePipeline(
   namespace: string,
   pipelineId: string,
   params: ParamValues,
-  options?: { signal?: AbortSignal; parentCallStack?: string[]; dryRun?: boolean },
+  options?: { signal?: AbortSignal; parentCallStack?: string[]; dryRun?: boolean; triggeredBy?: string },
 ): Promise<string> {
   const key = `${namespace}:${pipelineId}`;
   const dryRun = options?.dryRun ?? false;
@@ -63,6 +63,7 @@ export async function executePipeline(
       params: JSON.stringify(params),
       started_at: new Date().toISOString(),
       dry_run: dryRun,
+      triggered_by: options?.triggeredBy,
     });
 
     const stepRecords = pipeline.steps.map((step) => {
@@ -102,6 +103,7 @@ export async function executePipeline(
       vars: nsConfig.vars,
       region: nsConfig.aws_region,
       timeoutS: pipeline.timeout ?? DEFAULT_RUN_TIMEOUT_S,
+      triggeredBy: options?.triggeredBy,
     }).catch(() => {});
 
     return runId;
@@ -147,6 +149,7 @@ interface RunStepsOptions {
   vars: Record<string, unknown>;
   region: string;
   timeoutS: number;
+  triggeredBy?: string;
 }
 
 type StepResult = "success" | { failed: string } | "cancelled";
@@ -200,7 +203,7 @@ async function executeStep(
     } else {
       const ctx: ActionContext = {
         runId, stepId: def.id, region, signal: abort.signal,
-        log: sl.log, warn: sl.warn, callStack,
+        log: sl.log, warn: sl.warn, callStack, triggeredBy: opts.triggeredBy,
       };
       const handler = actionHandlers[def.action] as ActionHandler;
       const result = await handler(resolvedConfig as never, ctx);

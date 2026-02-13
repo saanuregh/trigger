@@ -21,6 +21,21 @@
       },
       "additionalProperties": {}
     },
+    "access": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "groups"
+      ],
+      "additionalProperties": false
+    },
     "pipelines": {
       "type": "array",
       "items": {
@@ -148,6 +163,21 @@
                 }
               ]
             }
+          },
+          "access": {
+            "type": "object",
+            "properties": {
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "groups"
+            ],
+            "additionalProperties": false
           },
           "steps": {
             "type": "array",

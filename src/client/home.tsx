@@ -6,22 +6,30 @@ import { Card, CardLink } from "./components/Card.tsx";
 import { HomeSkeleton } from "./components/Skeleton.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useConfigs, renderPage } from "./swr.tsx";
+import { useConfigs, useUser, renderPage } from "./swr.tsx";
+import { handleUnauthorized } from "./utils.ts";
 
 function HomePage() {
   const { data: configs, mutate } = useConfigs();
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
+  const { data: user } = useUser();
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await fetch("/api/config/refresh", { method: "POST" });
+      const res = await fetch("/api/config/refresh", { method: "POST" });
+      handleUnauthorized(res);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Refresh failed" }));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
       await mutate();
       toast("Configs refreshed", "success");
     } catch (err) {
       console.error("Failed to refresh configs:", err);
-      toast("Failed to refresh configs", "error");
+      toast(err instanceof Error ? err.message : "Failed to refresh configs", "error");
     } finally {
       setRefreshing(false);
     }
@@ -30,13 +38,15 @@ function HomePage() {
   return (
     <Layout
       actions={
-        <Button
-          onClick={handleRefresh}
-          loading={refreshing}
-          icon={<RefreshCw size={14} />}
-        >
-          Refresh configs
-        </Button>
+        user?.isSuperAdmin ? (
+          <Button
+            onClick={handleRefresh}
+            loading={refreshing}
+            icon={<RefreshCw size={14} />}
+          >
+            Refresh configs
+          </Button>
+        ) : undefined
       }
     >
       {!configs ? (

@@ -8,7 +8,7 @@ type ExecutePipelineFn = (
   ns: string,
   pipelineId: string,
   params: Record<string, string | boolean>,
-  options: { signal: AbortSignal; parentCallStack?: string[] },
+  options: { signal: AbortSignal; parentCallStack?: string[]; triggeredBy?: string },
 ) => Promise<string>;
 
 let executePipelineFn: ExecutePipelineFn | null = null;
@@ -61,6 +61,7 @@ export async function executeTriggerPipeline(config: TriggerPipelineActionConfig
   const runId = await executePipelineFn(namespace, pipeline_id, params, {
     signal: ctx.signal,
     parentCallStack: [...callStack, key],
+    triggeredBy: ctx.triggeredBy,
   });
 
   ctx.log("child pipeline started, waiting for completion", { childRunId: runId });

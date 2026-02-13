@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ChevronRight, Workflow } from "lucide-react";
+import { ChevronRight, Workflow, LogOut } from "lucide-react";
+import { useUser } from "../swr.tsx";
 
 interface Breadcrumb {
   label: string;
@@ -11,6 +12,31 @@ interface LayoutProps {
   sidebar?: ReactNode;
   breadcrumbs?: Breadcrumb[];
   actions?: ReactNode;
+}
+
+function UserMenu() {
+  const { data: user } = useUser();
+  if (!user) return null;
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
+
+  return (
+    <div className="flex items-center gap-2 ml-3 pl-3 border-l border-gray-700">
+      <span className="text-xs text-gray-400 max-w-32 truncate" title={user.email}>
+        {user.name || user.email}
+      </span>
+      <button
+        onClick={handleLogout}
+        className="text-gray-500 hover:text-gray-300 transition-colors p-0.5"
+        title="Sign out"
+      >
+        <LogOut size={14} />
+      </button>
+    </div>
+  );
 }
 
 export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps) {
@@ -35,7 +61,10 @@ export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps)
             </span>
           ))}
         </nav>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        <div className="flex items-center gap-2">
+          {actions}
+          <UserMenu />
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">

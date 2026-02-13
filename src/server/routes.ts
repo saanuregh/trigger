@@ -22,12 +22,17 @@ import type {
 } from "../types.ts";
 import { z } from "zod";
 import { pipelineConfigSchema } from "../config/schema.ts";
+import { getAuthUrl, exchangeCode, getOIDCConfig } from "../auth/oidc.ts";
+import { signSession, sessionCookieHeader, clearSessionCookie } from "../auth/session.ts";
+import { authed, canAccessPipeline, canAccessNamespace, filterAccessibleConfigs } from "../auth/access.ts";
+import type { AuthSession } from "../auth/session.ts";
 
 import homepage from "../../public/index.html";
 import namespacePage from "../../public/namespace.html";
 import pipelinePage from "../../public/pipeline.html";
 import configPage from "../../public/config.html";
 import runPage from "../../public/run.html";
+import loginPage from "../../public/login.html";
 
 const configJsonSchema = z.toJSONSchema(pipelineConfigSchema);
 
@@ -55,20 +60,17 @@ function toClientConfigs(configs: NamespaceConfig[]): NamespaceConfigSummary[] {
   }));
 }
 
-function findPipeline(configs: NamespaceConfig[], ns: string, id: string) {
-  const nsConfig = configs.find((c) => c.namespace === ns);
-  if (!nsConfig)
-    return {
-      error: Response.json({ error: "Namespace not found" }, { status: 404 }),
-    } as const;
+function findNsConfig(configs: NamespaceConfig[], ns: string) {
+  return configs.find((c) => c.namespace === ns);
+}
 
-  const pipeline = nsConfig.pipelines.find((p) => p.id === id);
-  if (!pipeline)
-    return {
-      error: Response.json({ error: "Pipeline not found" }, { status: 404 }),
-    } as const;
-
-  return { pipeline } as const;
+function checkPipelineAccess(session: AuthSession, nsConfig: NamespaceConfig | undefined, pipeline: NamespaceConfig["pipelines"][number] | undefined): Response | null {
+  if (!nsConfig) return Response.json({ error: "Namespace not found" }, { status: 404 });
+  if (!pipeline) return Response.json({ error: "Pipeline not found" }, { status: 404 });
+  if (!canAccessPipeline(session, nsConfig, pipeline)) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return null;
 }
 
 type RouteRequest = Request & { params: Record<string, string> };
@@ -89,8 +91,11 @@ function terminalSSEResponse(status: string): Response {
   return new Response(sseFormat("run", { status }), { headers: SSE_HEADERS });
 }
 
+const OAUTH_STATE_COOKIE = "trigger_oauth_state";
+
 export const routes = {
   "/": homepage,
+  "/login": loginPage,
   "/:ns": namespacePage,
   "/:ns/:pipeline": pipelinePage,
   "/:ns/:pipeline/config": configPage,
@@ -98,12 +103,98 @@ export const routes = {
 
   "/health": () => Response.json({ status: "ok" }),
 
-  "/api/configs": async () => {
-    const configs = await getConfigs();
-    return Response.json(toClientConfigs(configs));
+  "/api/auth/info": () => Response.json({ enabled: env.authEnabled }),
+
+  "/auth/login": (req: RouteRequest) => {
+    if (!env.authEnabled || !getOIDCConfig()) {
+      return Response.json({ error: "Auth not configured" }, { status: 501 });
+    }
+
+    const url = new URL(req.url);
+    const returnUrl = url.searchParams.get("return") ?? "/";
+    const state = btoa(JSON.stringify({ returnUrl, nonce: crypto.randomUUID() }));
+
+    const redirectUri = `${url.origin}/auth/callback`;
+    const authUrl = getAuthUrl(state, redirectUri);
+
+    const secure = !env.development ? "; Secure" : "";
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: authUrl,
+        "Set-Cookie": `${OAUTH_STATE_COOKIE}=${state}; HttpOnly; SameSite=Lax; Path=/; Max-Age=600${secure}`,
+      },
+    });
   },
 
-  "/api/runs": (req: RouteRequest) => {
+  "/auth/callback": async (req: RouteRequest) => {
+    const url = new URL(req.url);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+
+    if (!code || !state) {
+      return new Response(null, { status: 302, headers: { Location: "/login?error=missing_params" } });
+    }
+
+    // Validate CSRF state
+    const cookies = req.headers.get("cookie") ?? "";
+    let savedState = "";
+    for (const part of cookies.split(";")) {
+      const [key, ...rest] = part.trim().split("=");
+      if (key === OAUTH_STATE_COOKIE) { savedState = rest.join("="); break; }
+    }
+
+    if (savedState !== state) {
+      return new Response(null, { status: 302, headers: { Location: "/login?error=invalid_state" } });
+    }
+
+    try {
+      const redirectUri = `${url.origin}/auth/callback`;
+      const user = await exchangeCode(code, redirectUri);
+      const sessionCookie = await signSession(user);
+      const returnUrl = JSON.parse(atob(state)).returnUrl as string ?? "/";
+
+      logger.info({ email: user.email, groups: user.groups }, "user authenticated");
+
+      // Clear oauth state cookie + set session cookie
+      const secure = !env.development ? "; Secure" : "";
+      return new Response(null, {
+        status: 302,
+        headers: [
+          ["Location", returnUrl],
+          ["Set-Cookie", sessionCookieHeader(sessionCookie)],
+          ["Set-Cookie", `${OAUTH_STATE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`],
+        ],
+      });
+    } catch (err) {
+      logger.error({ error: errorMessage(err) }, "auth callback failed");
+      return new Response(null, { status: 302, headers: { Location: "/login?error=auth_failed" } });
+    }
+  },
+
+  "/api/me": authed(async (_req, session) => {
+    return Response.json({ email: session.email, name: session.name, groups: session.groups, isSuperAdmin: session.isSuperAdmin });
+  }),
+
+  "/api/auth/logout": {
+    POST: async (req: RouteRequest) => {
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Set-Cookie": clearSessionCookie(),
+        },
+      });
+    },
+  },
+
+  "/api/configs": authed(async (_req, session) => {
+    const configs = await getConfigs();
+    const filtered = filterAccessibleConfigs(configs, session);
+    return Response.json(toClientConfigs(filtered));
+  }),
+
+  "/api/runs": authed(async (req, session) => {
     const url = new URL(req.url);
     const namespace = url.searchParams.get("ns") || undefined;
     const pipeline_id = url.searchParams.get("pipeline_id") || undefined;
@@ -113,6 +204,15 @@ export const routes = {
       100,
       Math.max(1, Number(url.searchParams.get("per_page")) || 20),
     );
+
+    // If filtering by namespace, check access
+    if (namespace) {
+      const configs = await getConfigs();
+      const nsConfig = findNsConfig(configs, namespace);
+      if (nsConfig && !canAccessNamespace(session, nsConfig)) {
+        return Response.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
 
     const filters = { namespace, pipeline_id, status };
     const total = db.countRuns(filters);
@@ -128,20 +228,37 @@ export const routes = {
       page,
       per_page,
     } satisfies PaginatedResponse<RunRow>);
-  },
+  }),
 
-  "/api/runs/:runId": (req: RouteRequest) => {
+  "/api/runs/:runId": authed(async (req, session) => {
     const { runId } = req.params;
     const run = db.getRun(runId!);
     if (!run)
       return Response.json({ error: "Run not found" }, { status: 404 });
 
+    // Check namespace access
+    const configs = await getConfigs();
+    const nsConfig = findNsConfig(configs, run.namespace);
+    if (nsConfig && !canAccessNamespace(session, nsConfig)) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const steps = db.getStepsForRun(runId!);
     return Response.json({ run, steps });
-  },
+  }),
 
-  "/api/runs/:runId/logs": async (req: RouteRequest) => {
+  "/api/runs/:runId/logs": authed(async (req, session) => {
     const { runId } = req.params;
+
+    const run = db.getRun(runId!);
+    if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
+
+    const configs = await getConfigs();
+    const nsConfig = findNsConfig(configs, run.namespace);
+    if (nsConfig && !canAccessNamespace(session, nsConfig)) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const steps = db.getStepsForRun(runId!);
     const lines: LogLine[] = [];
 
@@ -163,50 +280,60 @@ export const routes = {
     }
 
     return Response.json({ lines, truncated: lines.length >= MAX_LOG_LINES });
-  },
+  }),
 
-  "/api/pipelines/:ns/:id": async (req: RouteRequest) => {
+  "/api/pipelines/:ns/:id": authed(async (req, session) => {
     const { ns, id } = req.params;
     const configs = await refreshNamespace(ns!).catch((err) => {
       logger.warn({ namespace: ns, error: errorMessage(err) }, "config refresh failed, using cache");
       return getConfigs();
     });
-    const result = findPipeline(configs, ns!, id!);
-    if ("error" in result) return result.error;
+    const nsConfig = findNsConfig(configs, ns!);
+    const pipeline = nsConfig?.pipelines.find((p) => p.id === id);
+    const denied = checkPipelineAccess(session, nsConfig, pipeline);
+    if (denied) return denied;
 
-    const { pipeline } = result;
     return Response.json({
-      id: pipeline.id,
-      name: pipeline.name,
-      description: pipeline.description,
-      confirm: pipeline.confirm,
-      params: pipeline.params,
-      steps: pipeline.steps.map(toStepSummary),
+      id: pipeline!.id,
+      name: pipeline!.name,
+      description: pipeline!.description,
+      confirm: pipeline!.confirm,
+      params: pipeline!.params,
+      steps: pipeline!.steps.map(toStepSummary),
     });
-  },
+  }),
 
-  "/api/pipelines/:ns/:id/config": async (req: RouteRequest) => {
+  "/api/pipelines/:ns/:id/config": authed(async (req, session) => {
     const { ns, id } = req.params;
     const configs = await getConfigs();
-    const result = findPipeline(configs, ns!, id!);
-    if ("error" in result) return result.error;
+    const nsConfig = findNsConfig(configs, ns!);
+    const pipeline = nsConfig?.pipelines.find((p) => p.id === id);
+    const denied = checkPipelineAccess(session, nsConfig, pipeline);
+    if (denied) return denied;
 
-    const { pipeline } = result;
     return Response.json({
-      id: pipeline.id,
-      name: pipeline.name,
-      description: pipeline.description,
-      params: pipeline.params,
-      steps: pipeline.steps.map((s) => ({
+      id: pipeline!.id,
+      name: pipeline!.name,
+      description: pipeline!.description,
+      params: pipeline!.params,
+      steps: pipeline!.steps.map((s) => ({
         ...toStepSummary(s),
         config: s.config,
       })),
     });
-  },
+  }),
 
   "/api/pipelines/:ns/:id/run": {
-    POST: async (req: RouteRequest) => {
+    POST: authed(async (req, session) => {
       const { ns, id } = req.params;
+
+      // Check pipeline access
+      const configs = await getConfigs();
+      const nsConfig = findNsConfig(configs, ns!);
+      const pipeline = nsConfig?.pipelines.find((p) => p.id === id);
+      const denied = checkPipelineAccess(session, nsConfig, pipeline);
+      if (denied) return denied;
+
       try {
         const body = (await req.json()) as {
           params?: Record<string, string | boolean>;
@@ -214,8 +341,9 @@ export const routes = {
         };
         const runId = await executePipeline(ns!, id!, body.params ?? {}, {
           dryRun: body.dryRun ?? false,
+          triggeredBy: session.email || undefined,
         });
-        logger.info({ namespace: ns, pipelineId: id, runId, dryRun: body.dryRun ?? false }, "pipeline triggered");
+        logger.info({ namespace: ns, pipelineId: id, runId, dryRun: body.dryRun ?? false, triggeredBy: session.email }, "pipeline triggered");
         return Response.json({ runId });
       } catch (err) {
         const msg = errorMessage(err);
@@ -227,12 +355,22 @@ export const routes = {
         }
         return Response.json({ error: msg }, { status });
       }
-    },
+    }),
   },
 
   "/api/runs/:runId/cancel": {
-    POST: (req: RouteRequest) => {
+    POST: authed(async (req, session) => {
       const { runId } = req.params;
+
+      const run = db.getRun(runId!);
+      if (run) {
+        const configs = await getConfigs();
+        const nsConfig = findNsConfig(configs, run.namespace);
+        if (nsConfig && !canAccessNamespace(session, nsConfig)) {
+          return Response.json({ error: "Forbidden" }, { status: 403 });
+        }
+      }
+
       const cancelled = cancelPipeline(runId!);
       if (!cancelled) {
         logger.warn({ runId }, "cancel requested for inactive run");
@@ -241,28 +379,38 @@ export const routes = {
           { status: 404 },
         );
       }
-      logger.info({ runId }, "pipeline cancellation requested");
+      logger.info({ runId, cancelledBy: session.email }, "pipeline cancellation requested");
       return Response.json({ ok: true });
-    },
+    }),
   },
 
   "/api/config/schema": () => Response.json(configJsonSchema),
 
   "/api/config/refresh": {
-    POST: async () => {
-      logger.info("config refresh requested");
+    POST: authed(async (_req, session) => {
+      if (!session.isSuperAdmin) {
+        return Response.json({ error: "Forbidden: admin only" }, { status: 403 });
+      }
+      logger.info({ refreshedBy: session.email }, "config refresh requested");
       await loadAllConfigs(true);
       return Response.json({ ok: true });
-    },
+    }),
   },
 
-  "/sse/runs/:runId": (req: RouteRequest) => {
+  "/sse/runs/:runId": authed(async (req, session) => {
     const { runId } = req.params;
 
     const run = db.getRun(runId!);
     if (!run) {
       logger.warn({ runId }, "SSE connection for unknown run");
       return new Response("Run not found", { status: 404 });
+    }
+
+    // Check namespace access
+    const configs = await getConfigs();
+    const nsConfig = findNsConfig(configs, run.namespace);
+    if (nsConfig && !canAccessNamespace(session, nsConfig)) {
+      return new Response("Forbidden", { status: 403 });
     }
 
     if (TERMINAL_STATUSES.has(run.status)) return terminalSSEResponse(run.status);
@@ -319,7 +467,7 @@ export const routes = {
     });
 
     return new Response(stream, { headers: SSE_HEADERS });
-  },
+  }),
 };
 
 export function fetch(req: Request) {

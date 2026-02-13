@@ -48,11 +48,16 @@ export interface ActionConfigMap {
   "trigger-pipeline": TriggerPipelineActionConfig;
 }
 
+export interface AccessConfig {
+  groups: string[];
+}
+
 export interface NamespaceConfig {
   namespace: string;
   display_name: string;
   aws_region: string;
   vars: Record<string, unknown>;
+  access?: AccessConfig;
   pipelines: PipelineDef[];
   _source: {
     config: string;

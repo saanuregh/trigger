@@ -3,6 +3,7 @@ import { errorMessage, type ParamDef, type PipelineDefSummary } from "../../type
 import { AlertCircle } from "lucide-react";
 import { Button } from "./Button.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
+import { handleUnauthorized } from "../utils.ts";
 
 function defaultParams(params: ParamDef[]): Record<string, string | boolean> {
   const defaults: Record<string, string | boolean> = {};
@@ -103,6 +104,7 @@ export function ParamForm({ pipeline, ns, onRunStarted }: ParamFormProps) {
         body: JSON.stringify({ params, dryRun }),
       });
 
+      handleUnauthorized(res);
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Request failed" }));
         throw new Error(data.error || `HTTP ${res.status}`);

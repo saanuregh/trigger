@@ -1,3 +1,9 @@
+export function handleUnauthorized(res: Response): void {
+  if (res.status === 401) {
+    window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}&error=session_expired`;
+  }
+}
+
 export function formatDuration(start: string, end: string): string {
   const ms = new Date(end).getTime() - new Date(start).getTime();
   const s = Math.floor(ms / 1000);

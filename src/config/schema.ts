@@ -102,6 +102,10 @@ const stepDef = z.object({
   config: stepConfig,
 }).strict();
 
+const accessConfig = z.object({
+  groups: z.array(z.string()),
+}).strict().optional();
+
 const pipelineDef = z.object({
   id: z.string(),
   name: z.string(),
@@ -109,6 +113,7 @@ const pipelineDef = z.object({
   confirm: z.boolean().optional(),
   timeout: z.number().optional(),
   params: z.array(paramDef).optional(),
+  access: accessConfig,
   steps: z.array(stepDef),
 }).strict();
 
@@ -118,6 +123,7 @@ export const pipelineConfigSchema = z.object({
   display_name: z.string(),
   aws_region: z.string(),
   vars: z.record(z.string(), z.unknown()).optional(),
+  access: accessConfig,
   pipelines: z.array(pipelineDef),
 }).strict().superRefine((config, ctx) => {
   const varNames = new Set(Object.keys(config.vars ?? {}));

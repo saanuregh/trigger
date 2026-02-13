@@ -4,13 +4,19 @@ import { loadAllConfigs } from "../config/loader.ts";
 import { shutdownAll, recoverStaleRuns } from "../pipeline/executor.ts";
 import { logger } from "../logger.ts";
 import { routes, fetch, error } from "./routes.ts";
+import { fetchOIDCConfig } from "../auth/oidc.ts";
 
 export function startServer() {
   getDb();
   recoverStaleRuns();
   loadAllConfigs();
 
-  // @ts-expect-error — Bun's type union requires `websocket` in one branch; we don't use WebSockets
+  if (env.authEnabled) {
+    fetchOIDCConfig().catch((err) => {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, "OIDC discovery failed — auth will not work");
+    });
+  }
+
   const server = Bun.serve({
     port: env.PORT,
     development: env.development,

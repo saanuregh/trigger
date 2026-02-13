@@ -18,6 +18,7 @@ export interface RunRow {
   finished_at: string | null;
   error: string | null;
   dry_run: number;
+  triggered_by: string | null;
 }
 
 export interface StepRow {

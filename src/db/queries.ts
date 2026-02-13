@@ -13,11 +13,11 @@ function buildRunFilters(filters: { namespace?: string; pipeline_id?: string; st
   return { where, values };
 }
 
-export function createRun(run: Pick<RunRow, "id" | "namespace" | "pipeline_id" | "pipeline_name" | "params" | "started_at"> & { dry_run?: boolean }): void {
+export function createRun(run: Pick<RunRow, "id" | "namespace" | "pipeline_id" | "pipeline_name" | "params" | "started_at"> & { dry_run?: boolean; triggered_by?: string }): void {
   getDb().run(
-    `INSERT INTO pipeline_runs (id, namespace, pipeline_id, pipeline_name, status, params, started_at, dry_run)
-     VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
-    [run.id, run.namespace, run.pipeline_id, run.pipeline_name, run.params, run.started_at, run.dry_run ? 1 : 0],
+    `INSERT INTO pipeline_runs (id, namespace, pipeline_id, pipeline_name, status, params, started_at, dry_run, triggered_by)
+     VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+    [run.id, run.namespace, run.pipeline_id, run.pipeline_name, run.params, run.started_at, run.dry_run ? 1 : 0, run.triggered_by ?? null],
   );
 }
 
