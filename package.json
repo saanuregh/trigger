@@ -1,21 +1,22 @@
 {
   "name": "trigger",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "module": "index.ts",
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --hot index.ts",
+    "dev": "bun --hot index.ts start",
     "typecheck": "bunx tsc --noEmit",
     "build": "bun build.ts",
-    "start": "cd dist && bun index.js"
+    "start": "cd dist && bun index.js start",
+    "schema": "bun index.ts schema"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.988.0",
-    "@aws-sdk/client-codebuild": "^3.988.0",
-    "@aws-sdk/client-ecs": "^3.988.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.989.0",
+    "@aws-sdk/client-codebuild": "^3.989.0",
+    "@aws-sdk/client-ecs": "^3.989.0",
     "bun-plugin-tailwind": "^0.1.2",
-    "lucide-react": "^0.563.0",
+    "lucide-react": "^0.564.0",
     "pino": "^10.3.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

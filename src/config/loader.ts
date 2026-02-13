@@ -124,7 +124,10 @@ async function loadNamespaceConfig(source: NamespaceSource): Promise<NamespaceCo
 function parseAndValidate(text: string, label: string): PipelineConfig {
   let parsed: unknown;
   try {
-    parsed = Bun.JSONC.parse(text);
+    parsed = Bun.YAML.parse(text);
+    if (Array.isArray(parsed)) {
+      throw new Error("Multi-document YAML is not supported — config must be a single document");
+    }
   } catch (err) {
     const msg = errorMessage(err);
     throw new Error(`Failed to parse config ${label}: ${msg}`);

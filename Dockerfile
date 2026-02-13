@@ -26,4 +26,4 @@ USER bun
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD bun -e "const r = await fetch('http://localhost:3000/health'); if (!r.ok) process.exit(1)"
 
-CMD ["bun", "index.js"]
+CMD ["bun", "index.js", "start"]
