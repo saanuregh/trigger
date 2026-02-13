@@ -1,10 +1,5 @@
 import { z } from "zod";
-import configPage from "../../public/config.html";
-import homepage from "../../public/index.html";
-import loginPage from "../../public/login.html";
-import namespacePage from "../../public/namespace.html";
-import pipelinePage from "../../public/pipeline.html";
-import runPage from "../../public/run.html";
+import appPage from "../../public/index.html";
 import { authed, canAccessNamespace, canAccessPipeline, filterAccessibleConfigs } from "../auth/access.ts";
 import { exchangeCode, getAuthUrl, getOIDCConfig } from "../auth/oidc.ts";
 import type { AuthSession } from "../auth/session.ts";
@@ -84,12 +79,8 @@ function terminalSSEResponse(status: string): Response {
 const OAUTH_STATE_COOKIE = "trigger_oauth_state";
 
 export const routes = {
-  "/": homepage,
-  "/login": loginPage,
-  "/:ns": namespacePage,
-  "/:ns/:pipeline": pipelinePage,
-  "/:ns/:pipeline/config": configPage,
-  "/:ns/:pipeline/runs/:runId": runPage,
+  // SPA catch-all — exact/param routes below take precedence (Bun route ordering)
+  "/*": appPage,
 
   "/health": () => Response.json({ status: "ok" }),
 
@@ -483,7 +474,7 @@ export const routes = {
 
 export function fetch(req: Request) {
   const url = new URL(req.url);
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/sse/")) {
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/sse/") || url.pathname.startsWith("/auth/")) {
     logger.warn({ method: req.method, path: url.pathname }, "unmatched API route");
   }
   return new Response("Not found", { status: 404 });

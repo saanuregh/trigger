@@ -1,11 +1,11 @@
 import tailwind from "bun-plugin-tailwind";
 
-const htmlEntries = Array.from(new Bun.Glob("public/*.html").scanSync("."));
-
 const result = await Bun.build({
-  entrypoints: ["index.ts", ...htmlEntries],
+  entrypoints: ["index.ts", "public/index.html"],
   outdir: "dist",
   target: "bun",
+  minify: true,
+  drop: ["debugger"],
   plugins: [tailwind],
 });
 

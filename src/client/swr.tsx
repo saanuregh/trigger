@@ -1,7 +1,5 @@
-import { createRoot } from "react-dom/client";
-import useSWR, { SWRConfig } from "swr";
+import useSWR from "swr";
 import type { NamespaceConfigSummary } from "../types.ts";
-import { ToastProvider } from "./components/Toast.tsx";
 
 export interface User {
   email: string;
@@ -19,16 +17,6 @@ export function fetcher(url: string) {
     if (!r.ok) throw new Error(r.statusText || `HTTP ${r.status}`);
     return r.json();
   });
-}
-
-export function renderPage(Page: () => React.JSX.Element) {
-  createRoot(document.getElementById("root")!).render(
-    <SWRConfig value={{ fetcher }}>
-      <ToastProvider>
-        <Page />
-      </ToastProvider>
-    </SWRConfig>,
-  );
 }
 
 export function useConfigs() {

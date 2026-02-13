@@ -6,10 +6,10 @@ import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { HomeSkeleton } from "./components/Skeleton.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { renderPage, useConfigs, useUser } from "./swr.tsx";
+import { useConfigs, useUser } from "./swr.tsx";
 import { handleUnauthorized } from "./utils.ts";
 
-function HomePage() {
+export function HomePage() {
   const { data: configs, mutate } = useConfigs();
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
@@ -73,7 +73,7 @@ function HomePage() {
                   </div>
                 </Card>
               ) : (
-                <CardLink key={ns.namespace} href={`/${ns.namespace}`} className="p-4">
+                <CardLink key={ns.namespace} to={`/${ns.namespace}`} className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-blue-900/30 flex items-center justify-center shrink-0">
                       <FolderOpen size={18} className="text-blue-400" />
@@ -94,5 +94,3 @@ function HomePage() {
     </Layout>
   );
 }
-
-renderPage(HomePage);

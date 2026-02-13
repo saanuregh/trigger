@@ -6,11 +6,12 @@ import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { NamespaceSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge } from "./components/StatusBadge.tsx";
-import { renderPage, useConfigs } from "./swr.tsx";
+import { Link, useRoute } from "./router.tsx";
+import { useConfigs } from "./swr.tsx";
 import { formatTime } from "./utils.ts";
 
-function NamespacePage() {
-  const ns = location.pathname.split("/")[1]!;
+export function NamespacePage() {
+  const { ns } = useRoute().params as { ns: string };
 
   const { data: configs, error: configsError } = useConfigs();
   const nsConfig = configs?.find((c) => c.namespace === ns);
@@ -64,14 +65,14 @@ function NamespacePage() {
           Running
         </div>
         {runningPipelines.map((run) => (
-          <a
+          <Link
             key={run.pipeline_id}
-            href={`/${ns}/${run.pipeline_id}`}
+            to={`/${ns}/${run.pipeline_id}`}
             className="flex items-center gap-2 px-2 py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-gray-800 rounded-md no-underline transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0" />
             {run.pipeline_name}
-          </a>
+          </Link>
         ))}
       </div>
     ) : undefined;
@@ -87,7 +88,7 @@ function NamespacePage() {
             {nsConfig.pipelines.map((p) => {
               const lastRun = latestRuns.get(p.id);
               return (
-                <CardLink key={p.id} href={`/${ns}/${p.id}`} className="flex items-center justify-between px-4 py-3">
+                <CardLink key={p.id} to={`/${ns}/${p.id}`} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center shrink-0">
                       <GitBranch size={16} className="text-gray-400" />
@@ -119,5 +120,3 @@ function NamespacePage() {
     </Layout>
   );
 }
-
-renderPage(NamespacePage);

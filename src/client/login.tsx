@@ -1,7 +1,6 @@
 import { LogIn, Workflow } from "lucide-react";
-import { createRoot } from "react-dom/client";
 
-function LoginPage() {
+export function LoginPage() {
   const params = new URLSearchParams(location.search);
   const returnUrl = params.get("return") ?? "/";
   const error = params.get("error");
@@ -30,5 +29,3 @@ function LoginPage() {
     </div>
   );
 }
-
-createRoot(document.getElementById("root")!).render(<LoginPage />);

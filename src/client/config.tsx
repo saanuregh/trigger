@@ -5,7 +5,8 @@ import type { ParamDef } from "../types.ts";
 import { Card } from "./components/Card.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
-import { renderPage, useNsDisplayName } from "./swr.tsx";
+import { useRoute } from "./router.tsx";
+import { useNsDisplayName } from "./swr.tsx";
 
 interface StepConfig {
   id: string;
@@ -172,10 +173,8 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
   );
 }
 
-function ConfigPage() {
-  const segments = location.pathname.split("/");
-  const ns = segments[1]!;
-  const pipelineId = segments[2]!;
+export function ConfigPage() {
+  const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
   const nsDisplayName = useNsDisplayName(ns);
   const { data: config, error } = useSWR<PipelineConfig>(`/api/pipelines/${ns}/${pipelineId}/config`);
@@ -260,5 +259,3 @@ function ConfigPage() {
     </Layout>
   );
 }
-
-renderPage(ConfigPage);

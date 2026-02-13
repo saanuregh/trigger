@@ -10,7 +10,8 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { PipelineSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { renderPage, useNsDisplayName } from "./swr.tsx";
+import { Link, navigate, useRoute } from "./router.tsx";
+import { useNsDisplayName } from "./swr.tsx";
 import { formatDuration, formatTime } from "./utils.ts";
 
 const PER_PAGE = 20;
@@ -21,10 +22,8 @@ function runDuration(run: RunRow): string {
   return "-";
 }
 
-function PipelinePage() {
-  const segments = location.pathname.split("/");
-  const ns = segments[1]!;
-  const pipelineId = segments[2]!;
+export function PipelinePage() {
+  const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
   const nsDisplayName = useNsDisplayName(ns);
   const [page, setPage] = useState(1);
@@ -48,7 +47,7 @@ function PipelinePage() {
 
   const handleRunStarted = (runId: string) => {
     toast("Pipeline run started", "success");
-    location.href = `/${ns}/${pipelineId}/runs/${runId}`;
+    navigate(`/${ns}/${pipelineId}/runs/${runId}`);
   };
 
   const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="runs" />;
@@ -100,12 +99,12 @@ function PipelinePage() {
                 {runs.map((run) => (
                   <tr key={run.id} className="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
                     <td className="py-2.5">
-                      <a
-                        href={`/${ns}/${pipelineId}/runs/${run.id}`}
+                      <Link
+                        to={`/${ns}/${pipelineId}/runs/${run.id}`}
                         className="text-blue-400 hover:text-blue-300 no-underline font-mono text-xs"
                       >
                         {run.id.slice(0, 8)}
-                      </a>
+                      </Link>
                       {run.dry_run === 1 && (
                         <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-900/60 text-purple-300">
                           DRY
@@ -131,5 +130,3 @@ function PipelinePage() {
     </Layout>
   );
 }
-
-renderPage(PipelinePage);

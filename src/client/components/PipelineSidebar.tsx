@@ -1,3 +1,5 @@
+import { Link } from "../router.tsx";
+
 interface PipelineSidebarProps {
   ns: string;
   pipelineId: string;
@@ -11,12 +13,12 @@ const inactiveStyle = `${base} text-gray-400 hover:text-white hover:bg-gray-800 
 export function PipelineSidebar({ ns, pipelineId, active }: PipelineSidebarProps) {
   return (
     <nav className="space-y-1">
-      <a href={`/${ns}/${pipelineId}`} className={active === "runs" ? activeStyle : inactiveStyle}>
+      <Link to={`/${ns}/${pipelineId}`} className={active === "runs" ? activeStyle : inactiveStyle}>
         Runs
-      </a>
-      <a href={`/${ns}/${pipelineId}/config`} className={active === "config" ? activeStyle : inactiveStyle}>
+      </Link>
+      <Link to={`/${ns}/${pipelineId}/config`} className={active === "config" ? activeStyle : inactiveStyle}>
         Config
-      </a>
+      </Link>
     </nav>
   );
 }

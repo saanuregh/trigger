@@ -10,7 +10,8 @@ import { LogViewer } from "./components/LogViewer.tsx";
 import { RunSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { renderPage, useNsDisplayName } from "./swr.tsx";
+import { useRoute } from "./router.tsx";
+import { useNsDisplayName } from "./swr.tsx";
 import { formatTime, handleUnauthorized, requestNotificationPermission, showRunNotification } from "./utils.ts";
 
 const stepCircleStyles: Record<string, string> = {
@@ -19,7 +20,7 @@ const stepCircleStyles: Record<string, string> = {
   failed: "border-red-800/50 bg-red-950/30",
 };
 
-function RunPage() {
+export function RunPage() {
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [cancelling, setCancelling] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
@@ -36,10 +37,7 @@ function RunPage() {
     setLogs((prev) => prev.concat(batch));
   }, []);
 
-  const segments = location.pathname.split("/");
-  const ns = segments[1]!;
-  const pipelineId = segments[2]!;
-  const runId = segments[4]!;
+  const { ns, pipelineId, runId } = useRoute().params as { ns: string; pipelineId: string; runId: string };
 
   const nsDisplayName = useNsDisplayName(ns);
 
@@ -255,5 +253,3 @@ function RunPage() {
     </Layout>
   );
 }
-
-renderPage(RunPage);

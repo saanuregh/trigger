@@ -1,5 +1,6 @@
 import { ChevronRight, LogOut, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
+import { Link } from "../router.tsx";
 import { useUser } from "../swr.tsx";
 
 interface Breadcrumb {
@@ -40,20 +41,20 @@ export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps)
     <div className="flex flex-col h-screen">
       <header className="bg-gray-900 border-b border-gray-800 px-4 h-11 flex items-center justify-between shrink-0 shadow-md shadow-black/10">
         <nav className="flex items-center gap-1.5 text-sm">
-          <a
-            href="/"
+          <Link
+            to="/"
             className="inline-flex items-center gap-1.5 font-bold tracking-wide text-white no-underline hover:text-blue-400 transition-colors"
           >
             <Workflow size={16} className="text-blue-400" />
             Trigger
-          </a>
+          </Link>
           {breadcrumbs?.map((crumb, i) => (
             <span key={i} className="inline-flex items-center gap-1.5">
               <ChevronRight size={14} className="text-gray-600" />
               {crumb.href ? (
-                <a href={crumb.href} className="text-gray-400 hover:text-white no-underline transition-colors max-w-48 truncate">
+                <Link to={crumb.href} className="text-gray-400 hover:text-white no-underline transition-colors max-w-48 truncate">
                   {crumb.label}
-                </a>
+                </Link>
               ) : (
                 <span className="text-gray-200 max-w-48 truncate">{crumb.label}</span>
               )}
