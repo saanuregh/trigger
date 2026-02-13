@@ -38,7 +38,13 @@ public/                       # HTML page shells (each loads one React entry poi
 src/
   server/
     index.ts                  # startServer(): Bun.serve lifecycle, startup, shutdown
-    routes.ts                 # All route handlers, SSE, helpers
+    routes.ts                 # Route map (path → controller handler) + fetch/error fallbacks
+    controllers/
+      helpers.ts              # Shared utilities: getConfigs, findNsConfig, SSE helpers, types
+      auth.ts                 # Auth flow handlers (login, callback, logout, me)
+      pipelines.ts            # Pipeline CRUD + trigger + config listing
+      runs.ts                 # Run listing, detail, logs, cancel, SSE streaming
+      config.ts               # JSON Schema endpoint + config refresh
   types.ts                    # Shared types (imported by server + client)
   env.ts                      # Env var access
   events.ts                   # In-memory pub/sub event bus
