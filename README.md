@@ -7,9 +7,10 @@ Trigger and monitor deployment pipelines. Declarative YAML pipeline configs fetc
 - **Runtime:** [Bun](https://bun.sh) 1.3+
 - **CLI:** `index.ts` dispatches subcommands (`start`, `validate`) via `util.parseArgs`
 - **Server:** Raw `Bun.serve()` with route-map API (no framework) in `src/server/`
-- **Frontend:** React 19 (client-side MPA), SWR, Tailwind CSS 4, Lucide icons
+- **Frontend:** React 19 (client-side SPA), SWR, Tailwind CSS 4, Lucide icons
 - **Database:** SQLite via `bun:sqlite` (WAL mode)
 - **Real-time:** Server-Sent Events (SSE)
+- **Auth:** Opt-in OIDC SSO with group-based ACLs
 - **Infra actions:** AWS CodeBuild, ECS (restart + run task), CloudWatch Logs, Cloudflare cache purge
 
 ## Prerequisites
@@ -60,9 +61,23 @@ TRIGGER_STAGING_CONFIG=https://github.com/saanuregh/trigger/blob/main/examples/c
 
 GitHub URLs are converted to `raw.githubusercontent.com` URLs at fetch time. A `GITHUB_TOKEN` is needed for private repos.
 
-### Network security
+### Authentication (optional)
 
-No built-in authentication. The app is designed to run behind a VPN or in a private network.
+Auth is opt-in via OIDC. Without it, the app is designed to run behind a VPN or in a private network.
+
+To enable SSO:
+
+```
+OIDC_ISSUER=https://auth.example.com/realms/myapp
+OIDC_CLIENT_ID=trigger
+OIDC_CLIENT_SECRET=xxx
+TRIGGER_ADMINS=admin@example.com,admin2@example.com
+```
+
+When enabled, the app supports:
+- **OIDC SSO** — authorization code flow with any OpenID Connect provider
+- **Group-based ACLs** — restrict namespace/pipeline access to specific groups (configured in YAML)
+- **Super admins** — emails in `TRIGGER_ADMINS` bypass all access controls
 
 ### Pipeline config files
 

@@ -6,7 +6,7 @@ Trigger is a single-process Bun application that serves a web UI, exposes JSON A
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Browser (React MPA)                                            │
+│  Browser (React SPA)                                            │
 │  ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌──────────────┐  │
 │  │ Home     │  │ Namespace  │  │ Pipeline │  │ Run (+ logs) │  │
 │  └────┬─────┘  └─────┬──────┘  └────┬─────┘  └──────┬───────┘  │
@@ -16,7 +16,7 @@ Trigger is a single-process Bun application that serves a web UI, exposes JSON A
 ┌───────┴──────────────┴──────────────┴────────────────┴──────────┐
 │  Bun.serve()  (src/server/)                                     │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │ Route map: HTML shells, JSON APIs, SSE endpoint          │   │
+│  │ Route map: SPA shell, JSON APIs, SSE endpoint, Auth      │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │       │                                                         │
 │  ┌────┴──────┐   ┌───────────┐   ┌───────────┐   ┌──────────┐  │
@@ -49,31 +49,37 @@ Server lifecycle lives in `src/server/index.ts`. Route handlers are organized in
 
 | Pattern | Purpose |
 |---------|---------|
-| `/`, `/:ns`, `/:ns/:pipeline`, ... | HTML page shells (static, Bun-bundled) |
-| `/api/configs`, `/api/runs`, ... | JSON read APIs |
+| `/*` | SPA HTML shell (Bun-bundled, serves all client routes) |
+| `/health` | Health check |
+| `/auth/login`, `/auth/callback` | OIDC login flow |
+| `/api/auth/info`, `/api/me`, `POST /api/auth/logout` | Auth info endpoints |
+| `/api/configs`, `/api/runs`, `/api/runs/:runId`, ... | JSON read APIs |
 | `POST /api/pipelines/:ns/:id/run` | Trigger a pipeline |
 | `POST /api/runs/:runId/cancel` | Cancel a running pipeline |
+| `/api/config/schema`, `POST /api/config/refresh` | Config management |
 | `/sse/runs/:runId` | SSE stream for live run updates |
 
-On startup, the server initializes the database, recovers stale runs (marking them as failed), and pre-loads pipeline configs. On SIGTERM/SIGINT, it cancels all active pipelines and exits.
+On startup, the server initializes the database, recovers stale runs (marking them as failed), initializes builtin + custom actions, rebuilds the config schema, pre-loads pipeline configs, and (if auth enabled) fetches the OIDC discovery document. On SIGTERM/SIGINT, it cancels all active pipelines, waits 2s for drain, closes the DB, and exits.
 
-## Frontend (MPA)
+## Frontend (SPA)
 
-Each page is an independent HTML shell in `public/` that loads a single React entry point from `src/client/`. There is no client-side router — navigation uses standard `<a>` tags between pages.
+A single HTML shell (`public/index.html`) loads `src/client/app.tsx`, which mounts a React 19 root with SWR and Toast providers wrapping a custom client-side router.
 
 ```
-public/index.html       → src/client/home.tsx       (namespace grid)
-public/namespace.html    → src/client/namespace.tsx   (pipeline list + run history)
-public/pipeline.html     → src/client/pipeline.tsx    (param form + trigger button)
-public/run.html          → src/client/run.tsx         (step status + live log viewer)
-public/config.html       → src/client/config.tsx      (raw pipeline config viewer)
+public/index.html  →  src/client/app.tsx  →  RouterProvider (src/client/router.tsx)
+                                                ├── /              → HomePage
+                                                ├── /login         → LoginPage
+                                                ├── /:ns           → NamespacePage
+                                                ├── /:ns/:id       → PipelinePage
+                                                ├── /:ns/:id/config → ConfigPage
+                                                └── /:ns/:id/runs/:runId → RunPage
 ```
 
-Each entry point calls `renderPage(Component)` from `src/client/swr.tsx`, which mounts the component into `#root` with SWR and Toast providers. Data is fetched client-side via SWR hooks hitting the JSON APIs.
+The router (`src/client/router.tsx`) implements pattern matching with named params, a `navigate()` function using `pushState`, and a `<Link>` component that intercepts clicks for client-side navigation. Route params are accessed via `RouteContext`.
 
-The HTML shells include inline skeleton markup that matches the final layout, so the page renders immediately while React hydrates and fetches data. This eliminates a flash of empty content.
+Data is fetched client-side via SWR hooks hitting the JSON APIs. 401 responses redirect to `/login`.
 
-**Server/client boundary:** Client code may only import from `src/types.ts` and `src/client/`. Server-only modules (`src/db/`, `src/pipeline/`, `src/config/`) must not be imported from client code — Bun's bundler would pull in `bun:sqlite` and Node APIs.
+**Server/client boundary:** Client code may only import from `src/types.ts` and `src/client/`. Server-only modules (`src/db/`, `src/pipeline/`, `src/config/`, `src/auth/`) must not be imported from client code — Bun's bundler would pull in `bun:sqlite` and Node APIs.
 
 ## Pipeline Config System
 
@@ -188,7 +194,7 @@ SQLite via `bun:sqlite` with WAL mode, stored at `$DATA_DIR/trigger.db`.
 **Tables:**
 
 ```sql
-pipeline_runs (id, namespace, pipeline_id, pipeline_name, status, params, started_at, finished_at, error, dry_run)
+pipeline_runs (id, namespace, pipeline_id, pipeline_name, status, params, started_at, finished_at, error, dry_run, triggered_by)
 pipeline_steps (id, run_id, step_id, step_name, action, status, started_at, finished_at, output, error, log_file)
 ```
 
@@ -196,10 +202,35 @@ pipeline_steps (id, run_id, step_id, step_name, action, status, started_at, fini
 
 Migrations are auto-applied at startup. New columns (like `dry_run`) are added via `ALTER TABLE` with a try/catch for idempotency.
 
+## Authentication & Authorization (src/auth/)
+
+Auth is opt-in — when `OIDC_ISSUER` is set, the full auth system activates. When unset, all requests get a stub super-admin session (designed for VPN/private network deployment).
+
+**OIDC flow (`src/auth/oidc.ts`):**
+1. `/auth/login` redirects to the OIDC provider with a random `state` param.
+2. `/auth/callback` exchanges the code for tokens, extracts user info + groups from the ID token.
+3. Session is signed and stored as an HMAC cookie (24h TTL).
+
+**Session management (`src/auth/session.ts`):**
+- HMAC-SHA256 signed cookies using `OIDC_CLIENT_SECRET` as the key.
+- Payload: email, name, groups, expiry. Base64url-encoded.
+- `Secure` flag set in production.
+
+**Access control (`src/auth/access.ts`):**
+- `authed()` HOF wraps route handlers — returns 401 if no valid session.
+- **Namespace-level ACLs:** `access.groups` in config restricts which groups can see the namespace.
+- **Pipeline-level ACLs:** Per-pipeline `access.groups` overrides namespace-level access.
+- **Super admins:** Emails in `TRIGGER_ADMINS` bypass all ACLs.
+- ACL check is group intersection: user must belong to at least one allowed group.
+
+## Logging
+
+Structured JSON logging via Pino (`src/logger.ts`). All server components log through the shared `logger` instance. Step execution logs are written to individual files (one per step) in `$DATA_DIR/` and streamed via SSE to the browser.
+
 ## Build
 
 `build.ts` uses `Bun.build()` with:
-- Entry points: `index.ts` + all `public/*.html` files.
+- Entry points: `index.ts` + `public/index.html`.
 - Target: `bun` (server bundle).
 - Plugins: `bun-plugin-tailwind` (required explicitly for production — the `bunfig.toml` `[serve.static]` config only applies to the dev server).
 - Output: `dist/`.
