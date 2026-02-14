@@ -17,8 +17,10 @@ Use Bun for everything. Bun auto-loads `.env`.
 ## Architecture
 
 - **CLI:** `index.ts` is the entry point (`start`, `validate` subcommands) using `util.parseArgs`. Server code lives in `src/server/`.
-- **Server:** Raw `Bun.serve()` with `routes` API (no framework). Server lifecycle in `src/server/index.ts`, route handlers in `src/server/routes.ts`. HTML page shells served via Bun's fullstack bundler.
-- **Frontend:** Client-side React 19 MPA. No SSR — components fetch JSON APIs on mount via SWR. Pages are separate HTML shells in `public/` with React entry points in `src/client/`.
+- **Server:** Raw `Bun.serve()` with `routes` API (no framework). Server lifecycle in `src/server/index.ts`, route map in `src/server/routes.ts`, domain-based controllers in `src/server/controllers/`.
+- **Frontend:** Client-side React 19 SPA. No SSR — a single HTML shell (`public/index.html`) loads `src/client/app.tsx`, which uses a custom client-side router (`src/client/router.tsx`). Data fetched via SWR hooks hitting JSON APIs.
+- **Auth:** Opt-in OIDC SSO (`src/auth/`). When `OIDC_ISSUER` is set, auth code flow + HMAC-signed session cookies + group-based ACLs. Super admin bypass via `TRIGGER_ADMINS`.
+- **Logging:** Structured JSON logging via Pino (`src/logger.ts`).
 - **Database:** `bun:sqlite` with WAL mode. Schema in `src/db/index.ts`, queries in `src/db/queries.ts`.
 - **Real-time:** SSE via raw `ReadableStream` on server, `EventSource` on client. In-memory pub/sub in `src/events.ts`. Browser notifications (Web Notifications API) fire on pipeline completion.
 - **Config:** Declarative YAML pipeline configs fetched from GitHub raw content API (single HTTP request per file). Local paths also supported. Validated at load time via Zod schemas (`src/config/schema.ts`) with cross-field template reference validation. Template strings resolved at execution time.
@@ -34,7 +36,9 @@ bunfig.toml                   # Bun config (dev Tailwind plugin)
 tsconfig.json                 # TypeScript config (strict, noEmit)
 mise.toml                     # Toolchain versions (Bun 1.3)
 .env.example                  # Env var reference
-public/                       # HTML page shells (each loads one React entry point)
+prek.toml                     # Pre-commit hooks (lint, typecheck, validate)
+public/
+  index.html                  # Single HTML shell (SPA entry point)
 packages/
   trigger-sdk/
     index.ts                  # SDK re-exports from src/pipeline/types.ts (z, defineAction, template helpers)
@@ -50,8 +54,13 @@ src/
       config.ts               # Dynamic JSON Schema endpoint + config refresh
   types.ts                    # Shared types (imported by server + client)
   env.ts                      # Env var access
+  logger.ts                   # Pino structured logger
   events.ts                   # In-memory pub/sub event bus
   input.css                   # Tailwind CSS entry point
+  auth/
+    session.ts                # HMAC-signed session cookies (24h TTL)
+    oidc.ts                   # OpenID Connect discovery + auth code flow
+    access.ts                 # Group-based ACLs, authed() HOF, super admin bypass
   config/
     schema.ts                 # Template helpers, buildSchema (Zod), buildJSONSchema (editor)
     types.ts                  # Re-exports from schema.ts + resolved action config types
@@ -74,12 +83,15 @@ src/
       trigger-pipeline.ts     # Trigger another pipeline (uses app internals)
       aws-utils.ts            # Shared AWS helpers (sleep, log streaming)
   client/
+    app.tsx                   # SPA root: React 19, SWR provider, route definitions
+    router.tsx                # Custom client-side router (pattern matching, Link, navigate)
     swr.tsx                   # SWR config, fetcher, shared hooks
-    home.tsx                  # Home page (namespace list)
+    home.tsx                  # Home page (namespace grid)
     namespace.tsx             # Namespace page (pipeline list)
     pipeline.tsx              # Pipeline page (param form + trigger)
     run.tsx                   # Run detail page (steps + live logs)
     config.tsx                # Pipeline config viewer
+    login.tsx                 # SSO login page
     utils.ts                  # Client-side utilities
     components/               # Reusable React components
 examples/
@@ -95,7 +107,7 @@ examples/
 - `src/pipeline/types.ts` is the action API barrel — re-exports `z`, `defineAction`, `ActionContext`, and all template helpers. Both builtin actions and the SDK import from here.
 - AWS clients use lazy initialization (created on first use per region, not at module load).
 - Status types (`RunStatus`, `StepStatus`) are defined in `src/types.ts`.
-- MPA approach: each page is a separate HTML shell + React entry point. Navigation via `<a>` tags, not client-side routing.
+- SPA approach: single HTML shell (`public/index.html`) with client-side routing via `src/client/router.tsx`. Navigation via `<Link>` component.
 - One active run per pipeline (keyed on `namespace:pipelineId`). Concurrent trigger returns 409.
 - Unknown actions are handled gracefully: config validation skips them, executor marks their steps as skipped.
 
@@ -131,6 +143,9 @@ Pipeline configs are YAML files. Key features:
 - `PORT` — server port (default `3000`).
 - `DATA_DIR` — SQLite database and log file directory (default `./data`).
 - `ACTIONS_DIR` — custom actions directory (default `./actions/`).
+- `OIDC_ISSUER` — OIDC provider URL (set to enable auth).
+- `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` — OIDC client credentials.
+- `TRIGGER_ADMINS` — comma-separated admin emails (bypass all ACLs).
 
 ## Testing
 
