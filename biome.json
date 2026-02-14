@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.3.15/schema.json",
   "files": {
-    "includes": ["**", "!dist", "!schema"]
+    "includes": ["**", "!dist", "!schema", "!examples/custom-actions"]
   },
   "formatter": {
     "indentStyle": "space",
@@ -24,11 +24,13 @@
     "rules": {
       "recommended": true,
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "useNodejsImportProtocol": "off"
       },
       "suspicious": {
         "noExplicitAny": "off",
-        "noArrayIndexKey": "off"
+        "noArrayIndexKey": "off",
+        "noThenProperty": "off"
       },
       "complexity": {
         "noForEach": "off"

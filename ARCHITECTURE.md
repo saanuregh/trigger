@@ -34,10 +34,12 @@ Trigger is a single-process Bun application that serves a web UI, exposes JSON A
 
 ## CLI (index.ts)
 
-`index.ts` is a CLI dispatcher using `util.parseArgs` with two subcommands:
+`index.ts` is the entry point using `util.parseArgs`:
 
 - **`start`** — starts the server (the default action in production)
-- **`schema`** — generates `schema/pipeline-config.schema.json` from the Zod schemas and exits
+- **`validate`** — validates YAML config files against the Zod schema (all registered actions) and exits
+
+JSON Schema is served dynamically at `/api/config/schema` — it includes per-action `if/then` typing for all registered actions (builtin + custom) with `$switch` support.
 
 ## Server (src/server/)
 
@@ -138,13 +140,25 @@ Key = "namespace:pipelineId"
 
 ### Action handlers
 
-Each action handler in `src/pipeline/actions/` receives:
-- `config` — the resolved (template-expanded) action config.
-- `ctx: ActionContext` — `{ runId, stepId, region, signal, log }`.
+Each action is a self-contained file that default-exports `defineAction({ name, schema, handler })`. The Zod config schema is defined inline in the action file — no separate schema file. All actions import `z`, `defineAction`, and template helpers from a single barrel: `src/pipeline/types.ts`.
 
-Handlers are long-running async functions that poll AWS APIs, stream logs, and respect the abort signal for cancellation.
+The handler receives:
+- `config` — the resolved (template-expanded) action config, typed by the Zod schema.
+- `ctx: ActionContext` — `{ runId, stepId, region, signal, log, warn, executePipeline? }`.
 
-**`trigger-pipeline`** is special: it calls `executePipeline()` recursively (via a registered callback to avoid circular imports) and waits for the child run to complete. It includes circular dependency detection via a `callStack` array.
+Handlers are long-running async functions that poll AWS APIs, stream logs, and respect the abort signal for cancellation. Unknown actions are handled gracefully — the executor skips the step instead of failing the entire pipeline.
+
+**`trigger-pipeline`** is the exception to self-containment: it imports app internals (`db`, `events`, `types`) because it needs to orchestrate cross-pipeline execution. It calls `ctx.executePipeline()` (injected via ActionContext) and waits for the child run to complete. Circular dependency detection uses a `callStack` array.
+
+### SDK
+
+`packages/trigger-sdk/index.ts` is a pure re-export barrel from `src/pipeline/types.ts`. Custom action plugins import everything they need from `"trigger-sdk"`:
+
+```ts
+import { defineAction, z } from "trigger-sdk";
+```
+
+The SDK exports: `z`, `defineAction`, `ActionContext`, `CustomActionDefinition`, and all template helpers (`stringOrTemplate`, `numberOrTemplate`, `booleanOrTemplate`, `stringArrayOrTemplate`, `templateString`).
 
 ### AWS client pattern
 

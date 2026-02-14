@@ -1,21 +1,25 @@
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
-import { Writable } from "node:stream";
 import pino from "pino";
 import { loadAllConfigs } from "../config/loader.ts";
 import { resolveConfig } from "../config/template.ts";
-import type { ActionName, StepDef } from "../config/types.ts";
+import type { StepDef } from "../config/types.ts";
 import * as db from "../db/queries.ts";
 import { env } from "../env.ts";
 import { publish } from "../events.ts";
 import { type Logger, logger, stepLoggerOpts } from "../logger.ts";
 import { errorMessage, type ParamValues } from "../types.ts";
-import { executeCloudflare } from "./actions/cloudflare.ts";
-import { executeCodeBuild } from "./actions/codebuild.ts";
-import { executeEcsRestart } from "./actions/ecs-restart.ts";
-import { executeEcsTask } from "./actions/ecs-task.ts";
-import { executeTriggerPipeline, registerExecutor } from "./actions/trigger-pipeline.ts";
-import type { ActionContext, ActionHandler, ActivePipeline } from "./types.ts";
+import { clearRegistry, getAction, type RegisteredAction, registerAction } from "./action-registry.ts";
+import cloudflare from "./actions/cloudflare.ts";
+import codebuild from "./actions/codebuild.ts";
+import ecsRestart from "./actions/ecs-restart.ts";
+import ecsTask from "./actions/ecs-task.ts";
+import triggerPipeline from "./actions/trigger-pipeline.ts";
+import type { ActionContext } from "./types.ts";
+
+interface ActivePipeline {
+  runId: string;
+  abort: AbortController;
+}
 
 export class PipelineError extends Error {
   constructor(
@@ -97,7 +101,7 @@ export async function executePipeline(
     publish(runId, { type: "run:status", runId, status: "running" });
     log.info("pipeline started");
 
-    const logDir = join(env.DATA_DIR, "logs", runId);
+    const logDir = `${env.DATA_DIR}/logs/${runId}`;
     mkdirSync(logDir, { recursive: true });
 
     runSteps({
@@ -114,7 +118,9 @@ export async function executePipeline(
       region: nsConfig.aws_region,
       timeoutS: pipeline.timeout ?? DEFAULT_RUN_TIMEOUT_S,
       triggeredBy: options?.triggeredBy,
-    }).catch(() => {});
+    }).catch((err) => {
+      logger.error({ runId, error: errorMessage(err) }, "runSteps unexpected rejection");
+    });
 
     return runId;
   } catch (err) {
@@ -166,16 +172,17 @@ type StepResult = "success" | { failed: string } | "cancelled";
 
 function createStepLogger(runId: string, def: StepDef, logFile: string, stepIndex: number, totalSteps: number) {
   const fileDest = pino.destination({ dest: logFile, sync: false, minLength: 4096 });
-  const sseSink = new Writable({
-    decodeStrings: false,
-    write(data, _enc, cb) {
+  const sseSink = {
+    write(data: string) {
       try {
-        const str = typeof data === "string" ? data : data.toString();
-        publish(runId, { type: "log", ...JSON.parse(str) });
-      } catch {}
-      cb();
+        publish(runId, { type: "log", ...JSON.parse(data) });
+      } catch (err) {
+        if (err instanceof SyntaxError) return; // malformed log line — skip
+        logger.warn({ runId, error: errorMessage(err) }, "SSE sink write failed");
+      }
     },
-  });
+    end() {},
+  };
   const stepLog = pino(stepLoggerOpts, pino.multistream([{ stream: fileDest }, { stream: sseSink }])).child({
     runId,
     stepId: def.id,
@@ -188,8 +195,12 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
   return {
     stepLog,
     flush() {
-      fileDest.flushSync();
-      fileDest.end();
+      try {
+        fileDest.flushSync();
+        fileDest.end();
+      } catch (err) {
+        logger.warn({ runId, stepId: def.id, error: errorMessage(err) }, "failed to flush step log file");
+      }
     },
     log: (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog.info(fields, msg) : stepLog.info(msg)),
     warn: (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog.warn(fields, msg) : stepLog.warn(msg)),
@@ -199,7 +210,7 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
 async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, stepIndex: number): Promise<StepResult> {
   const { runId, log, logDir, dryRun, params, vars, region, abort, callStack, stepRecords } = opts;
   const resolvedConfig = resolveConfig(def.config, { params, vars });
-  const logFile = join(logDir, `${def.id}.log`);
+  const logFile = `${logDir}/${def.id}.log`;
   const sl = createStepLogger(runId, def, logFile, stepIndex, stepRecords.length);
 
   db.updateStepStatus(dbId, "running", { log_file: logFile });
@@ -207,11 +218,20 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
   sl.stepLog.info("step starting");
 
   try {
+    const action = getAction(def.action);
+    if (!action) {
+      sl.stepLog.warn(`action "${def.action}" not registered, skipping step`);
+      db.updateStepStatus(dbId, "skipped");
+      publishStepStatus(runId, log, def, "skipped");
+      return "success";
+    }
+
     if (dryRun) {
-      sl.stepLog.info("dry run, skipping action");
+      sl.stepLog.info("dry run, skipping action execution");
       sl.stepLog.info({ resolvedConfig }, "dry run resolved config");
       await new Promise((r) => setTimeout(r, 1000 + Math.random() * 3000));
       if (Math.random() < 0.05) throw new Error("simulated dry run failure");
+      db.updateStepStatus(dbId, "success");
     } else {
       const ctx: ActionContext = {
         runId,
@@ -222,18 +242,14 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
         warn: sl.warn,
         callStack,
         triggeredBy: opts.triggeredBy,
+        executePipeline,
       };
-      const handler = actionHandlers[def.action] as ActionHandler;
-      const result = await handler(resolvedConfig as never, ctx);
+      const result = await action.handler(resolvedConfig, ctx);
       db.updateStepStatus(dbId, "success", {
         output: result.output ? JSON.stringify(result.output) : undefined,
       });
-      publishStepStatus(runId, log, def, "success");
-      sl.stepLog.info("step completed");
-      return "success";
     }
 
-    db.updateStepStatus(dbId, "success");
     publishStepStatus(runId, log, def, "success");
     sl.stepLog.info("step completed");
     return "success";
@@ -300,13 +316,17 @@ async function runSteps(opts: RunStepsOptions) {
   }
 }
 
-const actionHandlers: { [K in ActionName]: ActionHandler<K> } = {
-  codebuild: executeCodeBuild,
-  "ecs-restart": executeEcsRestart,
-  "ecs-task": executeEcsTask,
-  "cloudflare-purge": executeCloudflare,
-  "trigger-pipeline": executeTriggerPipeline,
-};
+export function initBuiltinActions(): void {
+  clearRegistry();
+  for (const action of [codebuild, ecsRestart, ecsTask, cloudflare, triggerPipeline]) {
+    registerAction({
+      name: action.name,
+      schema: action.schema,
+      handler: action.handler as RegisteredAction["handler"],
+      builtin: true,
+    });
+  }
+}
 
 export function cancelPipeline(runId: string): boolean {
   for (const [, active] of activePipelines) {
@@ -336,5 +356,3 @@ export function recoverStaleRuns(): void {
     }
   }
 }
-
-registerExecutor(executePipeline);

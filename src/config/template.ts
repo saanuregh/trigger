@@ -51,7 +51,11 @@ function resolveExpression(expr: string, ctx: ResolveContext): unknown {
   return val;
 }
 
-export function resolveConfig(value: unknown, ctx: ResolveContext): unknown {
+const MAX_RESOLVE_DEPTH = 50;
+
+export function resolveConfig(value: unknown, ctx: ResolveContext, depth = 0): unknown {
+  if (depth > MAX_RESOLVE_DEPTH)
+    throw new Error(`Template resolution exceeded maximum depth of ${MAX_RESOLVE_DEPTH} — possible circular $switch`);
   if (value === null || value === undefined) return value;
 
   if (typeof value === "string") {
@@ -61,14 +65,25 @@ export function resolveConfig(value: unknown, ctx: ResolveContext): unknown {
     }
 
     if (value.includes("{{")) {
-      return value.replace(TEMPLATE_RE, (_, expr) => String(resolveExpression(expr, ctx)));
+      return value.replace(TEMPLATE_RE, (_, expr) => {
+        const resolved = resolveExpression(expr, ctx);
+        if (resolved === null || resolved === undefined) {
+          throw new Error(`Template {{${expr.trim()}}} resolved to ${String(resolved)} in a string interpolation context`);
+        }
+        if (typeof resolved === "object") {
+          throw new Error(
+            `Template {{${expr.trim()}}} resolved to ${Array.isArray(resolved) ? "an array" : "an object"} in a string interpolation context — use a full-string template instead`,
+          );
+        }
+        return String(resolved);
+      });
     }
 
     return value;
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => resolveConfig(item, ctx));
+    return value.map((item) => resolveConfig(item, ctx, depth + 1));
   }
 
   if (typeof value === "object") {
@@ -84,12 +99,12 @@ export function resolveConfig(value: unknown, ctx: ResolveContext): unknown {
         throw new Error(`$switch on "${paramName}": no case for "${paramValue}" and no default`);
       }
 
-      return resolveConfig(selected, ctx);
+      return resolveConfig(selected, ctx, depth + 1);
     }
 
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
-      result[k] = resolveConfig(v, ctx);
+      result[k] = resolveConfig(v, ctx, depth + 1);
     }
     return result;
   }

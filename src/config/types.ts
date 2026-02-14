@@ -1,51 +1,23 @@
-import type { ParamValues } from "../types.ts";
-import type { PipelineDef } from "./schema.ts";
+import type { ParamDef } from "../types.ts";
 
-export type { ActionName, PipelineConfig, PipelineDef, StepDef } from "./schema.ts";
+export type { PipelineConfig } from "./schema.ts";
 
-export interface CodeBuildActionConfig {
-  project_name: string;
-  env_vars?: Record<string, string | { value: string; type: "PLAINTEXT" | "PARAMETER_STORE" | "SECRETS_MANAGER" }>;
-  source_version?: string;
+export interface StepDef {
+  id: string;
+  name: string;
+  action: string;
+  config: unknown;
 }
 
-export interface EcsRestartActionConfig {
-  cluster: string;
-  services: string[];
+export interface PipelineDef {
+  id: string;
+  name: string;
+  description?: string;
+  confirm?: boolean;
   timeout?: number;
-}
-
-export interface EcsTaskActionConfig {
-  cluster: string;
-  task_definition: string;
-  container_name: string;
-  command: string[];
-  subnets: string[];
-  security_groups: string[];
-  launch_type?: "FARGATE" | "EC2";
-  assign_public_ip?: boolean;
-  timeout?: number;
-  log_group?: string;
-  log_stream_prefix?: string;
-}
-
-export interface CloudflarePurgeActionConfig {
-  urls?: string[];
-  purge_everything?: boolean;
-}
-
-export interface TriggerPipelineActionConfig {
-  namespace: string;
-  pipeline_id: string;
-  params?: ParamValues;
-}
-
-export interface ActionConfigMap {
-  codebuild: CodeBuildActionConfig;
-  "ecs-restart": EcsRestartActionConfig;
-  "ecs-task": EcsTaskActionConfig;
-  "cloudflare-purge": CloudflarePurgeActionConfig;
-  "trigger-pipeline": TriggerPipelineActionConfig;
+  params?: ParamDef[];
+  access?: AccessConfig;
+  steps: StepDef[];
 }
 
 export interface AccessConfig {

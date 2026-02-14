@@ -33,8 +33,7 @@ export function subscribe(topic: string, listener: Listener): () => void {
   }
 
   if (set.size >= MAX_LISTENERS_PER_TOPIC) {
-    logger.warn({ topic, limit: MAX_LISTENERS_PER_TOPIC }, "listener limit reached, rejecting subscriber");
-    return () => {};
+    throw new Error(`Subscriber limit (${MAX_LISTENERS_PER_TOPIC}) reached for topic "${topic}"`);
   }
 
   set.add(listener);

@@ -1,4 +1,6 @@
 import { env } from "../env.ts";
+import { logger } from "../logger.ts";
+import { errorMessage } from "../types.ts";
 
 const SESSION_TTL_S = 24 * 60 * 60; // 24 hours
 const COOKIE_NAME = "trigger_session";
@@ -69,7 +71,9 @@ export async function verifySession(cookie: string): Promise<AuthSession | null>
       groups: payload.groups,
       isSuperAdmin: env.TRIGGER_ADMINS.includes(payload.email),
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof SyntaxError) return null; // malformed base64/JSON cookie
+    logger.warn({ error: errorMessage(err) }, "unexpected error verifying session");
     return null;
   }
 }

@@ -1,12 +1,8 @@
-import { z } from "zod";
 import { authed } from "../../auth/access.ts";
-import { loadAllConfigs } from "../../config/loader.ts";
-import { pipelineConfigSchema } from "../../config/schema.ts";
+import { getJSONSchema, loadAllConfigs } from "../../config/loader.ts";
 import { logger } from "../../logger.ts";
 
-const configJsonSchema = z.toJSONSchema(pipelineConfigSchema);
-
-export const getConfigSchema = () => Response.json(configJsonSchema);
+export const getConfigSchema = () => Response.json(getJSONSchema());
 
 export const refreshConfig = authed(async (_req, session) => {
   if (!session.isSuperAdmin) {

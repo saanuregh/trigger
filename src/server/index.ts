@@ -1,20 +1,31 @@
 import { fetchOIDCConfig } from "../auth/oidc.ts";
-import { loadAllConfigs } from "../config/loader.ts";
+import { loadAllConfigs, rebuildConfigSchema } from "../config/loader.ts";
 import { closeDb, getDb } from "../db/index.ts";
 import { env } from "../env.ts";
 import { logger } from "../logger.ts";
-import { recoverStaleRuns, shutdownAll } from "../pipeline/executor.ts";
+import { loadCustomActions } from "../pipeline/action-loader.ts";
+import { initBuiltinActions, recoverStaleRuns, shutdownAll } from "../pipeline/executor.ts";
+import { errorMessage } from "../types.ts";
 import { error, fetch, routes } from "./routes.ts";
 
-export function startServer() {
+export async function startServer(): Promise<void> {
   getDb();
   recoverStaleRuns();
-  loadAllConfigs();
+
+  initBuiltinActions();
+  await loadCustomActions(env.ACTIONS_DIR);
+  rebuildConfigSchema();
+
+  loadAllConfigs().catch((err) => {
+    logger.error({ error: errorMessage(err) }, "initial config load failed — pipelines may be unavailable until next refresh");
+  });
 
   if (env.authEnabled) {
-    fetchOIDCConfig().catch((err) => {
-      logger.error({ error: err instanceof Error ? err.message : String(err) }, "OIDC discovery failed — auth will not work");
-    });
+    try {
+      await fetchOIDCConfig();
+    } catch (err) {
+      logger.error({ error: errorMessage(err) }, "OIDC discovery failed — auth will not work until server restart");
+    }
   }
 
   const server = Bun.serve({
