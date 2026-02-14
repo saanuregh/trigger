@@ -1,14 +1,38 @@
+import type { z } from "zod";
 import { env } from "../env.ts";
 import { logger } from "../logger.ts";
+import { getAllActionSchemas } from "../pipeline/action-registry.ts";
 import { errorMessage } from "../types.ts";
 import { type NamespaceSource, resolveNamespaces } from "./namespace.ts";
-import { pipelineConfigSchema } from "./schema.ts";
+import { buildJSONSchema, buildSchema } from "./schema.ts";
 import type { NamespaceConfig, PipelineConfig } from "./types.ts";
 
 const REFRESH_TTL_MS = 60_000;
 
 let cachedConfigs: NamespaceConfig[] | null = null;
 const lastRefreshed = new Map<string, number>();
+const refreshInFlight = new Map<string, Promise<NamespaceConfig[]>>();
+let loadAllInFlight: Promise<NamespaceConfig[]> | null = null;
+
+let activeSchema: z.ZodType | null = null;
+let cachedJSONSchema: Record<string, unknown> | null = null;
+
+export function rebuildConfigSchema(): void {
+  const actions = getAllActionSchemas();
+  activeSchema = buildSchema(actions);
+  cachedJSONSchema = buildJSONSchema(activeSchema, actions);
+  logger.info({ actions: actions.length }, "config schema built");
+}
+
+export function getActiveSchema(): z.ZodType {
+  if (!activeSchema) throw new Error("Config schema not initialized — call rebuildConfigSchema() first");
+  return activeSchema;
+}
+
+export function getJSONSchema(): Record<string, unknown> {
+  if (!cachedJSONSchema) throw new Error("JSON schema not initialized — call rebuildConfigSchema() first");
+  return cachedJSONSchema;
+}
 
 function errorConfig(source: NamespaceSource, error: string): NamespaceConfig {
   return {
@@ -24,24 +48,34 @@ function errorConfig(source: NamespaceSource, error: string): NamespaceConfig {
 
 export async function loadAllConfigs(force = false): Promise<NamespaceConfig[]> {
   if (cachedConfigs && !force) return cachedConfigs;
+  if (loadAllInFlight && !force) return loadAllInFlight;
 
-  const sources = resolveNamespaces();
-  const results = await Promise.allSettled(sources.map(loadNamespaceConfig));
+  const promise = (async () => {
+    const sources = resolveNamespaces();
+    const results = await Promise.allSettled(sources.map(loadNamespaceConfig));
 
-  cachedConfigs = results.map((result, i) => {
-    if (result.status === "fulfilled") return result.value;
+    cachedConfigs = results.map((result, i) => {
+      if (result.status === "fulfilled") return result.value;
 
-    const source = sources[i]!;
-    const msg = errorMessage(result.reason);
-    logger.error({ namespace: source.namespace, config: source.config, error: msg }, "config load failed");
-    return errorConfig(source, msg);
-  });
+      const source = sources[i]!;
+      const msg = errorMessage(result.reason);
+      logger.error({ namespace: source.namespace, config: source.config, error: msg }, "config load failed");
+      return errorConfig(source, msg);
+    });
 
-  const ok = cachedConfigs.filter((c) => !c._error).length;
-  const failed = cachedConfigs.length - ok;
-  logger.info({ loaded: ok, failed, total: cachedConfigs.length }, "configs loaded");
+    const ok = cachedConfigs.filter((c) => !c._error).length;
+    const failed = cachedConfigs.length - ok;
+    logger.info({ loaded: ok, failed, total: cachedConfigs.length }, "configs loaded");
 
-  return cachedConfigs;
+    return cachedConfigs;
+  })();
+
+  loadAllInFlight = promise;
+  try {
+    return await promise;
+  } finally {
+    if (loadAllInFlight === promise) loadAllInFlight = null;
+  }
 }
 
 export function getCachedConfigs(): NamespaceConfig[] | null {
@@ -49,30 +83,42 @@ export function getCachedConfigs(): NamespaceConfig[] | null {
 }
 
 export async function refreshNamespace(ns: string): Promise<NamespaceConfig[]> {
-  const lastTime = lastRefreshed.get(ns) ?? 0;
-  if (Date.now() - lastTime < REFRESH_TTL_MS && cachedConfigs?.find((c) => c.namespace === ns && !c._error)) {
-    return cachedConfigs!;
-  }
+  const isFresh = Date.now() - (lastRefreshed.get(ns) ?? 0) < REFRESH_TTL_MS;
+  const hasCachedOk = cachedConfigs?.some((c) => c.namespace === ns && !c._error) ?? false;
+  if (isFresh && hasCachedOk) return cachedConfigs!;
 
-  const source = resolveNamespaces().find((s) => s.namespace === ns);
-  if (!source) throw new Error(`Unknown namespace: ${ns}`);
+  if (loadAllInFlight) return loadAllInFlight;
+  const existing = refreshInFlight.get(ns);
+  if (existing) return existing;
 
-  let updated: NamespaceConfig;
+  const promise = (async () => {
+    const source = resolveNamespaces().find((s) => s.namespace === ns);
+    if (!source) throw new Error(`Unknown namespace: ${ns}`);
+
+    let updated: NamespaceConfig;
+    try {
+      updated = await loadNamespaceConfig(source);
+    } catch (err) {
+      const msg = errorMessage(err);
+      logger.error({ namespace: ns, config: source.config, error: msg }, "config refresh failed");
+      updated = errorConfig(source, msg);
+    }
+    lastRefreshed.set(ns, Date.now());
+
+    cachedConfigs ??= [];
+    const idx = cachedConfigs.findIndex((c) => c.namespace === ns);
+    if (idx >= 0) cachedConfigs[idx] = updated;
+    else cachedConfigs.push(updated);
+
+    return cachedConfigs;
+  })();
+
+  refreshInFlight.set(ns, promise);
   try {
-    updated = await loadNamespaceConfig(source);
-  } catch (err) {
-    const msg = errorMessage(err);
-    logger.error({ namespace: ns, config: source.config, error: msg }, "config refresh failed");
-    updated = errorConfig(source, msg);
+    return await promise;
+  } finally {
+    refreshInFlight.delete(ns);
   }
-  lastRefreshed.set(ns, Date.now());
-
-  cachedConfigs ??= [];
-  const idx = cachedConfigs.findIndex((c) => c.namespace === ns);
-  if (idx >= 0) cachedConfigs[idx] = updated;
-  else cachedConfigs.push(updated);
-
-  return cachedConfigs;
 }
 
 function toRawUrl(url: string): string {
@@ -135,11 +181,11 @@ function parseAndValidate(text: string, label: string): PipelineConfig {
     throw new Error(`Failed to parse config ${label}: ${msg}`);
   }
 
-  const result = pipelineConfigSchema.safeParse(parsed);
+  const result = getActiveSchema().safeParse(parsed);
   if (!result.success) {
     const errors = result.error.issues.map((i) => `  ${i.path.join(".") || "/"}: ${i.message}`).join("\n");
     throw new Error(`Invalid config in ${label}:\n${errors}`);
   }
 
-  return result.data;
+  return result.data as PipelineConfig;
 }

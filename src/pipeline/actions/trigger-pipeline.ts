@@ -1,21 +1,15 @@
-import type { TriggerPipelineActionConfig } from "../../config/types.ts";
 import * as db from "../../db/queries.ts";
 import { subscribe } from "../../events.ts";
-import { type RunStatus, TERMINAL_STATUSES } from "../../types.ts";
-import type { ActionContext } from "../types.ts";
+import { type ParamValues, type RunStatus, TERMINAL_STATUSES } from "../../types.ts";
+import { defineAction, expectString, stringOrTemplate, z } from "../types.ts";
 
-type ExecutePipelineFn = (
-  ns: string,
-  pipelineId: string,
-  params: Record<string, string | boolean>,
-  options: { signal: AbortSignal; parentCallStack?: string[]; triggeredBy?: string },
-) => Promise<string>;
-
-let executePipelineFn: ExecutePipelineFn | null = null;
-
-export function registerExecutor(fn: ExecutePipelineFn) {
-  executePipelineFn = fn;
-}
+const schema = z
+  .object({
+    namespace: stringOrTemplate,
+    pipeline_id: stringOrTemplate,
+    params: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
+  })
+  .strict();
 
 function waitForRun(runId: string, signal: AbortSignal, log: (msg: string, fields?: Record<string, unknown>) => void): Promise<RunStatus> {
   const run = db.getRun(runId);
@@ -35,7 +29,10 @@ function waitForRun(runId: string, signal: AbortSignal, log: (msg: string, field
           resolve(status);
         }
       } else if (msg.type === "step:status") {
-        log("child step status changed", { childStep: msg.stepName as string, childStatus: msg.status as string });
+        log("child step status changed", {
+          childStep: msg.stepName as string,
+          childStatus: msg.status as string,
+        });
       }
     });
 
@@ -54,37 +51,43 @@ function waitForRun(runId: string, signal: AbortSignal, log: (msg: string, field
   });
 }
 
-export async function executeTriggerPipeline(config: TriggerPipelineActionConfig, ctx: ActionContext) {
-  if (!executePipelineFn) throw new Error("Pipeline executor not registered");
+export default defineAction({
+  name: "trigger-pipeline",
+  schema,
+  handler: async (config, ctx) => {
+    if (!ctx.executePipeline) throw new Error("Pipeline executor not available in context");
 
-  const { namespace, pipeline_id, params = {} } = config;
-  const key = `${namespace}:${pipeline_id}`;
+    const namespace = expectString(config.namespace, "namespace");
+    const pipeline_id = expectString(config.pipeline_id, "pipeline_id");
+    const params = (config.params ?? {}) as ParamValues;
+    const key = `${namespace}:${pipeline_id}`;
 
-  ctx.log("triggering child pipeline", { childNamespace: namespace, childPipelineId: pipeline_id });
+    ctx.log("triggering child pipeline", { childNamespace: namespace, childPipelineId: pipeline_id });
 
-  const callStack = ctx.callStack ?? [];
-  if (callStack.includes(key)) {
-    throw new Error(`Circular pipeline dependency detected: ${[...callStack, key].join(" -> ")}`);
-  }
+    const callStack = ctx.callStack ?? [];
+    if (callStack.includes(key)) {
+      throw new Error(`Circular pipeline dependency detected: ${[...callStack, key].join(" -> ")}`);
+    }
 
-  const runId = await executePipelineFn(namespace, pipeline_id, params, {
-    signal: ctx.signal,
-    parentCallStack: [...callStack, key],
-    triggeredBy: ctx.triggeredBy,
-  });
+    const runId = await ctx.executePipeline(namespace, pipeline_id, params, {
+      signal: ctx.signal,
+      parentCallStack: [...callStack, key],
+      triggeredBy: ctx.triggeredBy,
+    });
 
-  ctx.log("child pipeline started, waiting for completion", { childRunId: runId });
+    ctx.log("child pipeline started, waiting for completion", { childRunId: runId });
 
-  const status = await waitForRun(runId, ctx.signal, ctx.log);
+    const status = await waitForRun(runId, ctx.signal, ctx.log);
 
-  if (status === "failed") {
-    const childRun = db.getRun(runId);
-    throw new Error(childRun?.error ?? "child pipeline failed");
-  }
-  if (status === "cancelled") {
-    throw new Error("child pipeline was cancelled");
-  }
+    if (status === "failed") {
+      const childRun = db.getRun(runId);
+      throw new Error(childRun?.error ?? "child pipeline failed");
+    }
+    if (status === "cancelled") {
+      throw new Error("child pipeline was cancelled");
+    }
 
-  ctx.log("child pipeline completed");
-  return { output: { triggeredRunId: runId, namespace, pipeline_id, status } };
-}
+    ctx.log("child pipeline completed");
+    return { output: { triggeredRunId: runId, namespace, pipeline_id, status } };
+  },
+});

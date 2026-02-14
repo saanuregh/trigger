@@ -17,6 +17,7 @@ export const env = {
   development: NODE_ENV !== "production",
   PORT: Number(optional("PORT", "3000")),
   DATA_DIR: optional("DATA_DIR", "./data"),
+  ACTIONS_DIR: optional("ACTIONS_DIR", "./actions"),
 
   CLOUDFLARE_API_TOKEN: optional("CLOUDFLARE_API_TOKEN", ""),
   CLOUDFLARE_ZONE_ID: optional("CLOUDFLARE_ZONE_ID", ""),

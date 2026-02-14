@@ -5,7 +5,7 @@ Trigger and monitor deployment pipelines. Declarative YAML pipeline configs fetc
 ## Stack
 
 - **Runtime:** [Bun](https://bun.sh) 1.3+
-- **CLI:** `index.ts` dispatches subcommands (`start`, `schema`) via `util.parseArgs`
+- **CLI:** `index.ts` dispatches subcommands (`start`, `validate`) via `util.parseArgs`
 - **Server:** Raw `Bun.serve()` with route-map API (no framework) in `src/server/`
 - **Frontend:** React 19 (client-side MPA), SWR, Tailwind CSS 4, Lucide icons
 - **Database:** SQLite via `bun:sqlite` (WAL mode)
@@ -54,8 +54,8 @@ Each namespace points to a YAML config file — either a GitHub file URL or a lo
 ```
 TRIGGER_NAMESPACES=production,staging
 
-TRIGGER_PRODUCTION_CONFIG=https://github.com/saanuregh/trigger/blob/main/examples/production.yaml
-TRIGGER_STAGING_CONFIG=https://github.com/saanuregh/trigger/blob/main/examples/staging.yaml
+TRIGGER_PRODUCTION_CONFIG=https://github.com/saanuregh/trigger/blob/main/examples/configs/production.yaml
+TRIGGER_STAGING_CONFIG=https://github.com/saanuregh/trigger/blob/main/examples/configs/staging.yaml
 ```
 
 GitHub URLs are converted to `raw.githubusercontent.com` URLs at fetch time. A `GITHUB_TOKEN` is needed for private repos.
@@ -66,7 +66,7 @@ No built-in authentication. The app is designed to run behind a VPN or in a priv
 
 ### Pipeline config files
 
-Config files are YAML. See `examples/` for full working examples. A config declares a namespace with shared vars and one or more pipelines:
+Config files are YAML. See `examples/configs/` for full working examples. A config declares a namespace with shared vars and one or more pipelines:
 
 ```yaml
 namespace: production
@@ -108,7 +108,7 @@ Key config features:
 - **`$switch`** — conditional config based on a parameter value
 - **Schema validation** — configs are validated at load time against a JSON Schema
 
-### Supported actions
+### Built-in actions
 
 | Action | Description |
 |--------|-------------|
@@ -118,18 +118,40 @@ Key config features:
 | `cloudflare-purge` | Purge Cloudflare cache by URL list or purge everything |
 | `trigger-pipeline` | Trigger another pipeline (with circular dependency detection) |
 
-## JSON Schema
+### Custom actions
 
-A JSON Schema for pipeline config files is auto-generated from the Zod schemas:
+Drop a `.ts` file into the actions directory (default `./actions/`, set via `ACTIONS_DIR`):
 
-```bash
-bun run schema    # writes schema/pipeline-config.schema.json
+```ts
+import { defineAction, z } from "trigger-sdk";
+
+export default defineAction({
+  name: "slack-notify",
+  schema: z.object({ webhook_url: z.string().url(), message: z.string() }).strict(),
+  handler: async (config, ctx) => {
+    // ...
+    return { output: { ok: true } };
+  },
+});
 ```
 
-The schema is also served at `/api/config/schema`. Use it for editor validation in YAML config files:
+Custom actions are auto-discovered at startup. See `examples/custom-actions/` for a full example.
+
+## JSON Schema
+
+A dynamic JSON Schema is served at `/api/config/schema` — it includes per-action config typing for all registered actions (builtin + custom) with `$switch` support. Use it for editor validation:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/saanuregh/trigger/main/schema/pipeline-config.schema.json
+# yaml-language-server: $schema=http://localhost:3000/api/config/schema
+```
+
+## Validation
+
+Validate config files against the schema without starting the server:
+
+```bash
+bun run validate                           # validates examples/configs/*.yaml
+bun index.ts validate path/to/config.yaml  # validate specific files
 ```
 
 ## Type-checking

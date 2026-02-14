@@ -38,7 +38,7 @@ export const routes = {
   "/sse/runs/:runId": runs.sseRun,
 };
 
-export function fetch(req: Request) {
+export function fetch(req: Request): Response {
   const url = new URL(req.url);
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/sse/") || url.pathname.startsWith("/auth/")) {
     logger.warn({ method: req.method, path: url.pathname }, "unmatched API route");
@@ -46,7 +46,7 @@ export function fetch(req: Request) {
   return new Response("Not found", { status: 404 });
 }
 
-export function error(err: Error) {
+export function error(err: Error): Response {
   logger.error({ err }, "server error");
   return Response.json(
     {

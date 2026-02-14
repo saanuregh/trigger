@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/saanuregh/trigger/main/schema/pipeline-config.schema.json
+# yaml-language-server: $schema=http://localhost:3000/api/config/schema
 
 namespace: staging
 display_name: Staging
@@ -8,6 +8,7 @@ vars:
   cluster: acme-staging
   subnets: [subnet-abc123, subnet-def456]
   security_groups: [sg-web-001]
+  slack_webhook: https://hooks.slack.com/services/T00/B00/xxx
 
 pipelines:
   # ── Deploy to staging ───────────────────────────────────
@@ -54,6 +55,12 @@ pipelines:
           cluster: "{{vars.cluster}}"
           services: [api-service, worker-service]
           timeout: 600
+      - id: notify
+        name: Slack Notification
+        action: slack-notify
+        config:
+          webhook_url: "{{vars.slack_webhook}}"
+          message: "Staging deploy complete ({{param.branch}})"
 
   # ── Run one-off task ────────────────────────────────────
   - id: run-task

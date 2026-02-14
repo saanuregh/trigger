@@ -67,33 +67,45 @@ export function RunPage() {
     requestNotificationPermission();
 
     es.addEventListener("log", (e) => {
-      const entry = JSON.parse(e.data) as LogLine;
-      logBufferRef.current.push(entry);
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(flushLogs);
+      try {
+        const entry = JSON.parse(e.data) as LogLine;
+        logBufferRef.current.push(entry);
+        if (!rafRef.current) {
+          rafRef.current = requestAnimationFrame(flushLogs);
+        }
+      } catch {
+        console.warn("Failed to parse SSE log event:", e.data);
       }
     });
 
     es.addEventListener("step", (e) => {
-      const stepData = JSON.parse(e.data) as { stepId: string; status: string };
-      mutate(
-        (prev) =>
-          prev && {
-            ...prev,
-            steps: prev.steps.map((s) => (s.step_id === stepData.stepId ? { ...s, status: stepData.status as StepRow["status"] } : s)),
-          },
-        { revalidate: false },
-      );
+      try {
+        const stepData = JSON.parse(e.data) as { stepId: string; status: string };
+        mutate(
+          (prev) =>
+            prev && {
+              ...prev,
+              steps: prev.steps.map((s) => (s.step_id === stepData.stepId ? { ...s, status: stepData.status as StepRow["status"] } : s)),
+            },
+          { revalidate: false },
+        );
+      } catch {
+        console.warn("Failed to parse SSE step event:", e.data);
+      }
     });
 
     es.addEventListener("run", (e) => {
-      const { status } = JSON.parse(e.data) as { status: string };
-      mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } }, { revalidate: false });
-      if (TERMINAL_STATUSES.has(status)) {
-        showRunNotification(run.pipeline_name, status);
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        flushLogs();
-        es.close();
+      try {
+        const { status } = JSON.parse(e.data) as { status: string };
+        mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } }, { revalidate: false });
+        if (TERMINAL_STATUSES.has(status)) {
+          showRunNotification(run.pipeline_name, status);
+          if (rafRef.current) cancelAnimationFrame(rafRef.current);
+          flushLogs();
+          es.close();
+        }
+      } catch {
+        console.warn("Failed to parse SSE run event:", e.data);
       }
     });
 

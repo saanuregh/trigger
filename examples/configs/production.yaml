@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/saanuregh/trigger/main/schema/pipeline-config.schema.json
+# yaml-language-server: $schema=http://localhost:3000/api/config/schema
 
 namespace: production
 display_name: Production

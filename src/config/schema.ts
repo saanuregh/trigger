@@ -1,11 +1,12 @@
 import { z } from "zod";
+import { logger } from "../logger.ts";
 import { parseTemplateRef, TEMPLATE_RE, type TemplateRef } from "./template.ts";
 
-const templateString = z.string().regex(/\{\{.+?\}\}/);
-const stringOrTemplate = z.string();
-const stringArrayOrTemplate = z.union([z.array(z.string()), templateString]);
-const numberOrTemplate = z.union([z.number(), templateString]);
-const booleanOrTemplate = z.union([z.boolean(), templateString]);
+export const templateString = z.string().regex(/\{\{.+?\}\}/);
+export const stringOrTemplate = z.string();
+export const stringArrayOrTemplate = z.union([z.array(z.string()), templateString]);
+export const numberOrTemplate = z.union([z.number(), templateString]);
+export const booleanOrTemplate = z.union([z.boolean(), templateString]);
 
 const stringParam = z
   .object({
@@ -40,87 +41,11 @@ const selectParam = z
 
 const paramDef = z.discriminatedUnion("type", [stringParam, booleanParam, selectParam]);
 
-const codebuildConfig = z
-  .object({
-    project_name: stringOrTemplate,
-    source_version: stringOrTemplate.optional(),
-    env_vars: z
-      .union([
-        z.record(
-          z.string(),
-          z.union([
-            z.string(),
-            z
-              .object({
-                value: z.string(),
-                type: z.enum(["PLAINTEXT", "PARAMETER_STORE", "SECRETS_MANAGER"]),
-              })
-              .strict(),
-          ]),
-        ),
-        templateString,
-      ])
-      .optional(),
-  })
-  .strict();
-
-const ecsRestartConfig = z
-  .object({
-    cluster: stringOrTemplate,
-    services: stringArrayOrTemplate,
-    timeout: numberOrTemplate.optional(),
-  })
-  .strict();
-
-const ecsTaskConfig = z
-  .object({
-    cluster: stringOrTemplate,
-    task_definition: stringOrTemplate,
-    container_name: stringOrTemplate,
-    command: stringArrayOrTemplate,
-    subnets: stringArrayOrTemplate,
-    security_groups: stringArrayOrTemplate,
-    launch_type: z.enum(["FARGATE", "EC2"]).optional(),
-    assign_public_ip: booleanOrTemplate.optional(),
-    timeout: numberOrTemplate.optional(),
-    log_group: stringOrTemplate.optional(),
-    log_stream_prefix: stringOrTemplate.optional(),
-  })
-  .strict();
-
-const cloudflarePurgeConfig = z
-  .object({
-    urls: stringArrayOrTemplate.optional(),
-    purge_everything: booleanOrTemplate.optional(),
-  })
-  .strict();
-
-const triggerPipelineConfig = z
-  .object({
-    namespace: stringOrTemplate,
-    pipeline_id: stringOrTemplate,
-    params: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
-  })
-  .strict();
-
 const switchConfig = z
   .object({
     $switch: z.string(),
     cases: z.record(z.string(), z.unknown()).optional(),
     default: z.unknown().optional(),
-  })
-  .strict();
-
-export const actionName = z.enum(["codebuild", "ecs-restart", "ecs-task", "cloudflare-purge", "trigger-pipeline"]);
-
-const stepConfig = z.union([codebuildConfig, ecsRestartConfig, ecsTaskConfig, cloudflarePurgeConfig, triggerPipelineConfig, switchConfig]);
-
-const stepDef = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    action: actionName,
-    config: stepConfig,
   })
   .strict();
 
@@ -131,52 +56,90 @@ const accessConfig = z
   .strict()
   .optional();
 
-const pipelineDef = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string().optional(),
-    confirm: z.boolean().optional(),
-    timeout: z.number().optional(),
-    params: z.array(paramDef).optional(),
-    access: accessConfig,
-    steps: z.array(stepDef),
-  })
-  .strict();
+export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>) {
+  const actionMap = new Map(actions.map((a) => [a.name, a.schema]));
 
-export const pipelineConfigSchema = z
-  .object({
-    $schema: z.string().optional(),
-    namespace: z.string(),
-    display_name: z.string(),
-    aws_region: z.string(),
-    vars: z.record(z.string(), z.unknown()).optional(),
-    access: accessConfig,
-    pipelines: z.array(pipelineDef),
-  })
-  .strict()
-  .superRefine((config, ctx) => {
-    const varNames = new Set(Object.keys(config.vars ?? {}));
+  const stepDef = z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      action: z.string(),
+      config: z.unknown(),
+    })
+    .strict()
+    .superRefine((step, ctx) => {
+      const schema = actionMap.get(step.action);
+      if (!schema) return; // unknown action — accept any config
 
-    for (let pi = 0; pi < config.pipelines.length; pi++) {
-      const pipeline = config.pipelines[pi]!;
-      const paramNames = new Set((pipeline.params ?? []).map((p) => p.name));
+      const switchResult = switchConfig.safeParse(step.config);
+      if (switchResult.success) return; // $switch config is always valid
 
-      for (let si = 0; si < pipeline.steps.length; si++) {
-        const step = pipeline.steps[si]!;
-        const knownNames = { vars: varNames, param: paramNames };
-        for (const ref of extractTemplateRefs(step.config)) {
-          if (!knownNames[ref.type].has(ref.name)) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["pipelines", pi, "steps", si, "config"],
-              message: `Unknown ${ref.type === "vars" ? "variable" : "parameter"} reference: {{${ref.type}.${ref.name}}}`,
-            });
+      if (hasTemplateRefs(step.config)) return; // templates resolve at runtime
+
+      const result = schema.safeParse(step.config);
+      if (!result.success) {
+        for (const issue of result.error.issues) {
+          ctx.addIssue({ ...issue, path: ["config", ...issue.path] });
+        }
+      }
+    });
+
+  const pipelineDef = z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string().optional(),
+      confirm: z.boolean().optional(),
+      timeout: z.number().optional(),
+      params: z.array(paramDef).optional(),
+      access: accessConfig,
+      steps: z.array(stepDef),
+    })
+    .strict();
+
+  return z
+    .object({
+      $schema: z.string().optional(),
+      namespace: z.string(),
+      display_name: z.string(),
+      aws_region: z.string(),
+      vars: z.record(z.string(), z.unknown()).optional(),
+      access: accessConfig,
+      pipelines: z.array(pipelineDef),
+    })
+    .strict()
+    .superRefine((config, ctx) => {
+      const varNames = new Set(Object.keys(config.vars ?? {}));
+
+      for (let pi = 0; pi < config.pipelines.length; pi++) {
+        const pipeline = config.pipelines[pi]!;
+        const paramNames = new Set((pipeline.params ?? []).map((p) => p.name));
+
+        for (let si = 0; si < pipeline.steps.length; si++) {
+          const step = pipeline.steps[si]!;
+          const knownNames = { vars: varNames, param: paramNames };
+          for (const ref of extractTemplateRefs(step.config)) {
+            if (!knownNames[ref.type].has(ref.name)) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["pipelines", pi, "steps", si, "config"],
+                message: `Unknown ${ref.type === "vars" ? "variable" : "parameter"} reference: {{${ref.type}.${ref.name}}}`,
+              });
+            }
           }
         }
       }
-    }
-  });
+    });
+}
+
+const HAS_TEMPLATE = /\{\{.+?\}\}/;
+
+function hasTemplateRefs(value: unknown): boolean {
+  if (typeof value === "string") return HAS_TEMPLATE.test(value);
+  if (Array.isArray(value)) return value.some(hasTemplateRefs);
+  if (value && typeof value === "object") return Object.values(value).some(hasTemplateRefs);
+  return false;
+}
 
 function extractTemplateRefs(value: unknown): TemplateRef[] {
   const refs: TemplateRef[] = [];
@@ -198,7 +161,47 @@ function extractTemplateRefs(value: unknown): TemplateRef[] {
   return refs;
 }
 
-export type PipelineConfig = z.infer<typeof pipelineConfigSchema>;
-export type PipelineDef = z.infer<typeof pipelineDef>;
-export type StepDef = z.infer<typeof stepDef>;
-export type ActionName = z.infer<typeof actionName>;
+export type PipelineConfig = ReturnType<typeof buildSchema> extends z.ZodType<infer T> ? T : never;
+
+// ── JSON Schema generation with per-action config typing ──────────
+
+interface JSONSchemaNode {
+  type?: string;
+  const?: string;
+  properties?: Record<string, JSONSchemaNode>;
+  items?: JSONSchemaNode;
+  required?: string[];
+  additionalProperties?: boolean | JSONSchemaNode;
+  allOf?: JSONSchemaNode[];
+  anyOf?: JSONSchemaNode[];
+  if?: JSONSchemaNode;
+  then?: JSONSchemaNode;
+  not?: JSONSchemaNode;
+  [key: string]: unknown;
+}
+
+export function buildJSONSchema(zodSchema: z.ZodType, actions: Array<{ name: string; schema: z.ZodType }>): JSONSchemaNode {
+  const base = z.toJSONSchema(zodSchema) as JSONSchemaNode;
+
+  if (actions.length === 0) return base;
+
+  const stepItems = base.properties?.pipelines?.items?.properties?.steps?.items;
+  if (!stepItems) {
+    logger.warn("JSON Schema structure does not match expected layout — per-action config typing unavailable");
+    return base;
+  }
+
+  const switchSchema = z.toJSONSchema(switchConfig) as JSONSchemaNode;
+
+  stepItems.allOf = actions.map(({ name, schema }) => ({
+    if: {
+      properties: { action: { const: name } },
+      required: ["action"] as string[],
+    },
+    then: {
+      properties: { config: { anyOf: [z.toJSONSchema(schema) as JSONSchemaNode, switchSchema] } },
+    },
+  }));
+
+  return base;
+}

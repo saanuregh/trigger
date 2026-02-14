@@ -8,18 +8,21 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run typecheck && bun run build
 
-# Production stage — just the compiled output, no node_modules needed
+# Production stage — compiled output + trigger-sdk for custom actions
 FROM oven/bun:1-slim
 WORKDIR /app
 
 COPY --from=build /app/dist .
+COPY --from=build /app/node_modules/zod /app/node_modules/zod
+COPY --from=build /app/packages/trigger-sdk /app/node_modules/trigger-sdk
 
-RUN mkdir -p /app/data && chown -R bun:bun /app/data
+RUN mkdir -p /app/data /app/actions && chown -R bun:bun /app/data /app/actions
 
 EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV DATA_DIR=/app/data
+ENV ACTIONS_DIR=/app/actions
 
 USER bun
 

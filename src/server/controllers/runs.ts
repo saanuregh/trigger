@@ -1,11 +1,11 @@
-import { authed, canAccessNamespace } from "../../auth/access.ts";
+import { authed } from "../../auth/access.ts";
 import * as db from "../../db/queries.ts";
 import { subscribe } from "../../events.ts";
 import { logger } from "../../logger.ts";
 import { cancelPipeline } from "../../pipeline/executor.ts";
 import type { LogLine, PaginatedResponse, RunRow } from "../../types.ts";
-import { TERMINAL_STATUSES } from "../../types.ts";
-import { findNsConfig, getConfigs, MAX_LOG_LINES, SSE_HEADERS, sseFormat, terminalSSEResponse } from "./helpers.ts";
+import { errorMessage, TERMINAL_STATUSES } from "../../types.ts";
+import { checkNamespaceAccess, MAX_LOG_LINES, SSE_HEADERS, sseFormat, terminalSSEResponse } from "./helpers.ts";
 
 export const listRuns = authed(async (req, session) => {
   const url = new URL(req.url);
@@ -16,11 +16,8 @@ export const listRuns = authed(async (req, session) => {
   const per_page = Math.min(100, Math.max(1, Number(url.searchParams.get("per_page")) || 20));
 
   if (namespace) {
-    const configs = await getConfigs();
-    const nsConfig = findNsConfig(configs, namespace);
-    if (nsConfig && !canAccessNamespace(session, nsConfig)) {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const denied = await checkNamespaceAccess(session, namespace);
+    if (denied) return denied;
   }
 
   const filters = { namespace, pipeline_id, status };
@@ -44,11 +41,8 @@ export const getRun = authed(async (req, session) => {
   const run = db.getRun(runId!);
   if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
 
-  const configs = await getConfigs();
-  const nsConfig = findNsConfig(configs, run.namespace);
-  if (nsConfig && !canAccessNamespace(session, nsConfig)) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const denied = await checkNamespaceAccess(session, run.namespace);
+  if (denied) return denied;
 
   const steps = db.getStepsForRun(runId!);
   return Response.json({ run, steps });
@@ -60,11 +54,8 @@ export const getRunLogs = authed(async (req, session) => {
   const run = db.getRun(runId!);
   if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
 
-  const configs = await getConfigs();
-  const nsConfig = findNsConfig(configs, run.namespace);
-  if (nsConfig && !canAccessNamespace(session, nsConfig)) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const denied = await checkNamespaceAccess(session, run.namespace);
+  if (denied) return denied;
 
   const steps = db.getStepsForRun(runId!);
   const lines: LogLine[] = [];
@@ -103,18 +94,17 @@ export const cancelRun = authed(async (req, session) => {
   const { runId } = req.params;
 
   const run = db.getRun(runId!);
-  if (run) {
-    const configs = await getConfigs();
-    const nsConfig = findNsConfig(configs, run.namespace);
-    if (nsConfig && !canAccessNamespace(session, nsConfig)) {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
+  if (!run) {
+    return Response.json({ error: "Run not found" }, { status: 404 });
   }
+
+  const denied = await checkNamespaceAccess(session, run.namespace);
+  if (denied) return denied;
 
   const cancelled = cancelPipeline(runId!);
   if (!cancelled) {
     logger.warn({ runId }, "cancel requested for inactive run");
-    return Response.json({ error: "Run not found or not active" }, { status: 404 });
+    return Response.json({ error: "Run not active" }, { status: 404 });
   }
   logger.info({ runId, cancelledBy: session.email }, "pipeline cancellation requested");
   return Response.json({ ok: true });
@@ -129,11 +119,8 @@ export const sseRun = authed(async (req, session) => {
     return new Response("Run not found", { status: 404 });
   }
 
-  const configs = await getConfigs();
-  const nsConfig = findNsConfig(configs, run.namespace);
-  if (nsConfig && !canAccessNamespace(session, nsConfig)) {
-    return new Response("Forbidden", { status: 403 });
-  }
+  const denied = await checkNamespaceAccess(session, run.namespace);
+  if (denied) return denied;
 
   if (TERMINAL_STATUSES.has(run.status)) return terminalSSEResponse(run.status);
 
@@ -147,7 +134,8 @@ export const sseRun = authed(async (req, session) => {
       function send(event: string, data: object) {
         try {
           controller.enqueue(encoder.encode(sseFormat(event, data)));
-        } catch {
+        } catch (err) {
+          if (!(err instanceof TypeError)) logger.warn({ runId, error: errorMessage(err) }, "SSE send failed");
           ac.abort();
         }
       }
@@ -156,27 +144,38 @@ export const sseRun = authed(async (req, session) => {
         ac.abort();
         try {
           controller.close();
-        } catch {}
+        } catch (err) {
+          if (!(err instanceof TypeError)) logger.warn({ runId, error: errorMessage(err) }, "SSE close failed");
+        }
       }
 
       const heartbeatTimer = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(": keepalive\n\n"));
         } catch {
+          clearInterval(heartbeatTimer);
           ac.abort();
         }
       }, 30_000);
 
-      const unsubscribe = subscribe(runId!, (message) => {
-        const { type, ...payload } = message;
+      let unsubscribe: () => void;
+      try {
+        unsubscribe = subscribe(runId!, (message) => {
+          const { type, ...payload } = message;
 
-        if (type === "log") send("log", payload);
-        else if (type === "step:status") send("step", payload);
-        else if (type === "run:status") {
-          send("run", { status: payload.status });
-          if (TERMINAL_STATUSES.has(payload.status as string)) closeStream();
-        }
-      });
+          if (type === "log") send("log", payload);
+          else if (type === "step:status") send("step", payload);
+          else if (type === "run:status") {
+            send("run", { status: payload.status });
+            if (TERMINAL_STATUSES.has(payload.status as string)) closeStream();
+          }
+        });
+      } catch (err) {
+        logger.warn({ runId, error: errorMessage(err) }, "SSE subscribe failed");
+        controller.enqueue(encoder.encode(sseFormat("error", { message: "Too many connections" })));
+        controller.close();
+        return;
+      }
 
       ac.signal.addEventListener(
         "abort",

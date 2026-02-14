@@ -45,8 +45,11 @@ export async function pollUntil<T>(opts: {
   onProgress?: (result: T) => void | Promise<void>;
   timeoutMessage: string;
 }): Promise<{ output?: Record<string, unknown> }> {
-  while (!opts.signal.aborted && Date.now() < opts.deadline) {
-    await sleep(opts.intervalMs, opts.signal);
+  for (;;) {
+    if (opts.signal.aborted) throw new Error("Aborted");
+    if (Date.now() >= opts.deadline) throw new Error(opts.timeoutMessage);
+
+    await sleep(Math.min(opts.intervalMs, opts.deadline - Date.now()), opts.signal);
 
     const result = await opts.poll();
     const status = await opts.check(result);
@@ -58,9 +61,6 @@ export async function pollUntil<T>(opts: {
     if ("error" in status) throw new Error(status.error);
     return { output: status.output };
   }
-
-  if (opts.signal.aborted) throw new Error("Aborted");
-  throw new Error(opts.timeoutMessage);
 }
 
 export async function streamLogs(

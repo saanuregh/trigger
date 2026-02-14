@@ -69,7 +69,7 @@ function migrate(db: Database) {
   } catch (err) {
     const msg = errorMessage(err);
     if (!msg.includes("duplicate column")) {
-      logger.error({ error: msg }, "migration: failed to add dry_run column");
+      throw new Error(`Migration failed (dry_run column): ${msg}`);
     }
   }
 
@@ -79,7 +79,7 @@ function migrate(db: Database) {
   } catch (err) {
     const msg = errorMessage(err);
     if (!msg.includes("duplicate column")) {
-      logger.error({ error: msg }, "migration: failed to add triggered_by column");
+      throw new Error(`Migration failed (triggered_by column): ${msg}`);
     }
   }
 

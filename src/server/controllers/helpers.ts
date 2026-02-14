@@ -1,16 +1,16 @@
-import { canAccessPipeline } from "../../auth/access.ts";
+import { canAccessNamespace, canAccessPipeline } from "../../auth/access.ts";
 import type { AuthSession } from "../../auth/session.ts";
 import { getCachedConfigs, loadAllConfigs } from "../../config/loader.ts";
 import type { NamespaceConfig } from "../../config/types.ts";
-import type { NamespaceConfigSummary } from "../../types.ts";
+import type { NamespaceConfigSummary, StepDefSummary } from "../../types.ts";
 
 export type RouteRequest = Request & { params: Record<string, string> };
 
-export async function getConfigs() {
+export async function getConfigs(): Promise<NamespaceConfig[]> {
   return getCachedConfigs() ?? (await loadAllConfigs());
 }
 
-export function toStepSummary(s: { id: string; name: string; action: string }) {
+export function toStepSummary(s: { id: string; name: string; action: string }): StepDefSummary {
   return { id: s.id, name: s.name, action: s.action };
 }
 
@@ -30,8 +30,17 @@ export function toClientConfigs(configs: NamespaceConfig[]): NamespaceConfigSumm
   }));
 }
 
-export function findNsConfig(configs: NamespaceConfig[], ns: string) {
+export function findNsConfig(configs: NamespaceConfig[], ns: string): NamespaceConfig | undefined {
   return configs.find((c) => c.namespace === ns);
+}
+
+export async function checkNamespaceAccess(session: AuthSession, namespace: string): Promise<Response | null> {
+  const configs = await getConfigs();
+  const nsConfig = findNsConfig(configs, namespace);
+  if (nsConfig && !canAccessNamespace(session, nsConfig)) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return null;
 }
 
 export function checkPipelineAccess(

@@ -6,6 +6,8 @@ import { logger } from "../../logger.ts";
 import { errorMessage } from "../../types.ts";
 import { OAUTH_STATE_COOKIE, type RouteRequest } from "./helpers.ts";
 
+const SECURE_SUFFIX = env.development ? "" : "; Secure";
+
 export const info = () => Response.json({ enabled: env.authEnabled });
 
 export const login = (req: RouteRequest) => {
@@ -20,12 +22,11 @@ export const login = (req: RouteRequest) => {
   const redirectUri = `${url.origin}/auth/callback`;
   const authUrl = getAuthUrl(state, redirectUri);
 
-  const secure = !env.development ? "; Secure" : "";
   return new Response(null, {
     status: 302,
     headers: {
       Location: authUrl,
-      "Set-Cookie": `${OAUTH_STATE_COOKIE}=${state}; HttpOnly; SameSite=Lax; Path=/; Max-Age=600${secure}`,
+      "Set-Cookie": `${OAUTH_STATE_COOKIE}=${state}; HttpOnly; SameSite=Lax; Path=/; Max-Age=600${SECURE_SUFFIX}`,
     },
   });
 };
@@ -39,7 +40,6 @@ export const callback = async (req: RouteRequest) => {
     return new Response(null, { status: 302, headers: { Location: "/login?error=missing_params" } });
   }
 
-  // Validate CSRF state
   const cookies = req.headers.get("cookie") ?? "";
   let savedState = "";
   for (const part of cookies.split(";")) {
@@ -58,18 +58,22 @@ export const callback = async (req: RouteRequest) => {
     const redirectUri = `${url.origin}/auth/callback`;
     const user = await exchangeCode(code, redirectUri);
     const sessionCookie = await signSession(user);
-    const returnUrl = (JSON.parse(atob(state)).returnUrl as string) ?? "/";
+
+    let returnUrl = "/";
+    try {
+      returnUrl = (JSON.parse(atob(state)).returnUrl as string) ?? "/";
+    } catch {
+      logger.warn("failed to parse returnUrl from OAuth state, defaulting to /");
+    }
 
     logger.info({ email: user.email, groups: user.groups }, "user authenticated");
 
-    // Clear oauth state cookie + set session cookie
-    const secure = !env.development ? "; Secure" : "";
     return new Response(null, {
       status: 302,
       headers: [
         ["Location", returnUrl],
         ["Set-Cookie", sessionCookieHeader(sessionCookie)],
-        ["Set-Cookie", `${OAUTH_STATE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`],
+        ["Set-Cookie", `${OAUTH_STATE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${SECURE_SUFFIX}`],
       ],
     });
   } catch (err) {
@@ -82,9 +86,8 @@ export const me = authed(async (_req, session) => {
   return Response.json({ email: session.email, name: session.name, groups: session.groups, isSuperAdmin: session.isSuperAdmin });
 });
 
-export const logout = async (_req: RouteRequest) => {
+export const logout = (_req: RouteRequest) => {
   return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
     headers: {
       "Content-Type": "application/json",
       "Set-Cookie": clearSessionCookie(),
