@@ -44,7 +44,7 @@ function UserMenu() {
 export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps) {
   return (
     <div className="flex flex-col h-screen">
-      <header className="bg-neutral-900/80 backdrop-blur-md border-b border-neutral-800/50 px-4 h-12 flex items-center justify-between shrink-0 shadow-[0_1px_12px_rgba(0,0,0,0.3)]">
+      <header className="relative bg-neutral-900/80 backdrop-blur-xl border-b border-neutral-800/50 px-4 h-12 flex items-center justify-between shrink-0 shadow-[inset_0_-1px_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.4),0_4px_20px_rgba(0,0,0,0.3)] header-glow">
         <nav className="flex items-center gap-1.5 text-sm">
           <Link
             to="/"
@@ -82,7 +82,7 @@ export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps)
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {sidebar && <aside className="w-56 bg-neutral-900/50 border-r border-neutral-800 overflow-y-auto shrink-0 p-3">{sidebar}</aside>}
+        {sidebar && <aside className="w-56 bg-neutral-900/40 border-r border-neutral-800/60 overflow-y-auto shrink-0 p-3">{sidebar}</aside>}
         <main className="flex-1 overflow-y-auto p-5">
           <div className="max-w-6xl mx-auto animate-fade-in">{children}</div>
         </main>

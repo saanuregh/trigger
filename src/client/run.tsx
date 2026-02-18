@@ -24,8 +24,8 @@ import {
 
 const stepCircleStyles: Record<string, string> = {
   running: "border-neutral-400/50 bg-neutral-800/50 animate-pulse-ring",
-  success: "border-green-800/50 bg-green-950/30",
-  failed: "border-red-800/50 bg-red-950/30",
+  success: "border-green-800/50 bg-green-950/30 shadow-[0_0_10px_rgba(74,222,128,0.25)]",
+  failed: "border-red-800/50 bg-red-950/30 shadow-[0_0_10px_rgba(248,113,113,0.25)]",
 };
 
 export function RunPage() {

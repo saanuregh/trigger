@@ -48,7 +48,7 @@ export function ConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl shadow-black/50 p-6 max-w-md w-full mx-4 animate-scale-in"
+        className="relative bg-neutral-900 border border-neutral-700/50 rounded-xl depth-elevated p-6 max-w-md w-full mx-4 animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex gap-4">

@@ -1,8 +1,8 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { Link } from "../router.tsx";
 
-const base = "bg-neutral-900 border border-neutral-800 rounded-xl shadow-sm shadow-black/20";
-const interactive = "hover:border-neutral-600 hover:shadow-lg hover:shadow-black/40 hover:-translate-y-0.5 transition-all duration-200";
+const base = "bg-neutral-900 border border-neutral-700/50 rounded-xl card-surface";
+const interactive = "card-interactive hover:border-neutral-600 hover:-translate-y-0.5";
 
 export function Card({ className = "", children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
