@@ -22,9 +22,11 @@ export function NamespacePage() {
     if (!latestRuns.has(run.pipeline_id)) latestRuns.set(run.pipeline_id, run);
   }
 
-  const runningPipelines = new Map<string, RunRow>();
+  const runningByPipeline = new Map<string, RunRow[]>();
   for (const run of runningData?.data ?? []) {
-    if (!runningPipelines.has(run.pipeline_id)) runningPipelines.set(run.pipeline_id, run);
+    const arr = runningByPipeline.get(run.pipeline_id) ?? [];
+    arr.push(run);
+    runningByPipeline.set(run.pipeline_id, arr);
   }
 
   let error = "";
@@ -48,20 +50,21 @@ export function NamespacePage() {
   }
 
   const sidebar =
-    runningPipelines.size > 0 ? (
+    runningByPipeline.size > 0 ? (
       <div>
         <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">
           <Loader2 size={12} className="animate-spin text-neutral-400" />
           Running
         </div>
-        {[...runningPipelines.values()].map((run) => (
+        {[...runningByPipeline.entries()].map(([pipelineId, runs]) => (
           <Link
-            key={run.pipeline_id}
-            to={`/${ns}/${run.pipeline_id}`}
+            key={pipelineId}
+            to={`/${ns}/${pipelineId}`}
             className="flex items-center gap-2 px-2 py-1.5 text-sm text-neutral-300 hover:text-white hover:bg-white/[0.04] rounded-lg no-underline transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
-            {run.pipeline_name}
+            {runs[0]!.pipeline_name}
+            {runs.length > 1 && <span className="text-[10px] text-neutral-500 font-mono">{runs.length}</span>}
           </Link>
         ))}
       </div>
@@ -80,6 +83,7 @@ export function NamespacePage() {
                 <tr className="text-left text-neutral-500 text-[11px] font-medium">
                   <th className="px-4 py-2.5">Pipeline</th>
                   <th className="px-4 py-2.5 w-16">Steps</th>
+                  <th className="px-4 py-2.5 w-24">Concurrency</th>
                   <th className="px-4 py-2.5">Last Run</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5 w-20">Duration</th>
@@ -101,6 +105,18 @@ export function NamespacePage() {
                         {p.description && <div className="text-xs text-neutral-500 mt-0.5">{p.description}</div>}
                       </td>
                       <td className="px-4 py-2.5 text-neutral-500 text-xs font-mono">{p.steps.length}</td>
+                      <td className="px-4 py-2.5 text-xs font-mono">
+                        {(() => {
+                          const running = runningByPipeline.get(p.id)?.length ?? 0;
+                          return running > 0 ? (
+                            <span className="text-white">
+                              {running}/{p.concurrency}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-500">{p.concurrency}</span>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-2.5 text-neutral-500 text-xs">
                         {lastRun ? (
                           <span title={lastRun.started_at}>{timeAgo(lastRun.started_at)}</span>

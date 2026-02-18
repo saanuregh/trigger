@@ -18,6 +18,7 @@ export const env = {
   PORT: Number(optional("PORT", "3000")),
   DATA_DIR: optional("DATA_DIR", "./data"),
   ACTIONS_DIR: optional("ACTIONS_DIR", "./actions"),
+  MAX_CONCURRENT_RUNS: Number(optional("MAX_CONCURRENT_RUNS", "10")),
 
   CLOUDFLARE_API_TOKEN: optional("CLOUDFLARE_API_TOKEN", ""),
   CLOUDFLARE_ZONE_ID: optional("CLOUDFLARE_ZONE_ID", ""),

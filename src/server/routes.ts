@@ -5,6 +5,7 @@ import * as auth from "./controllers/auth.ts";
 import * as config from "./controllers/config.ts";
 import * as pipelines from "./controllers/pipelines.ts";
 import * as runs from "./controllers/runs.ts";
+import * as status from "./controllers/status.ts";
 
 export const routes = {
   "/*": appPage,
@@ -30,6 +31,9 @@ export const routes = {
   "/api/runs/:runId/logs": runs.getRunLogs,
   "/api/runs/:runId/cancel": { POST: runs.cancelRun },
   "/api/runs/:runId/retry": { POST: runs.retryRun },
+
+  // Status
+  "/api/status": status.getStatus,
 
   // Config management
   "/api/config/schema": config.getConfigSchema,

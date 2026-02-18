@@ -15,6 +15,7 @@ pipelines:
   - id: deploy
     name: Deploy to Staging
     description: Build from any branch, run migrations, and restart staging services.
+    concurrency: 3
     params:
       - name: branch
         label: Branch
@@ -66,6 +67,7 @@ pipelines:
   - id: run-task
     name: Run One-Off Task
     description: Run an arbitrary command on the staging cluster.
+    concurrency: 1
     params:
       - name: task
         label: Task
@@ -90,10 +92,30 @@ pipelines:
           security_groups: "{{vars.security_groups}}"
           timeout: 300
 
+  # ── Send Slack notification ────────────────────────────
+  - id: slack-notify
+    name: Send Slack Notification
+    description: Send a custom message to the team Slack channel.
+    concurrency: 3
+    params:
+      - name: message
+        label: Message
+        type: string
+        required: true
+        placeholder: "Deployment complete, all systems go"
+    steps:
+      - id: notify
+        name: Send Notification
+        action: slack-notify
+        config:
+          webhook_url: "{{vars.slack_webhook}}"
+          message: "{{param.message}}"
+
   # ── Promote staging to production ───────────────────────
   - id: promote
     name: Promote to Production
     description: Trigger the production deploy pipeline from staging.
+    concurrency: 1
     confirm: true
     steps:
       - id: trigger-prod
