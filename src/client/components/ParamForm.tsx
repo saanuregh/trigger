@@ -172,8 +172,15 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
               <span className="group-hover:text-neutral-300 transition-colors">Dry run</span>
             </label>
           </div>
-          {pipeline.confirm && !dryRun && (
-            <span className="text-[11px] text-yellow-500/80">This pipeline requires confirmation before running.</span>
+          {atGlobalLimit ? (
+            <span className="text-[11px] text-yellow-500/80">Global concurrency limit reached.</span>
+          ) : activeRunCount >= pipeline.concurrency ? (
+            <span className="text-[11px] text-yellow-500/80">
+              Pipeline at max concurrency ({activeRunCount}/{pipeline.concurrency}).
+            </span>
+          ) : (
+            pipeline.confirm &&
+            !dryRun && <span className="text-[11px] text-yellow-500/80">This pipeline requires confirmation before running.</span>
           )}
         </div>
 

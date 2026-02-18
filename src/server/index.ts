@@ -7,6 +7,13 @@ import { loadCustomActions } from "../pipeline/action-loader.ts";
 import { initBuiltinActions, recoverStaleRuns, shutdownAll } from "../pipeline/executor.ts";
 import { errorMessage } from "../types.ts";
 import { error, fetch, routes } from "./routes.ts";
+import { initWSGlobalSubscription, wsHandlers } from "./ws.ts";
+
+let _server: ReturnType<typeof Bun.serve> | null = null;
+
+export function getServer() {
+  return _server!;
+}
 
 export async function startServer(): Promise<void> {
   getDb();
@@ -34,7 +41,11 @@ export async function startServer(): Promise<void> {
     routes,
     fetch,
     error,
+    websocket: wsHandlers,
   });
+
+  _server = server;
+  initWSGlobalSubscription();
 
   logger.info({ env: env.NODE_ENV, port: server.port, dataDir: env.DATA_DIR }, "server started");
 

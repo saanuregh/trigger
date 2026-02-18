@@ -278,7 +278,7 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
       publish(runId, { type: "log", ...JSON.parse(line) });
     } catch (err) {
       if (err instanceof SyntaxError) return;
-      logger.warn({ runId, error: errorMessage(err) }, "SSE sink write failed");
+      logger.warn({ runId, error: errorMessage(err) }, "event publish failed");
     }
   };
 
@@ -371,6 +371,7 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
 async function runSteps(opts: RunStepsOptions) {
   const { runId, key, log, stepRecords, abort, timeoutS } = opts;
   const startedAt = Date.now();
+  let finalStatus: "success" | "failed" | "cancelled" | null = null;
   const timeoutTimer = setTimeout(() => {
     if (!abort.signal.aborted) {
       log.error({ timeoutSec: timeoutS }, "run exceeded timeout, aborting");
@@ -390,8 +391,8 @@ async function runSteps(opts: RunStepsOptions) {
 
       if (result !== "success") {
         skipRemainingSteps(runId, log, stepRecords, i + 1);
-        const status = result === "cancelled" ? "cancelled" : "failed";
-        finishRun(runId, log, status, {
+        finalStatus = result === "cancelled" ? "cancelled" : "failed";
+        finishRun(runId, log, finalStatus, {
           error: typeof result === "object" ? result.failed : undefined,
           durationMs: Date.now() - startedAt,
         });
@@ -399,15 +400,21 @@ async function runSteps(opts: RunStepsOptions) {
       }
     }
 
-    finishRun(runId, log, abort.signal.aborted ? "cancelled" : "success", { durationMs: Date.now() - startedAt });
+    finalStatus = abort.signal.aborted ? "cancelled" : "success";
+    finishRun(runId, log, finalStatus, { durationMs: Date.now() - startedAt });
   } catch (err) {
     const msg = errorMessage(err);
     log.error({ error: msg }, "unexpected error");
+    finalStatus = "failed";
     finishRun(runId, log, "failed", { error: `Unexpected error: ${msg}`, durationMs: Date.now() - startedAt });
     db.markStaleSteps(runId);
   } finally {
     clearTimeout(timeoutTimer);
     untrackRun(key, runId);
+    if (finalStatus) {
+      const [namespace, pipelineId] = key.split(":");
+      publish("global", { type: "run:completed", runId, namespace, pipelineId, status: finalStatus });
+    }
   }
 }
 

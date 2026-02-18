@@ -7,9 +7,10 @@ import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { HomeSkeleton } from "./components/Skeleton.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useConfigs, useStatus, useUser } from "./hooks.tsx";
+import { useConfigs, useUser } from "./hooks.tsx";
 import { Link } from "./router.tsx";
 import { handleUnauthorized, nsColor } from "./utils.ts";
+import { useStatus } from "./ws.tsx";
 
 function NamespaceCard({ ns }: { ns: NamespaceConfigSummary }) {
   const color = nsColor(ns.namespace);

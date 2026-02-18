@@ -7,6 +7,7 @@ import { StatusDot } from "./components/StatusBadge.tsx";
 import { useConfigs, useFetch } from "./hooks.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
 import { formatDuration, timeAgo } from "./utils.ts";
+import { useGlobalEvents } from "./ws.tsx";
 
 export function NamespacePage() {
   const { ns } = useRoute().params as { ns: string };
@@ -14,8 +15,15 @@ export function NamespacePage() {
   const { data: configs, error: configsError } = useConfigs();
   const nsConfig = configs?.find((c) => c.namespace === ns);
 
-  const { data: runsData } = useFetch<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&per_page=100`);
-  const { data: runningData } = useFetch<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&status=running&per_page=50`);
+  const { data: runsData, mutate: mutateRuns } = useFetch<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&per_page=100`);
+  const { data: runningData, mutate: mutateRunning } = useFetch<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&status=running&per_page=50`);
+
+  useGlobalEvents((event) => {
+    if (event.namespace === ns) {
+      mutateRuns();
+      mutateRunning();
+    }
+  });
 
   const latestRuns = new Map<string, RunRow>();
   for (const run of runsData?.data ?? []) {

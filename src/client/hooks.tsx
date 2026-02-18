@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NamespaceConfigSummary, SystemStatus } from "../types.ts";
+import type { NamespaceConfigSummary } from "../types.ts";
 
 // --- Fetcher ---
 
@@ -109,10 +109,6 @@ export function useConfigs() {
 export function useNsDisplayName(ns: string): string {
   const { data } = useConfigs();
   return data?.find((c) => c.namespace === ns)?.display_name ?? ns;
-}
-
-export function useStatus() {
-  return useFetch<SystemStatus>("/api/status", { refreshInterval: 3000 });
 }
 
 export function useUser() {
