@@ -21,7 +21,7 @@ export function LoginPage() {
         )}
         <a
           href={`/auth/login?return=${encodeURIComponent(returnUrl)}`}
-          className="inline-flex items-center gap-2 bg-white hover:bg-neutral-200 text-neutral-950 font-medium px-6 py-2.5 rounded-lg transition-all duration-150 active:scale-[0.98] no-underline shadow-sm"
+          className="inline-flex items-center gap-2 bg-white/[0.12] hover:bg-white/[0.18] text-white font-medium border border-white/[0.1] px-6 py-2.5 rounded-lg transition-all duration-150 active:scale-[0.98] no-underline"
         >
           <LogIn size={16} />
           Sign in with SSO

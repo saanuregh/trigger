@@ -5,7 +5,7 @@ type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ButtonSize = "sm" | "md" | "icon";
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: "bg-white text-neutral-950 font-medium shadow-sm hover:bg-neutral-200",
+  primary: "bg-white/[0.12] text-white font-medium border border-white/[0.1] hover:bg-white/[0.18]",
   secondary: "bg-white/[0.06] text-neutral-300 border border-white/[0.08] hover:bg-white/[0.1] hover:text-white",
   danger: "bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25",
   ghost: "text-neutral-400 hover:bg-white/[0.06] hover:text-white",
