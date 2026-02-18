@@ -32,7 +32,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
 
   return (
     <div className="flex items-center justify-between text-sm mt-4">
-      <span className="text-gray-500 text-xs">
+      <span className="text-neutral-500 text-xs">
         Page {page} of {totalPages}
       </span>
       <div className="flex items-center gap-1">
@@ -40,7 +40,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
 
         {pages.map((p, i) =>
           p === "..." ? (
-            <span key={`ellipsis-${i}`} className="px-2 text-gray-600 text-xs">
+            <span key={`ellipsis-${i}`} className="px-2 text-neutral-600 text-xs">
               ...
             </span>
           ) : (
@@ -49,7 +49,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
               key={p}
               onClick={() => onPageChange(p)}
               className={`min-w-7 h-7 rounded-md text-xs font-medium transition-colors ${
-                p === page ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                p === page ? "bg-white text-neutral-900" : "text-neutral-400 hover:text-white hover:bg-neutral-800"
               }`}
             >
               {p}

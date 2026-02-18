@@ -6,6 +6,7 @@
   --animate-slide-up: slide-up 0.25s ease-out;
   --animate-scale-in: scale-in 0.15s ease-out;
   --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 2s ease-in-out infinite;
 }
 
 @keyframes fade-in {
@@ -57,10 +58,34 @@
   }
 }
 
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+/* Dot grid background */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(255 255 255 / 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
 /* Skeleton shimmer effect */
 .skeleton {
-  background: linear-gradient(90deg, var(--color-gray-800) 25%, var(--color-gray-700) 50%, var(--color-gray-800) 75%);
+  background: linear-gradient(90deg, var(--color-neutral-800) 25%, var(--color-neutral-700) 50%, var(--color-neutral-800) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-md);
+}
+
+/* Log viewer scroll fade */
+.log-fade-top {
+  mask-image: linear-gradient(to bottom, transparent, black 24px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 24px);
 }

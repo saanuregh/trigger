@@ -8,7 +8,7 @@ export function HomeSkeleton() {
       <Skeleton className="h-6 w-32 mb-4" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2">
+          <div key={i} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 space-y-2">
             <Skeleton className="h-5 w-36" />
             <Skeleton className="h-4 w-20" />
           </div>
@@ -24,7 +24,7 @@ export function NamespaceSkeleton() {
       <Skeleton className="h-6 w-40 mb-4" />
       <div className="space-y-2">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 flex items-center justify-between">
+          <div key={i} className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 flex items-center justify-between">
             <div className="space-y-1.5">
               <Skeleton className="h-4 w-48" />
               <Skeleton className="h-3 w-32" />
@@ -40,7 +40,7 @@ export function NamespaceSkeleton() {
 export function PipelineSkeleton() {
   return (
     <div>
-      <div className="mb-6 pb-6 border-b border-gray-800 space-y-3">
+      <div className="mb-6 pb-6 border-b border-neutral-800 space-y-3">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-4 w-64" />
         <Skeleton className="h-9 w-32" />
@@ -81,7 +81,7 @@ export function RunSkeleton() {
           </div>
         ))}
       </div>
-      <div className="bg-gray-900 border border-gray-800 rounded-lg h-48" />
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl h-48" />
     </div>
   );
 }
