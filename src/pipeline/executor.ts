@@ -129,6 +129,94 @@ export async function executePipeline(
   }
 }
 
+export async function retryRun(runId: string, options?: { signal?: AbortSignal; triggeredBy?: string }): Promise<string> {
+  const run = db.getRun(runId);
+  if (!run) throw new PipelineError("Run not found", 404);
+  if (run.status !== "failed") throw new PipelineError("Only failed runs can be retried", 400);
+
+  const key = `${run.namespace}:${run.pipeline_id}`;
+  if (run.dry_run !== 1 && activePipelines.has(key)) {
+    throw new PipelineError(`Pipeline ${key} is already running (run: ${activePipelines.get(key)!.runId})`, 409);
+  }
+
+  const configs = await loadAllConfigs();
+  const nsConfig = configs.find((c) => c.namespace === run.namespace);
+  if (!nsConfig) throw new PipelineError(`Namespace not found: ${run.namespace}`, 404);
+
+  const pipeline = nsConfig.pipelines.find((p) => p.id === run.pipeline_id);
+  if (!pipeline) throw new PipelineError(`Pipeline not found: ${run.pipeline_id} in namespace ${run.namespace}`, 404);
+
+  const existingSteps = db.getStepsForRun(runId);
+  const failedIndex = existingSteps.findIndex((s) => s.status === "failed");
+  if (failedIndex === -1) throw new PipelineError("No failed step found in this run", 400);
+
+  // Build stepRecords for ALL steps (correct step indexing in logs)
+  const stepRecords = existingSteps.map((dbStep) => {
+    const def = pipeline.steps.find((s) => s.id === dbStep.step_id);
+    if (!def) throw new PipelineError(`Step "${dbStep.step_id}" no longer exists in pipeline config`, 400);
+    return { dbId: dbStep.id, def };
+  });
+
+  // Reset failed + subsequent steps in DB
+  const stepsToReset = existingSteps.slice(failedIndex).map((s) => s.id);
+  db.resetStepsForRetry(runId, stepsToReset);
+  db.resetRunForRetry(runId);
+
+  const dryRun = run.dry_run === 1;
+  const abort = new AbortController();
+  if (!dryRun) activePipelines.set(key, { runId, abort });
+
+  try {
+    if (options?.signal) {
+      options.signal.addEventListener("abort", () => abort.abort(), { once: true });
+    }
+
+    const params: ParamValues = run.params ? JSON.parse(run.params) : {};
+    const logDir = `${env.DATA_DIR}/logs/${runId}`;
+
+    const log = logger.child({
+      namespace: run.namespace,
+      pipeline: run.pipeline_name,
+      pipelineId: run.pipeline_id,
+      runId,
+      params,
+      stepCount: pipeline.steps.length,
+      region: nsConfig.aws_region,
+      retry: true,
+      retryFromStep: existingSteps[failedIndex]!.step_id,
+    });
+
+    publish("global", { type: "run:started", runId, namespace: run.namespace, pipelineId: run.pipeline_id });
+    publish(runId, { type: "run:status", runId, status: "running" });
+    log.info("pipeline retry started");
+
+    runSteps({
+      runId,
+      key,
+      log,
+      stepRecords,
+      abort,
+      logDir,
+      dryRun,
+      params,
+      callStack: [key],
+      vars: nsConfig.vars,
+      region: nsConfig.aws_region,
+      timeoutS: pipeline.timeout ?? DEFAULT_RUN_TIMEOUT_S,
+      triggeredBy: options?.triggeredBy,
+      startFromIndex: failedIndex,
+    }).catch((err) => {
+      logger.error({ runId, error: errorMessage(err) }, "runSteps unexpected rejection");
+    });
+
+    return runId;
+  } catch (err) {
+    if (!dryRun) activePipelines.delete(key);
+    db.updateRunStatus(runId, "failed", `Retry setup failed: ${errorMessage(err)}`);
+    throw err;
+  }
+}
+
 function publishStepStatus(runId: string, log: Logger, def: StepDef, status: string) {
   publish(runId, { type: "step:status", runId, stepId: def.id, stepName: def.name, action: def.action, status });
   log.info({ step: def.name, action: def.action, status }, "step status changed");
@@ -166,6 +254,7 @@ interface RunStepsOptions {
   region: string;
   timeoutS: number;
   triggeredBy?: string;
+  startFromIndex?: number;
 }
 
 type StepResult = "success" | { failed: string } | "cancelled";
@@ -283,7 +372,7 @@ async function runSteps(opts: RunStepsOptions) {
   }, timeoutS * 1000);
 
   try {
-    for (let i = 0; i < stepRecords.length; i++) {
+    for (let i = opts.startFromIndex ?? 0; i < stepRecords.length; i++) {
       if (abort.signal.aborted) {
         skipRemainingSteps(runId, log, stepRecords, i);
         break;

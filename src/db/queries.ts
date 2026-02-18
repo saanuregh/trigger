@@ -105,6 +105,24 @@ export function getStepsForRun(runId: string): StepRow[] {
   return getDb().query<StepRow, [string]>(`SELECT * FROM pipeline_steps WHERE run_id = ? ORDER BY rowid`).all(runId);
 }
 
+export function resetStepsForRetry(runId: string, stepIds: string[]): void {
+  const placeholders = stepIds.map(() => "?").join(",");
+  getDb().run(
+    `UPDATE pipeline_steps SET
+       status = 'pending',
+       started_at = NULL,
+       finished_at = NULL,
+       output = NULL,
+       error = NULL
+     WHERE run_id = ? AND id IN (${placeholders})`,
+    [runId, ...stepIds],
+  );
+}
+
+export function resetRunForRetry(id: string): void {
+  getDb().run(`UPDATE pipeline_runs SET status = 'running', error = NULL, finished_at = NULL WHERE id = ?`, [id]);
+}
+
 export function markStaleSteps(runId: string): void {
   const now = new Date().toISOString();
   getDb().run(
