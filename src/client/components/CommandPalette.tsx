@@ -107,11 +107,11 @@ export function CommandPalette() {
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" onClick={close}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
       <div
-        className="relative w-full max-w-lg bg-neutral-900 border border-neutral-700/50 rounded-xl depth-elevated animate-scale-in overflow-hidden"
+        className="relative w-full max-w-lg bg-neutral-900 border border-white/[0.08] rounded-xl shadow-2xl shadow-black/40 animate-scale-in overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-800">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06]">
           <Search size={16} className="text-neutral-500 shrink-0" />
           <input
             ref={inputRef}
@@ -124,7 +124,7 @@ export function CommandPalette() {
             placeholder="Search namespaces and pipelines..."
             className="flex-1 bg-transparent text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none"
           />
-          <kbd className="text-[10px] text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">ESC</kbd>
+          <kbd className="text-[10px] text-neutral-500 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.06]">ESC</kbd>
         </div>
 
         <div className="max-h-72 overflow-y-auto py-2">
@@ -137,7 +137,7 @@ export function CommandPalette() {
               return (
                 <div key={item.id}>
                   {showHeader && (
-                    <div className="px-4 py-1.5 text-[10px] text-neutral-500 uppercase tracking-wider font-semibold mt-1 first:mt-0">
+                    <div className="px-4 py-1.5 text-[10px] text-neutral-500 uppercase tracking-wider font-medium mt-1 first:mt-0">
                       {item.type === "namespace" ? "Namespaces" : "Pipelines"}
                     </div>
                   )}
@@ -146,7 +146,7 @@ export function CommandPalette() {
                     onClick={() => handleSelect(item)}
                     onMouseEnter={() => setSelectedIndex(i)}
                     className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
-                      i === selectedIndex ? "bg-neutral-800" : "hover:bg-neutral-800/50"
+                      i === selectedIndex ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
                     }`}
                   >
                     {item.type === "namespace" ? (

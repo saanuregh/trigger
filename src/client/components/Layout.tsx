@@ -25,7 +25,7 @@ function UserMenu() {
   };
 
   return (
-    <div className="flex items-center gap-2 ml-3 pl-3 border-l border-neutral-700">
+    <div className="flex items-center gap-2 ml-3 pl-3 border-l border-white/[0.06]">
       <span className="text-xs text-neutral-400 max-w-32 truncate" title={user.email}>
         {user.name || user.email}
       </span>
@@ -44,18 +44,18 @@ function UserMenu() {
 export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps) {
   return (
     <div className="flex flex-col h-screen">
-      <header className="relative bg-neutral-900/80 backdrop-blur-xl border-b border-neutral-800/50 px-4 h-12 flex items-center justify-between shrink-0 shadow-[inset_0_-1px_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.4),0_4px_20px_rgba(0,0,0,0.3)] header-glow">
+      <header className="bg-neutral-950/80 backdrop-blur-xl border-b border-white/[0.06] px-4 h-12 flex items-center justify-between shrink-0">
         <nav className="flex items-center gap-1.5 text-sm">
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 font-bold font-mono tracking-wide text-white no-underline hover:text-neutral-300 transition-colors bg-neutral-800/50 rounded-lg px-2.5 py-1"
+            className="inline-flex items-center gap-1.5 font-bold font-mono tracking-wide text-white no-underline hover:text-neutral-300 transition-colors px-2.5 py-1"
           >
             <Workflow size={16} className="text-white" />
             Trigger
           </Link>
           {breadcrumbs?.map((crumb, i) => (
             <span key={i} className="inline-flex items-center gap-1.5">
-              <ChevronRight size={14} className="text-neutral-600" />
+              <ChevronRight size={14} className="text-neutral-700" />
               {crumb.href ? (
                 <Link to={crumb.href} className="text-neutral-400 hover:text-white no-underline transition-colors max-w-48 truncate">
                   {crumb.label}
@@ -71,8 +71,8 @@ export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps)
           <button
             type="button"
             onClick={() => dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
-            className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-neutral-500 hover:text-neutral-300 bg-neutral-800/50 border border-neutral-700/50 rounded-md px-2 py-1 transition-colors"
-            title="Search (⌘K)"
+            className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-neutral-500 hover:text-neutral-300 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1 transition-colors"
+            title="Search (\u2318K)"
           >
             <Command size={11} />
             <span>K</span>
@@ -82,7 +82,7 @@ export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps)
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {sidebar && <aside className="w-56 bg-neutral-900/40 border-r border-neutral-800/60 overflow-y-auto shrink-0 p-3">{sidebar}</aside>}
+        {sidebar && <aside className="w-56 bg-neutral-950/40 border-r border-white/[0.06] overflow-y-auto shrink-0 p-3">{sidebar}</aside>}
         <main className="flex-1 overflow-y-auto p-5">
           <div className="max-w-6xl mx-auto animate-fade-in">{children}</div>
         </main>

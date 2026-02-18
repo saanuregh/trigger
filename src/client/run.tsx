@@ -21,9 +21,9 @@ import {
 } from "./utils.ts";
 
 const stepCircleStyles: Record<string, string> = {
-  running: "border-neutral-400/50 bg-neutral-800/50 animate-pulse-ring",
-  success: "border-green-800/50 bg-green-950/30 shadow-[0_0_10px_rgba(74,222,128,0.25)]",
-  failed: "border-red-800/50 bg-red-950/30 shadow-[0_0_10px_rgba(248,113,113,0.25)]",
+  running: "border-white/[0.15] bg-white/[0.04]",
+  success: "border-green-500/30 bg-green-500/[0.08]",
+  failed: "border-red-500/30 bg-red-500/[0.08]",
 };
 
 function StepProgress({ steps }: { steps: StepRow[] }) {
@@ -271,7 +271,7 @@ export function RunPage() {
     <Layout breadcrumbs={breadcrumbs}>
       <div className="h-full flex flex-col">
         {/* Metadata bar */}
-        <div className="flex items-center justify-between mb-4 pb-4 border-b border-neutral-800 shrink-0">
+        <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/[0.06] shrink-0">
           <div className="flex items-center gap-3">
             <StatusBadge status={run.status} />
             <div>
@@ -285,7 +285,7 @@ export function RunPage() {
               </p>
             </div>
             {run.dry_run === 1 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-900/60 text-purple-300">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/15">
                 DRY RUN
               </span>
             )}
@@ -315,7 +315,7 @@ export function RunPage() {
 
         {/* Error banner */}
         {run.error && (
-          <div className="flex items-start gap-3 bg-red-950/50 border border-red-900/50 rounded-lg p-3 mb-4 shrink-0">
+          <div className="flex items-start gap-3 bg-red-500/[0.08] border border-red-500/15 rounded-lg p-3 mb-4 shrink-0">
             <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
             <div className="text-sm text-red-300">{run.error}</div>
           </div>
@@ -328,8 +328,10 @@ export function RunPage() {
             <button
               type="button"
               onClick={() => selectStep(null)}
-              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-md transition-colors mb-2 ${
-                selectedStepId === null ? "bg-white text-neutral-900 font-medium" : "bg-neutral-800/50 text-neutral-400 hover:text-white"
+              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg transition-all duration-150 active:scale-[0.98] mb-2 ${
+                selectedStepId === null
+                  ? "bg-white text-neutral-950 font-medium"
+                  : "bg-white/[0.04] text-neutral-400 hover:text-white hover:bg-white/[0.06]"
               }`}
             >
               All steps
@@ -338,7 +340,7 @@ export function RunPage() {
             {steps.map((step, i) => {
               const isLast = i === steps.length - 1;
               const isSelected = selectedStepId === step.step_id;
-              const circleStyle = stepCircleStyles[step.status] ?? "border-neutral-800 bg-neutral-900";
+              const circleStyle = stepCircleStyles[step.status] ?? "border-white/[0.06] bg-neutral-900";
 
               return (
                 <div key={step.step_id} className="flex gap-2.5">
@@ -347,15 +349,15 @@ export function RunPage() {
                       <StepIcon status={step.status} size={12} />
                     </div>
                     {!isLast && (
-                      <div className={`w-0.5 flex-1 min-h-4 ${step.status === "success" ? "bg-green-800/50" : "bg-neutral-800"}`} />
+                      <div className={`w-0.5 flex-1 min-h-4 ${step.status === "success" ? "bg-green-500/20" : "bg-white/[0.04]"}`} />
                     )}
                   </div>
 
                   <button
                     type="button"
                     onClick={() => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
-                    className={`pb-3 pt-0.5 flex-1 min-w-0 px-1.5 rounded-md transition-colors text-left ${
-                      isSelected ? "bg-neutral-800/50 ring-1 ring-neutral-600/30" : "hover:bg-neutral-800/30"
+                    className={`pb-3 pt-0.5 flex-1 min-w-0 px-1.5 rounded-lg transition-colors text-left ${
+                      isSelected ? "bg-white/[0.06] ring-1 ring-white/[0.08]" : "hover:bg-white/[0.03]"
                     }`}
                   >
                     <div className={`text-xs font-medium truncate ${step.status === "skipped" ? "text-neutral-600" : "text-neutral-200"}`}>

@@ -21,7 +21,7 @@ function NamespaceCard({ ns }: { ns: NamespaceConfigSummary }) {
           </div>
           <div>
             <h2 className="text-sm font-semibold text-neutral-200">{ns.display_name}</h2>
-            <span className="inline-flex items-center mt-1 text-[11px] bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded-full font-mono">
+            <span className="inline-flex items-center mt-1 text-[11px] bg-white/[0.04] text-neutral-400 px-1.5 py-0.5 rounded-full font-mono">
               {ns.pipelines.length} pipeline{ns.pipelines.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -85,7 +85,7 @@ export function HomePage() {
                 <Card key={ns.namespace} className="relative overflow-hidden p-4 opacity-50">
                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-red-500/60" />
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-red-900/30 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-lg bg-red-500/15 flex items-center justify-center shrink-0">
                       <AlertTriangle size={18} className="text-red-400" />
                     </div>
                     <div className="min-w-0">

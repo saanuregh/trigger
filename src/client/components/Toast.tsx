@@ -21,9 +21,9 @@ export function useToast() {
 }
 
 const variantConfig: Record<ToastVariant, { style: string; icon: typeof CheckCircle2; iconColor: string }> = {
-  success: { style: "border-green-800/50 bg-green-950/90", icon: CheckCircle2, iconColor: "text-green-400" },
-  error: { style: "border-red-800/50 bg-red-950/90", icon: XCircle, iconColor: "text-red-400" },
-  info: { style: "border-neutral-700 bg-neutral-900/90", icon: Info, iconColor: "text-neutral-400" },
+  success: { style: "border-green-500/15 bg-neutral-900/95", icon: CheckCircle2, iconColor: "text-green-400" },
+  error: { style: "border-red-500/15 bg-neutral-900/95", icon: XCircle, iconColor: "text-red-400" },
+  info: { style: "border-white/[0.06] bg-neutral-900/95", icon: Info, iconColor: "text-neutral-400" },
 };
 
 let nextId = 0;
@@ -60,7 +60,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border shadow-[0_4px_12px_rgba(0,0,0,0.4),0_1px_3px_rgba(0,0,0,0.3)] backdrop-blur-md text-sm text-neutral-200 ${style} ${t.removing ? "animate-fade-out" : "animate-slide-up"}`}
+              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border shadow-2xl shadow-black/40 backdrop-blur-md text-sm text-neutral-200 ${style} ${t.removing ? "animate-fade-out" : "animate-slide-up"}`}
             >
               <Icon size={16} className={iconColor} />
               <span className="flex-1">{t.message}</span>

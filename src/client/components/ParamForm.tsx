@@ -14,7 +14,7 @@ function defaultParams(params: ParamDef[]): Record<string, string | boolean> {
 }
 
 const inputBase =
-  "w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500/30 transition-colors";
+  "w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-white/[0.2] focus:ring-1 focus:ring-white/[0.08] transition-colors";
 
 function ParamField({ param, value, onChange }: { param: ParamDef; value: string | boolean; onChange: (value: string | boolean) => void }) {
   if (param.type === "boolean") {
@@ -24,7 +24,7 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
           type="checkbox"
           checked={value as boolean}
           onChange={(e) => onChange(e.target.checked)}
-          className="w-4 h-4 rounded bg-neutral-800 border-neutral-600 text-white focus:ring-neutral-500/30 focus:ring-offset-0"
+          className="w-4 h-4 rounded bg-white/[0.04] border-white/[0.08] text-white focus:ring-white/[0.08] focus:ring-offset-0"
         />
         <span className="text-neutral-300 group-hover:text-neutral-200 transition-colors">{param.label}</span>
       </label>
@@ -158,7 +158,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId }: ParamFormProp
               type="checkbox"
               checked={dryRun}
               onChange={(e) => setDryRun(e.target.checked)}
-              className="w-4 h-4 rounded bg-neutral-800 border-neutral-600 text-white focus:ring-neutral-500/30 focus:ring-offset-0"
+              className="w-4 h-4 rounded bg-white/[0.04] border-white/[0.08] text-white focus:ring-white/[0.08] focus:ring-offset-0"
             />
             <span className="group-hover:text-neutral-300 transition-colors">Dry run</span>
           </label>

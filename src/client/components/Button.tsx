@@ -5,10 +5,10 @@ type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ButtonSize = "sm" | "md" | "icon";
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: "bg-white hover:bg-neutral-100 text-neutral-900 font-medium shadow-[0_0_20px_rgba(255,255,255,0.15),0_1px_3px_rgba(0,0,0,0.3)]",
-  secondary: "bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-700",
-  danger: "bg-red-900/80 hover:bg-red-800 text-red-200",
-  ghost: "hover:bg-neutral-800 text-neutral-400 hover:text-white",
+  primary: "bg-white text-neutral-950 font-medium shadow-sm hover:bg-neutral-200",
+  secondary: "bg-white/[0.06] text-neutral-300 border border-white/[0.08] hover:bg-white/[0.1] hover:text-white",
+  danger: "bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25",
+  ghost: "text-neutral-400 hover:bg-white/[0.06] hover:text-white",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -30,7 +30,7 @@ export function Button({ variant = "secondary", size = "sm", icon, loading, clas
 
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 disabled:opacity-50 disabled:pointer-events-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-lg transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/[0.2] focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 disabled:opacity-50 disabled:pointer-events-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       disabled={isDisabled}
       {...props}
     >

@@ -26,11 +26,11 @@ const TEMPLATE_SPLIT_RE = /(\{\{.+?\}\})/g;
 const TEMPLATE_TEST_RE = /^\{\{.+?\}\}$/;
 
 const actionColors: Record<string, string> = {
-  codebuild: "bg-orange-900/50 text-orange-300",
-  "ecs-task": "bg-neutral-700 text-neutral-300",
-  "cloudflare-purge": "bg-amber-900/50 text-amber-300",
+  codebuild: "bg-orange-500/15 text-orange-300",
+  "ecs-task": "bg-white/[0.06] text-neutral-300",
+  "cloudflare-purge": "bg-amber-500/15 text-amber-300",
 };
-const defaultActionColor = "bg-neutral-700 text-neutral-400";
+const defaultActionColor = "bg-white/[0.06] text-neutral-400";
 
 function TemplateString({ value }: { value: string }) {
   const parts = value.split(TEMPLATE_SPLIT_RE);
@@ -127,7 +127,7 @@ function ConfigValue({ value }: { value: unknown }) {
   if (typeof value === "object") {
     const obj = value as Record<string, unknown>;
     if ("$switch" in obj) return <SwitchView value={obj} />;
-    return <pre className="text-neutral-300 text-xs bg-neutral-800 rounded p-2 mt-1">{JSON.stringify(value, null, 2)}</pre>;
+    return <pre className="text-neutral-300 text-xs bg-white/[0.04] rounded-lg p-2 mt-1">{JSON.stringify(value, null, 2)}</pre>;
   }
   return <span className="text-green-400">"{String(value)}"</span>;
 }
@@ -140,7 +140,7 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 p-4 text-left hover:bg-neutral-800/30 transition-colors rounded-lg"
+        className="w-full flex items-center gap-2 p-4 text-left hover:bg-white/[0.03] transition-colors rounded-lg"
       >
         {expanded ? (
           <ChevronDown size={14} className="text-neutral-500 shrink-0" />
@@ -149,12 +149,12 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
         )}
         <span className="text-xs text-neutral-600 w-5 text-right">{index + 1}.</span>
         <span className="text-sm font-medium text-neutral-200">{step.name}</span>
-        <span className={`text-[11px] px-1.5 py-0.5 rounded font-mono ${actionColors[step.action] ?? defaultActionColor}`}>
+        <span className={`text-[11px] px-1.5 py-0.5 rounded-lg font-mono ${actionColors[step.action] ?? defaultActionColor}`}>
           {step.action}
         </span>
       </button>
       {expanded && (
-        <div className="px-4 pb-4 ml-9 space-y-1.5 border-t border-neutral-800/50 pt-3">
+        <div className="px-4 pb-4 ml-9 space-y-1.5 border-t border-white/[0.04] pt-3">
           {Object.entries(step.config).map(([key, val]) => (
             <div key={key} className="text-sm flex items-start gap-2 group">
               <span className="text-neutral-500 shrink-0">{key}:</span>
@@ -212,44 +212,44 @@ export function ConfigPage() {
 
         {config.params && config.params.length > 0 && (
           <div>
-            <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider border-l-2 border-neutral-500 pl-2 mb-3">
-              Parameters
-            </h2>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-neutral-500 border-b border-neutral-800">
-                  <th className="pb-2 font-medium">Name</th>
-                  <th className="pb-2 font-medium">Type</th>
-                  <th className="pb-2 font-medium">Default</th>
-                  <th className="pb-2 font-medium">Required</th>
-                </tr>
-              </thead>
-              <tbody>
-                {config.params.map((p) => (
-                  <tr key={p.name} className="border-b border-neutral-800/50">
-                    <td className="py-2 text-neutral-200">{p.label}</td>
-                    <td className="py-2">
-                      <span className="text-xs bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded font-mono">{p.type}</span>
-                    </td>
-                    <td className="py-2">
-                      <ConfigValue value={p.default} />
-                    </td>
-                    <td className="py-2 text-neutral-400">
-                      {"required" in p && p.required ? (
-                        <span className="text-xs bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded">Yes</span>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
+            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-3">Parameters</h2>
+            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-neutral-500 text-[11px] font-medium">
+                    <th className="px-4 py-2.5">Name</th>
+                    <th className="px-4 py-2.5">Type</th>
+                    <th className="px-4 py-2.5">Default</th>
+                    <th className="px-4 py-2.5">Required</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {config.params.map((p) => (
+                    <tr key={p.name} className="border-t border-white/[0.04]">
+                      <td className="px-4 py-2.5 text-neutral-200">{p.label}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-xs bg-white/[0.06] text-neutral-400 px-1.5 py-0.5 rounded-lg font-mono">{p.type}</span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <ConfigValue value={p.default} />
+                      </td>
+                      <td className="px-4 py-2.5 text-neutral-400">
+                        {"required" in p && p.required ? (
+                          <span className="text-xs bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-lg">Yes</span>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         <div>
-          <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider border-l-2 border-neutral-500 pl-2 mb-3">Steps</h2>
+          <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-3">Steps</h2>
           <div className="space-y-2">
             {config.steps.map((step, i) => (
               <StepCard key={step.id} step={step} index={i} />

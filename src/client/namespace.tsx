@@ -50,7 +50,7 @@ export function NamespacePage() {
   const sidebar =
     runningPipelines.size > 0 ? (
       <div>
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">
           <Loader2 size={12} className="animate-spin text-neutral-400" />
           Running
         </div>
@@ -58,7 +58,7 @@ export function NamespacePage() {
           <Link
             key={run.pipeline_id}
             to={`/${ns}/${run.pipeline_id}`}
-            className="flex items-center gap-2 px-2 py-1.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-md no-underline transition-colors"
+            className="flex items-center gap-2 px-2 py-1.5 text-sm text-neutral-300 hover:text-white hover:bg-white/[0.04] rounded-lg no-underline transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
             {run.pipeline_name}
@@ -74,15 +74,15 @@ export function NamespacePage() {
         {nsConfig.pipelines.length === 0 ? (
           <EmptyState icon={<GitBranch size={48} />} title="No pipelines" description="This namespace has no pipelines configured." />
         ) : (
-          <div className="bg-neutral-900 border border-neutral-700/50 rounded-xl overflow-hidden card-surface">
+          <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-neutral-500 bg-neutral-800/50 text-xs uppercase tracking-wider">
-                  <th className="px-4 py-2.5 font-medium">Pipeline</th>
-                  <th className="px-4 py-2.5 font-medium w-16">Steps</th>
-                  <th className="px-4 py-2.5 font-medium">Last Run</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 font-medium w-20">Duration</th>
+                <tr className="text-left text-neutral-500 text-[11px] font-medium">
+                  <th className="px-4 py-2.5">Pipeline</th>
+                  <th className="px-4 py-2.5 w-16">Steps</th>
+                  <th className="px-4 py-2.5">Last Run</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5 w-20">Duration</th>
                 </tr>
               </thead>
               <tbody>
@@ -91,7 +91,7 @@ export function NamespacePage() {
                   return (
                     <tr
                       key={p.id}
-                      className="border-b border-neutral-800/50 last:border-b-0 hover:bg-neutral-800/40 transition-colors cursor-pointer"
+                      className="border-t border-white/[0.04] hover:bg-white/[0.03] transition-colors cursor-pointer"
                       onClick={() => navigate(`/${ns}/${p.id}`)}
                     >
                       <td className="px-4 py-2.5">

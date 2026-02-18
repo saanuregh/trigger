@@ -76,8 +76,8 @@ export function PipelinePage() {
     <Layout breadcrumbs={[{ label: nsDisplayName, href: `/${ns}` }, { label: pipeline.name }]} sidebar={sidebar}>
       <div className="space-y-8">
         {/* Trigger section */}
-        <div className="bg-neutral-900 border border-neutral-700/50 rounded-xl overflow-hidden card-surface">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-800 bg-neutral-800/30">
+        <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.04]">
             <Play size={14} className="text-neutral-400" />
             <h2 className="text-sm font-medium text-neutral-200">Run Pipeline</h2>
           </div>
@@ -92,46 +92,44 @@ export function PipelinePage() {
           <EmptyState icon={<Clock size={48} />} title="No runs yet" description="Run this pipeline to see execution history." />
         ) : (
           <div>
-            <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider border-l-2 border-neutral-500 pl-2 mb-4">
-              Recent Runs
-            </h2>
+            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-4">Recent Runs</h2>
 
             {activeRun && (
               <Link
                 to={`/${ns}/${pipelineId}/runs/${activeRun.id}`}
-                className="flex items-center gap-2.5 bg-neutral-800/40 border border-neutral-700/30 rounded-xl px-4 py-3 mb-4 no-underline hover:bg-neutral-800/60 transition-colors"
+                className="flex items-center gap-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 mb-4 no-underline hover:bg-white/[0.05] transition-colors"
               >
                 <Loader2 size={14} className="text-white animate-spin" />
                 <span className="text-sm text-neutral-300">Pipeline is running</span>
-                <span className="ml-auto text-xs font-mono text-neutral-300 bg-neutral-800 px-2 py-0.5 rounded">
+                <span className="ml-auto text-xs font-mono text-neutral-300 bg-white/[0.04] px-2 py-0.5 rounded-lg">
                   {activeRun.id.slice(0, 8)}
                 </span>
               </Link>
             )}
 
-            <div className="bg-neutral-900 border border-neutral-700/50 rounded-xl overflow-hidden card-surface">
+            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-neutral-500 bg-neutral-800/50 text-xs uppercase tracking-wider">
-                    <th className="px-4 py-2.5 font-medium">Run</th>
-                    <th className="px-4 py-2.5 font-medium">Status</th>
-                    <th className="px-4 py-2.5 font-medium">Started</th>
-                    <th className="px-4 py-2.5 font-medium">Duration</th>
-                    <th className="px-4 py-2.5 font-medium">By</th>
+                  <tr className="text-left text-neutral-500 text-[11px] font-medium">
+                    <th className="px-4 py-2.5">Run</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5">Started</th>
+                    <th className="px-4 py-2.5">Duration</th>
+                    <th className="px-4 py-2.5">By</th>
                   </tr>
                 </thead>
                 <tbody>
                   {runs.map((run) => (
-                    <tr key={run.id} className="border-b border-neutral-800/50 last:border-b-0 hover:bg-neutral-800/40 transition-colors">
+                    <tr key={run.id} className="border-t border-white/[0.04] hover:bg-white/[0.03] transition-colors">
                       <td className="px-4 py-2.5">
                         <Link
                           to={`/${ns}/${pipelineId}/runs/${run.id}`}
-                          className="inline-flex items-center bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white no-underline font-mono text-xs px-2 py-0.5 rounded transition-colors"
+                          className="inline-flex items-center bg-white/[0.06] hover:bg-white/[0.1] text-neutral-300 hover:text-white no-underline font-mono text-xs px-2 py-0.5 rounded-lg transition-colors"
                         >
                           {run.id.slice(0, 8)}
                         </Link>
                         {run.dry_run === 1 && (
-                          <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-900/60 text-purple-300">
+                          <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/15">
                             DRY
                           </span>
                         )}
