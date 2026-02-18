@@ -1,7 +1,7 @@
 import { AlertCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { errorMessage, type ParamDef, type PipelineDefSummary, type RunRow } from "../../types.ts";
-import { handleUnauthorized } from "../utils.ts";
+import { handleUnauthorized, isMac } from "../utils.ts";
 import { Button } from "./Button.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 
@@ -78,6 +78,19 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (e.shiftKey) setDryRun(true);
+        formRef.current?.requestSubmit();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   useEffect(() => {
     setParams(defaultParams(pipeline.params ?? []));
@@ -125,6 +138,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
       setError(errorMessage(err));
     } finally {
       setSubmitting(false);
+      setDryRun(false);
     }
   };
 
@@ -141,7 +155,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
         {(pipeline.params ?? []).map((param) => (
           <ParamField
             key={param.name}
@@ -151,36 +165,27 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
           />
         ))}
 
-        <div className="flex flex-col gap-2 pt-1">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="primary"
-              size="md"
-              type="submit"
-              loading={submitting}
-              disabled={activeRunCount >= pipeline.concurrency || atGlobalLimit}
-            >
-              Run Pipeline
-            </Button>
-            <label className="inline-flex items-center gap-2 text-sm text-neutral-400 select-none cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={dryRun}
-                onChange={(e) => setDryRun(e.target.checked)}
-                className="w-4 h-4 rounded bg-white/[0.04] border-white/[0.08] text-white focus:ring-white/[0.08] focus:ring-offset-0"
-              />
-              <span className="group-hover:text-neutral-300 transition-colors">Dry run</span>
-            </label>
-          </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="primary"
+            size="md"
+            type="submit"
+            loading={submitting}
+            disabled={activeRunCount >= pipeline.concurrency || atGlobalLimit}
+          >
+            Run Pipeline
+            <kbd className="hidden sm:inline text-[10px] opacity-60 ml-1.5 bg-white/10 px-1.5 py-0.5 rounded">
+              {isMac ? "\u2318\u23CE" : "Ctrl+\u23CE"}
+            </kbd>
+          </Button>
           {atGlobalLimit ? (
             <span className="text-[11px] text-yellow-500/80">Global concurrency limit reached.</span>
           ) : activeRunCount >= pipeline.concurrency ? (
             <span className="text-[11px] text-yellow-500/80">
-              Pipeline at max concurrency ({activeRunCount}/{pipeline.concurrency}).
+              At max concurrency ({activeRunCount}/{pipeline.concurrency}).
             </span>
           ) : (
-            pipeline.confirm &&
-            !dryRun && <span className="text-[11px] text-yellow-500/80">This pipeline requires confirmation before running.</span>
+            pipeline.confirm && <span className="text-[11px] text-yellow-500/80">Requires confirmation.</span>
           )}
         </div>
 
