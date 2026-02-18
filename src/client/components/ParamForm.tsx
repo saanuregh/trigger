@@ -68,9 +68,11 @@ interface ParamFormProps {
   ns: string;
   onRunStarted: (runId: string) => void;
   rerunId?: string | null;
+  activeRunCount?: number;
+  atGlobalLimit?: boolean;
 }
 
-export function ParamForm({ pipeline, ns, onRunStarted, rerunId }: ParamFormProps) {
+export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount = 0, atGlobalLimit = false }: ParamFormProps) {
   const [params, setParams] = useState<Record<string, string | boolean>>(() => defaultParams(pipeline.params ?? []));
   const [dryRun, setDryRun] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -151,7 +153,13 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId }: ParamFormProp
 
         <div className="flex flex-col gap-2 pt-1">
           <div className="flex items-center gap-3">
-            <Button variant="primary" size="md" type="submit" loading={submitting}>
+            <Button
+              variant="primary"
+              size="md"
+              type="submit"
+              loading={submitting}
+              disabled={activeRunCount >= pipeline.concurrency || atGlobalLimit}
+            >
               Run Pipeline
             </Button>
             <label className="inline-flex items-center gap-2 text-sm text-neutral-400 select-none cursor-pointer group">

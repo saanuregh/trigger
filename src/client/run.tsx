@@ -192,7 +192,7 @@ export function RunPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Retry failed" }));
         if (res.status === 409) {
-          toast("Pipeline already has an active run — wait for it to finish or cancel it first", "error");
+          toast("Pipeline at max concurrency — wait for a run to finish or cancel one first", "error");
         } else {
           toast(data.error ?? "Retry failed", "error");
         }

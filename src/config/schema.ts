@@ -92,6 +92,7 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
       description: z.string().optional(),
       confirm: z.boolean().optional(),
       timeout: z.number().optional(),
+      concurrency: z.number().int().positive().optional(),
       params: z.array(paramDef).optional(),
       access: accessConfig,
       steps: z.array(stepDef),

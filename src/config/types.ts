@@ -15,6 +15,7 @@ export interface PipelineDef {
   description?: string;
   confirm?: boolean;
   timeout?: number;
+  concurrency?: number;
   params?: ParamDef[];
   access?: AccessConfig;
   steps: StepDef[];

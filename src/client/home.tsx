@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronRight, FolderOpen, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, ChevronRight, FolderOpen, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import type { NamespaceConfigSummary } from "../types.ts";
 import { Button } from "./components/Button.tsx";
@@ -7,7 +7,8 @@ import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { HomeSkeleton } from "./components/Skeleton.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useConfigs, useUser } from "./hooks.tsx";
+import { useConfigs, useStatus, useUser } from "./hooks.tsx";
+import { Link } from "./router.tsx";
 import { handleUnauthorized, nsColor } from "./utils.ts";
 
 function NamespaceCard({ ns }: { ns: NamespaceConfigSummary }) {
@@ -34,6 +35,7 @@ function NamespaceCard({ ns }: { ns: NamespaceConfigSummary }) {
 
 export function HomePage() {
   const { data: configs, mutate } = useConfigs();
+  const { data: status } = useStatus();
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
@@ -78,6 +80,35 @@ export function HomePage() {
         />
       ) : (
         <div>
+          {status && status.pipelines.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity size={14} className="text-neutral-400" />
+                <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">Active Runs</h2>
+                <span className="text-[11px] font-mono text-neutral-500">
+                  {status.activeRuns}/{status.maxConcurrentRuns}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {status.pipelines.map((p) =>
+                  p.runIds.map((runId) => (
+                    <Link
+                      key={runId}
+                      to={`/${p.namespace}/${p.pipelineId}/runs/${runId}`}
+                      className="inline-flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-1.5 text-xs no-underline hover:bg-white/[0.06] transition-colors"
+                    >
+                      <Loader2 size={12} className="text-white animate-spin" />
+                      <span className="text-neutral-400">
+                        {p.namespace}/{p.pipelineId}
+                      </span>
+                      <span className="font-mono text-neutral-500">{runId.slice(0, 8)}</span>
+                    </Link>
+                  )),
+                )}
+              </div>
+            </div>
+          )}
+
           <h1 className="text-xl font-semibold tracking-tight mb-6">Namespaces</h1>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {configs.map((ns) =>

@@ -65,6 +65,7 @@ export interface PipelineDefSummary {
   name: string;
   description?: string;
   confirm?: boolean;
+  concurrency: number;
   params?: ParamDef[];
   steps: StepDefSummary[];
 }
@@ -81,4 +82,16 @@ export interface NamespaceConfigSummary {
   display_name: string;
   pipelines: PipelineDefSummary[];
   error?: string;
+}
+
+export interface ActiveRunInfo {
+  namespace: string;
+  pipelineId: string;
+  runIds: string[];
+}
+
+export interface SystemStatus {
+  activeRuns: number;
+  maxConcurrentRuns: number;
+  pipelines: ActiveRunInfo[];
 }

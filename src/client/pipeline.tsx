@@ -9,7 +9,7 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { PipelineSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useFetch, useNsDisplayName } from "./hooks.tsx";
+import { useFetch, useNsDisplayName, useStatus } from "./hooks.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
 import { formatDuration, timeAgo, useLiveDuration } from "./utils.ts";
 
@@ -28,6 +28,7 @@ export function PipelinePage() {
   const nsDisplayName = useNsDisplayName(ns);
   const [page, setPage] = useState(1);
   const { toast } = useToast();
+  const { data: status } = useStatus();
 
   const { data: pipeline, error } = useFetch<PipelineDefSummary>(`/api/pipelines/${ns}/${pipelineId}`);
   const { data: runsData } = useFetch<PaginatedResponse<RunRow>>(
@@ -68,7 +69,7 @@ export function PipelinePage() {
     );
   }
 
-  const activeRun = runs.find((r) => r.status === "running");
+  const activeRuns = runs.filter((r) => r.status === "running");
 
   const rerunId = new URLSearchParams(window.location.search).get("rerun");
 
@@ -80,10 +81,20 @@ export function PipelinePage() {
           <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.04]">
             <Play size={14} className="text-neutral-400" />
             <h2 className="text-sm font-medium text-neutral-200">Run Pipeline</h2>
+            <span className="ml-auto text-[11px] font-mono text-neutral-500">
+              {activeRuns.length}/{pipeline.concurrency} slots
+            </span>
           </div>
           <div className="p-4">
             {pipeline.description && <p className="text-sm text-neutral-400 mb-3">{pipeline.description}</p>}
-            <ParamForm pipeline={pipeline} ns={ns} onRunStarted={handleRunStarted} rerunId={rerunId} />
+            <ParamForm
+              pipeline={pipeline}
+              ns={ns}
+              onRunStarted={handleRunStarted}
+              rerunId={rerunId}
+              activeRunCount={activeRuns.length}
+              atGlobalLimit={status ? status.activeRuns >= status.maxConcurrentRuns : false}
+            />
           </div>
         </div>
 
@@ -94,17 +105,22 @@ export function PipelinePage() {
           <div>
             <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-4">Recent Runs</h2>
 
-            {activeRun && (
-              <Link
-                to={`/${ns}/${pipelineId}/runs/${activeRun.id}`}
-                className="flex items-center gap-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 mb-4 no-underline hover:bg-white/[0.05] transition-colors"
-              >
-                <Loader2 size={14} className="text-white animate-spin" />
-                <span className="text-sm text-neutral-300">Pipeline is running</span>
-                <span className="ml-auto text-xs font-mono text-neutral-300 bg-white/[0.04] px-2 py-0.5 rounded-lg">
-                  {activeRun.id.slice(0, 8)}
-                </span>
-              </Link>
+            {activeRuns.length > 0 && (
+              <div className="space-y-2 mb-4">
+                {activeRuns.map((activeRun) => (
+                  <Link
+                    key={activeRun.id}
+                    to={`/${ns}/${pipelineId}/runs/${activeRun.id}`}
+                    className="flex items-center gap-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 no-underline hover:bg-white/[0.05] transition-colors"
+                  >
+                    <Loader2 size={14} className="text-white animate-spin" />
+                    <span className="text-sm text-neutral-300">Pipeline is running</span>
+                    <span className="ml-auto text-xs font-mono text-neutral-300 bg-white/[0.04] px-2 py-0.5 rounded-lg">
+                      {activeRun.id.slice(0, 8)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             )}
 
             <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">

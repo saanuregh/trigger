@@ -30,12 +30,31 @@ export class PipelineError extends Error {
 }
 
 const DEFAULT_RUN_TIMEOUT_S = 3600;
-const activePipelines = new Map<string, ActivePipeline>();
+const activePipelines = new Map<string, ActivePipeline[]>();
 
-function assertNotActive(key: string, dryRun: boolean): void {
-  if (!dryRun && activePipelines.has(key)) {
-    throw new PipelineError(`Pipeline ${key} is already running (run: ${activePipelines.get(key)!.runId})`, 409);
+function assertConcurrency(key: string, limit: number): void {
+  const active = activePipelines.get(key) ?? [];
+  if (active.length >= limit) {
+    throw new PipelineError(`Pipeline ${key} at max concurrency (${active.length}/${limit})`, 409);
   }
+  const globalCount = [...activePipelines.values()].reduce((sum, arr) => sum + arr.length, 0);
+  if (globalCount >= env.MAX_CONCURRENT_RUNS) {
+    throw new PipelineError(`Global concurrency limit reached (${globalCount}/${env.MAX_CONCURRENT_RUNS})`, 409);
+  }
+}
+
+function trackRun(key: string, entry: ActivePipeline): void {
+  const arr = activePipelines.get(key) ?? [];
+  arr.push(entry);
+  activePipelines.set(key, arr);
+}
+
+function untrackRun(key: string, runId: string): void {
+  const arr = activePipelines.get(key);
+  if (!arr) return;
+  const filtered = arr.filter((a) => a.runId !== runId);
+  if (filtered.length === 0) activePipelines.delete(key);
+  else activePipelines.set(key, filtered);
 }
 
 async function loadPipeline(namespace: string, pipelineId: string) {
@@ -59,15 +78,15 @@ export async function executePipeline(
 ): Promise<string> {
   const key = `${namespace}:${pipelineId}`;
   const dryRun = options?.dryRun ?? false;
-  assertNotActive(key, dryRun);
+  const { nsConfig, pipeline } = await loadPipeline(namespace, pipelineId);
+  assertConcurrency(key, pipeline.concurrency ?? 1);
 
   const runId = Bun.randomUUIDv7();
   const abort = new AbortController();
-  if (!dryRun) activePipelines.set(key, { runId, abort });
+  trackRun(key, { runId, abort });
 
   try {
     wireAbort(options?.signal, abort);
-    const { nsConfig, pipeline } = await loadPipeline(namespace, pipelineId);
 
     db.createRun({
       id: runId,
@@ -131,7 +150,7 @@ export async function executePipeline(
 
     return runId;
   } catch (err) {
-    if (!dryRun) activePipelines.delete(key);
+    untrackRun(key, runId);
     throw err;
   }
 }
@@ -143,14 +162,13 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
 
   const key = `${run.namespace}:${run.pipeline_id}`;
   const dryRun = run.dry_run === 1;
-  assertNotActive(key, dryRun);
+  const { nsConfig, pipeline } = await loadPipeline(run.namespace, run.pipeline_id);
+  assertConcurrency(key, pipeline.concurrency ?? 1);
 
   const abort = new AbortController();
-  if (!dryRun) activePipelines.set(key, { runId, abort });
+  trackRun(key, { runId, abort });
 
   try {
-    const { nsConfig, pipeline } = await loadPipeline(run.namespace, run.pipeline_id);
-
     const existingSteps = db.getStepsForRun(runId);
     const failedIndex = existingSteps.findIndex((s) => s.status === "failed");
     if (failedIndex === -1) throw new PipelineError("No failed step found in this run", 400);
@@ -208,7 +226,7 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
 
     return runId;
   } catch (err) {
-    if (!dryRun) activePipelines.delete(key);
+    untrackRun(key, runId);
     db.updateRunStatus(runId, "failed", `Retry setup failed: ${errorMessage(err)}`);
     throw err;
   }
@@ -307,7 +325,7 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
     if (dryRun) {
       sl.stepLog.info("dry run, skipping action execution");
       sl.stepLog.info({ resolvedConfig }, "dry run resolved config");
-      await Bun.sleep(1000 + Math.random() * 3000);
+      await Bun.sleep(5000 + Math.random() * 10000);
       if (Math.random() < 0.05) throw new Error("simulated dry run failure");
       db.updateStepStatus(dbId, "success");
     } else {
@@ -351,7 +369,7 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
 }
 
 async function runSteps(opts: RunStepsOptions) {
-  const { runId, key, log, stepRecords, abort, dryRun, timeoutS } = opts;
+  const { runId, key, log, stepRecords, abort, timeoutS } = opts;
   const startedAt = Date.now();
   const timeoutTimer = setTimeout(() => {
     if (!abort.signal.aborted) {
@@ -389,8 +407,16 @@ async function runSteps(opts: RunStepsOptions) {
     db.markStaleSteps(runId);
   } finally {
     clearTimeout(timeoutTimer);
-    if (!dryRun) activePipelines.delete(key);
+    untrackRun(key, runId);
   }
+}
+
+export function getActiveRunSummary(): { total: number; byPipeline: Record<string, string[]> } {
+  const byPipeline: Record<string, string[]> = {};
+  for (const [key, arr] of activePipelines) {
+    byPipeline[key] = arr.map((a) => a.runId);
+  }
+  return { total: [...activePipelines.values()].reduce((sum, arr) => sum + arr.length, 0), byPipeline };
 }
 
 export function initBuiltinActions(): void {
@@ -401,24 +427,29 @@ export function initBuiltinActions(): void {
 }
 
 export function cancelPipeline(runId: string): boolean {
-  const active = [...activePipelines.values()].find((a) => a.runId === runId);
-  if (!active) return false;
-  active.abort.abort();
-  return true;
+  for (const arr of activePipelines.values()) {
+    const active = arr.find((a) => a.runId === runId);
+    if (active) {
+      active.abort.abort();
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function shutdownAll(): Promise<void> {
-  if (activePipelines.size === 0) return;
+  const allActive = [...activePipelines.values()].flat();
+  if (allActive.length === 0) return;
 
-  logger.info({ active: activePipelines.size }, "aborting active pipelines");
-  for (const active of activePipelines.values()) active.abort.abort();
+  logger.info({ active: allActive.length }, "aborting active pipelines");
+  for (const active of allActive) active.abort.abort();
 
   const deadline = Date.now() + 10_000;
   while (activePipelines.size > 0 && Date.now() < deadline) {
     await Bun.sleep(100);
   }
 
-  for (const active of activePipelines.values()) {
+  for (const active of [...activePipelines.values()].flat()) {
     db.updateRunStatus(active.runId, "cancelled", "Server shutdown");
     db.markStaleSteps(active.runId);
   }

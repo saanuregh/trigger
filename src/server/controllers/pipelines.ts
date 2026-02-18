@@ -27,6 +27,7 @@ export const getPipeline = authed(async (req, session) => {
     name: pipeline!.name,
     description: pipeline!.description,
     confirm: pipeline!.confirm,
+    concurrency: pipeline!.concurrency ?? 1,
     params: pipeline!.params,
     steps: pipeline!.steps.map(toStepSummary),
   });

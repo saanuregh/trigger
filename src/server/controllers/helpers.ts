@@ -24,6 +24,7 @@ export function toClientConfigs(configs: NamespaceConfig[]): NamespaceConfigSumm
       name: p.name,
       description: p.description,
       confirm: p.confirm,
+      concurrency: p.concurrency ?? 1,
       params: p.params,
       steps: p.steps.map(toStepSummary),
     })),
