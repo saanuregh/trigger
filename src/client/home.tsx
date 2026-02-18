@@ -7,7 +7,7 @@ import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { HomeSkeleton } from "./components/Skeleton.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useConfigs, useUser } from "./swr.tsx";
+import { useConfigs, useUser } from "./hooks.tsx";
 import { handleUnauthorized, nsColor } from "./utils.ts";
 
 function NamespaceCard({ ns }: { ns: NamespaceConfigSummary }) {

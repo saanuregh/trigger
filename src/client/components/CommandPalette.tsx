@@ -1,8 +1,8 @@
 import { FolderOpen, GitBranch, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useConfigs } from "../hooks.tsx";
 import { navigate } from "../router.tsx";
-import { useConfigs } from "../swr.tsx";
 
 interface PaletteItem {
   id: string;

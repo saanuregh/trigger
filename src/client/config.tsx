@@ -1,12 +1,11 @@
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
-import useSWR from "swr";
 import type { ParamDef } from "../types.ts";
 import { Card } from "./components/Card.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
+import { useFetch, useNsDisplayName } from "./hooks.tsx";
 import { useRoute } from "./router.tsx";
-import { useNsDisplayName } from "./swr.tsx";
 
 interface StepConfig {
   id: string;
@@ -177,7 +176,7 @@ export function ConfigPage() {
   const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
   const nsDisplayName = useNsDisplayName(ns);
-  const { data: config, error } = useSWR<PipelineConfig>(`/api/pipelines/${ns}/${pipelineId}/config`);
+  const { data: config, error } = useFetch<PipelineConfig>(`/api/pipelines/${ns}/${pipelineId}/config`);
 
   const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="config" />;
 

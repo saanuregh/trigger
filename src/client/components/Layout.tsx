@@ -1,7 +1,7 @@
 import { ChevronRight, Command, LogOut, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
+import { useUser } from "../hooks.tsx";
 import { Link } from "../router.tsx";
-import { useUser } from "../swr.tsx";
 
 interface Breadcrumb {
   label: string;
