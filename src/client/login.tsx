@@ -6,13 +6,14 @@ export function LoginPage() {
   const error = params.get("error");
 
   return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="text-center space-y-6 max-w-sm">
-        <div className="flex items-center justify-center gap-2 text-2xl font-bold">
-          <Workflow size={28} className="text-blue-400" />
+    <div className="flex items-center justify-center h-screen relative">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.04)_0%,_transparent_70%)]" />
+      <div className="relative text-center space-y-6 max-w-sm bg-neutral-900/50 border border-neutral-800 rounded-xl p-8 backdrop-blur-sm">
+        <div className="flex items-center justify-center gap-2.5 text-2xl font-bold">
+          <Workflow size={32} className="text-white" />
           Trigger
         </div>
-        <p className="text-gray-400 text-sm">Sign in to access pipelines</p>
+        <p className="text-neutral-400 text-sm">Sign in to access pipelines</p>
         {error && (
           <div className="bg-red-950/50 border border-red-900/50 rounded-lg px-4 py-2 text-sm text-red-300">
             {error === "session_expired" ? "Session expired. Please sign in again." : `Authentication error: ${error}`}
@@ -20,7 +21,7 @@ export function LoginPage() {
         )}
         <a
           href={`/auth/login?return=${encodeURIComponent(returnUrl)}`}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-2.5 rounded-lg transition-colors no-underline"
+          className="inline-flex items-center gap-2 bg-white hover:bg-neutral-200 text-neutral-900 font-medium px-6 py-2.5 rounded-lg transition-all duration-200 no-underline shadow-lg shadow-black/20 hover:shadow-black/30"
         >
           <LogIn size={16} />
           Sign in with SSO

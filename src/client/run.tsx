@@ -1,4 +1,4 @@
-import { AlertCircle, Download, Square } from "lucide-react";
+import { AlertCircle, Download, RotateCcw, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import type { LogLine, RunRow, StepRow } from "../types.ts";
@@ -10,12 +10,20 @@ import { LogViewer } from "./components/LogViewer.tsx";
 import { RunSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useRoute } from "./router.tsx";
+import { navigate, useRoute } from "./router.tsx";
 import { useNsDisplayName } from "./swr.tsx";
-import { formatTime, handleUnauthorized, requestNotificationPermission, showRunNotification } from "./utils.ts";
+import {
+  formatDuration,
+  handleUnauthorized,
+  requestNotificationPermission,
+  setFaviconStatus,
+  showRunNotification,
+  timeAgo,
+  useLiveDuration,
+} from "./utils.ts";
 
 const stepCircleStyles: Record<string, string> = {
-  running: "border-blue-500/50 bg-blue-950/50 shadow-[0_0_8px_rgba(59,130,246,0.3)]",
+  running: "border-neutral-400/50 bg-neutral-800/50 animate-pulse-ring",
   success: "border-green-800/50 bg-green-950/30",
   failed: "border-red-800/50 bg-red-950/30",
 };
@@ -24,6 +32,8 @@ export function RunPage() {
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [cancelling, setCancelling] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [autoFollow, setAutoFollow] = useState(true);
   const { toast } = useToast();
 
   const logBufferRef = useRef<LogLine[]>([]);
@@ -51,6 +61,14 @@ export function RunPage() {
       document.title = "Trigger";
     };
   }, [run, runId]);
+
+  // Dynamic favicon based on run status
+  useEffect(() => {
+    if (run) setFaviconStatus(run.status);
+    return () => setFaviconStatus(null);
+  }, [run?.status]);
+
+  const liveDuration = useLiveDuration(run?.started_at ?? null, run?.status === "running");
 
   useEffect(() => {
     if (!run) return;
@@ -121,6 +139,27 @@ export function RunPage() {
     };
   }, [run?.status, runId, flushLogs, mutate]);
 
+  // Auto-follow: select the running step's logs
+  useEffect(() => {
+    if (!autoFollow) return;
+    const runningStep = steps.find((s) => s.status === "running");
+    if (runningStep) setSelectedStepId(runningStep.step_id);
+  }, [steps, autoFollow]);
+
+  const handleStepClick = (stepId: string) => {
+    setAutoFollow(false);
+    setSelectedStepId(selectedStepId === stepId ? null : stepId);
+  };
+
+  const handleShowAllLogs = () => {
+    setAutoFollow(false);
+    setSelectedStepId(null);
+  };
+
+  const handleRerun = () => {
+    navigate(`/${ns}/${pipelineId}?rerun=${runId}`);
+  };
+
   const handleStop = useCallback(async () => {
     setCancelling(true);
     setShowStopConfirm(false);
@@ -186,70 +225,127 @@ export function RunPage() {
 
   return (
     <Layout breadcrumbs={breadcrumbs}>
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-lg font-semibold">{run.pipeline_name}</h1>
-            <p className="text-sm text-gray-500">
-              {formatTime(run.started_at)}
-              {run.triggered_by && <span className="ml-2">by {run.triggered_by}</span>}
-            </p>
-          </div>
+      <div className="h-full flex flex-col">
+        {/* Metadata bar */}
+        <div className="flex items-center justify-between mb-4 pb-4 border-b border-neutral-800 shrink-0">
           <div className="flex items-center gap-3">
+            <StatusBadge status={run.status} />
+            <div>
+              <h1 className="text-base font-semibold tracking-tight">{run.pipeline_name}</h1>
+              <p className="text-xs text-neutral-500">
+                <span className="font-mono" title={run.started_at}>
+                  {timeAgo(run.started_at)}
+                </span>
+                {run.triggered_by && <span className="ml-2">by {run.triggered_by}</span>}
+                {liveDuration && <span className="ml-2 font-mono text-white">{liveDuration}</span>}
+              </p>
+            </div>
             {run.dry_run === 1 && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-900/60 text-purple-300">
-                dry run
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-900/60 text-purple-300">
+                DRY RUN
               </span>
             )}
-            <StatusBadge status={run.status} />
+          </div>
+          <div className="flex items-center gap-2">
+            {steps.length > 0 &&
+              (() => {
+                const done = steps.filter((s) => s.status === "success" || s.status === "failed" || s.status === "skipped").length;
+                const runningStep = steps.find((s) => s.status === "running");
+                if (runningStep) {
+                  const idx = steps.indexOf(runningStep) + 1;
+                  return (
+                    <span className="text-xs text-neutral-400 font-mono">
+                      {idx}/{steps.length}
+                    </span>
+                  );
+                }
+                return (
+                  <span className="text-xs text-neutral-500 font-mono">
+                    {done}/{steps.length}
+                  </span>
+                );
+              })()}
             {isActive && (
               <Button variant="danger" onClick={() => setShowStopConfirm(true)} loading={cancelling} icon={<Square size={12} />}>
                 Stop
               </Button>
             )}
+            {!isActive && (
+              <Button onClick={handleRerun} icon={<RotateCcw size={14} />}>
+                Re-run
+              </Button>
+            )}
             <Button onClick={handleDownloadLogs} icon={<Download size={14} />}>
-              Download logs
+              Logs
             </Button>
           </div>
         </div>
 
+        {/* Error banner */}
         {run.error && (
-          <div className="flex items-start gap-3 bg-red-950/50 border border-red-900/50 rounded-lg p-4 mb-4">
-            <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 bg-red-950/50 border border-red-900/50 rounded-lg p-3 mb-4 shrink-0">
+            <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
             <div className="text-sm text-red-300">{run.error}</div>
           </div>
         )}
 
-        <div className="mb-4">
-          {steps.map((step, i) => {
-            const isLast = i === steps.length - 1;
+        {/* Side-by-side: Steps + Logs */}
+        <div className="flex gap-4 flex-1 min-h-0">
+          {/* Steps panel */}
+          <div className="w-60 shrink-0 overflow-y-auto">
+            <button
+              type="button"
+              onClick={handleShowAllLogs}
+              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-md transition-colors mb-2 ${
+                selectedStepId === null ? "bg-white text-neutral-900 font-medium" : "bg-neutral-800/50 text-neutral-400 hover:text-white"
+              }`}
+            >
+              All steps
+            </button>
 
-            const circleStyle = stepCircleStyles[step.status] ?? "border-gray-800 bg-gray-900";
+            {steps.map((step, i) => {
+              const isLast = i === steps.length - 1;
+              const isSelected = selectedStepId === step.step_id;
+              const circleStyle = stepCircleStyles[step.status] ?? "border-neutral-800 bg-neutral-900";
 
-            return (
-              <div key={step.step_id} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div className={`relative z-10 flex items-center justify-center w-7 h-7 rounded-full border-2 ${circleStyle}`}>
-                    <StepIcon status={step.status} size={14} />
+              return (
+                <div key={step.step_id} className="flex gap-2.5">
+                  <div className="flex flex-col items-center">
+                    <div className={`relative z-10 flex items-center justify-center w-6 h-6 rounded-full border-2 ${circleStyle}`}>
+                      <StepIcon status={step.status} size={12} />
+                    </div>
+                    {!isLast && (
+                      <div className={`w-0.5 flex-1 min-h-4 ${step.status === "success" ? "bg-green-800/50" : "bg-neutral-800"}`} />
+                    )}
                   </div>
-                  {!isLast && <div className={`w-px flex-1 min-h-4 ${step.status === "success" ? "bg-green-800/50" : "bg-gray-800"}`} />}
-                </div>
 
-                <div className="pb-4 pt-1 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-medium ${step.status === "skipped" ? "text-gray-600" : "text-gray-200"}`}>
+                  <button
+                    type="button"
+                    onClick={() => handleStepClick(step.step_id)}
+                    className={`pb-3 pt-0.5 flex-1 min-w-0 px-1.5 rounded-md transition-colors text-left ${
+                      isSelected ? "bg-neutral-800/50 ring-1 ring-neutral-600/30" : "hover:bg-neutral-800/30"
+                    }`}
+                  >
+                    <div className={`text-xs font-medium truncate ${step.status === "skipped" ? "text-neutral-600" : "text-neutral-200"}`}>
                       {step.step_name}
-                    </span>
-                    <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded font-mono">{step.action}</span>
-                    {step.status !== "pending" && step.status !== "skipped" && <StatusBadge status={step.status} />}
-                  </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-neutral-600 font-mono">{step.action}</span>
+                      {step.started_at && step.finished_at && (
+                        <span className="text-[10px] text-neutral-600 font-mono">{formatDuration(step.started_at, step.finished_at)}</span>
+                      )}
+                    </div>
+                  </button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        <LogViewer lines={logs} />
+          {/* Log viewer */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            <LogViewer lines={logs} stepFilter={selectedStepId} fullHeight />
+          </div>
+        </div>
 
         <ConfirmDialog
           open={showStopConfirm}

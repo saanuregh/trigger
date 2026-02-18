@@ -28,10 +28,10 @@ const TEMPLATE_TEST_RE = /^\{\{.+?\}\}$/;
 
 const actionColors: Record<string, string> = {
   codebuild: "bg-orange-900/50 text-orange-300",
-  "ecs-task": "bg-blue-900/50 text-blue-300",
+  "ecs-task": "bg-neutral-700 text-neutral-300",
   "cloudflare-purge": "bg-amber-900/50 text-amber-300",
 };
-const defaultActionColor = "bg-gray-700 text-gray-400";
+const defaultActionColor = "bg-neutral-700 text-neutral-400";
 
 function TemplateString({ value }: { value: string }) {
   const parts = value.split(TEMPLATE_SPLIT_RE);
@@ -76,7 +76,7 @@ function SwitchView({ value }: { value: Record<string, unknown> }) {
         ))}
         {defaultCase !== undefined && (
           <div className="flex gap-2">
-            <span className="text-gray-500 italic shrink-0">default:</span>
+            <span className="text-neutral-500 italic shrink-0">default:</span>
             <ConfigValue value={defaultCase} />
           </div>
         )}
@@ -98,7 +98,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center text-gray-600 hover:text-gray-400 transition-colors p-0.5"
+      className="inline-flex items-center text-neutral-600 hover:text-neutral-400 transition-colors p-0.5"
       title="Copy value"
     >
       {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
@@ -107,13 +107,13 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function ConfigValue({ value }: { value: unknown }) {
-  if (value === null || value === undefined) return <span className="text-gray-600">-</span>;
+  if (value === null || value === undefined) return <span className="text-neutral-600">-</span>;
   if (typeof value === "boolean") return <span className="text-yellow-400">{String(value)}</span>;
-  if (typeof value === "number") return <span className="text-blue-400">{value}</span>;
+  if (typeof value === "number") return <span className="text-neutral-300">{value}</span>;
   if (typeof value === "string") return <TemplateString value={value} />;
   if (Array.isArray(value)) {
     return (
-      <span className="text-gray-300">
+      <span className="text-neutral-300">
         [
         {value.map((v, i) => (
           <span key={i}>
@@ -128,7 +128,7 @@ function ConfigValue({ value }: { value: unknown }) {
   if (typeof value === "object") {
     const obj = value as Record<string, unknown>;
     if ("$switch" in obj) return <SwitchView value={obj} />;
-    return <pre className="text-gray-300 text-xs bg-gray-800 rounded p-2 mt-1">{JSON.stringify(value, null, 2)}</pre>;
+    return <pre className="text-neutral-300 text-xs bg-neutral-800 rounded p-2 mt-1">{JSON.stringify(value, null, 2)}</pre>;
   }
   return <span className="text-green-400">"{String(value)}"</span>;
 }
@@ -141,24 +141,24 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 p-4 text-left hover:bg-gray-800/30 transition-colors rounded-lg"
+        className="w-full flex items-center gap-2 p-4 text-left hover:bg-neutral-800/30 transition-colors rounded-lg"
       >
         {expanded ? (
-          <ChevronDown size={14} className="text-gray-500 shrink-0" />
+          <ChevronDown size={14} className="text-neutral-500 shrink-0" />
         ) : (
-          <ChevronRight size={14} className="text-gray-500 shrink-0" />
+          <ChevronRight size={14} className="text-neutral-500 shrink-0" />
         )}
-        <span className="text-xs text-gray-600 w-5 text-right">{index + 1}.</span>
-        <span className="text-sm font-medium text-gray-200">{step.name}</span>
+        <span className="text-xs text-neutral-600 w-5 text-right">{index + 1}.</span>
+        <span className="text-sm font-medium text-neutral-200">{step.name}</span>
         <span className={`text-[11px] px-1.5 py-0.5 rounded font-mono ${actionColors[step.action] ?? defaultActionColor}`}>
           {step.action}
         </span>
       </button>
       {expanded && (
-        <div className="px-4 pb-4 ml-9 space-y-1.5 border-t border-gray-800/50 pt-3">
+        <div className="px-4 pb-4 ml-9 space-y-1.5 border-t border-neutral-800/50 pt-3">
           {Object.entries(step.config).map(([key, val]) => (
             <div key={key} className="text-sm flex items-start gap-2 group">
-              <span className="text-gray-500 shrink-0">{key}:</span>
+              <span className="text-neutral-500 shrink-0">{key}:</span>
               <ConfigValue value={val} />
               {typeof val === "string" && (
                 <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -198,7 +198,7 @@ export function ConfigPage() {
   if (!config) {
     return (
       <Layout breadcrumbs={breadcrumbs} sidebar={sidebar}>
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-neutral-500">Loading...</div>
       </Layout>
     );
   }
@@ -207,16 +207,18 @@ export function ConfigPage() {
     <Layout breadcrumbs={breadcrumbs} sidebar={sidebar}>
       <div className="space-y-6">
         <div>
-          <h1 className="text-lg font-semibold">{config.name}</h1>
-          {config.description && <p className="text-sm text-gray-400 mt-1">{config.description}</p>}
+          <h1 className="text-xl font-semibold tracking-tight">{config.name}</h1>
+          {config.description && <p className="text-sm text-neutral-400 mt-1">{config.description}</p>}
         </div>
 
         {config.params && config.params.length > 0 && (
           <div>
-            <h2 className="text-sm font-semibold text-gray-400 mb-2">Parameters</h2>
+            <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider border-l-2 border-neutral-500 pl-2 mb-3">
+              Parameters
+            </h2>
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-gray-500 border-b border-gray-800">
+                <tr className="text-left text-neutral-500 border-b border-neutral-800">
                   <th className="pb-2 font-medium">Name</th>
                   <th className="pb-2 font-medium">Type</th>
                   <th className="pb-2 font-medium">Default</th>
@@ -225,15 +227,15 @@ export function ConfigPage() {
               </thead>
               <tbody>
                 {config.params.map((p) => (
-                  <tr key={p.name} className="border-b border-gray-800/50">
-                    <td className="py-2 text-gray-200">{p.label}</td>
+                  <tr key={p.name} className="border-b border-neutral-800/50">
+                    <td className="py-2 text-neutral-200">{p.label}</td>
                     <td className="py-2">
-                      <span className="text-xs bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded font-mono">{p.type}</span>
+                      <span className="text-xs bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded font-mono">{p.type}</span>
                     </td>
                     <td className="py-2">
                       <ConfigValue value={p.default} />
                     </td>
-                    <td className="py-2 text-gray-400">
+                    <td className="py-2 text-neutral-400">
                       {"required" in p && p.required ? (
                         <span className="text-xs bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded">Yes</span>
                       ) : (
@@ -248,7 +250,7 @@ export function ConfigPage() {
         )}
 
         <div>
-          <h2 className="text-sm font-semibold text-gray-400 mb-2">Steps</h2>
+          <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider border-l-2 border-neutral-500 pl-2 mb-3">Steps</h2>
           <div className="space-y-2">
             {config.steps.map((step, i) => (
               <StepCard key={step.id} step={step} index={i} />

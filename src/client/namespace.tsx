@@ -1,14 +1,13 @@
 import { GitBranch, Loader2 } from "lucide-react";
 import useSWR from "swr";
 import type { PaginatedResponse, RunRow } from "../types.ts";
-import { CardLink } from "./components/Card.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { NamespaceSkeleton } from "./components/Skeleton.tsx";
-import { StatusBadge } from "./components/StatusBadge.tsx";
-import { Link, useRoute } from "./router.tsx";
+import { StatusDot } from "./components/StatusBadge.tsx";
+import { Link, navigate, useRoute } from "./router.tsx";
 import { useConfigs } from "./swr.tsx";
-import { formatTime } from "./utils.ts";
+import { formatDuration, timeAgo } from "./utils.ts";
 
 export function NamespacePage() {
   const { ns } = useRoute().params as { ns: string };
@@ -60,17 +59,17 @@ export function NamespacePage() {
   const sidebar =
     runningPipelines.length > 0 ? (
       <div>
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-          <Loader2 size={12} className="animate-spin text-blue-400" />
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+          <Loader2 size={12} className="animate-spin text-neutral-400" />
           Running
         </div>
         {runningPipelines.map((run) => (
           <Link
             key={run.pipeline_id}
             to={`/${ns}/${run.pipeline_id}`}
-            className="flex items-center gap-2 px-2 py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-gray-800 rounded-md no-underline transition-colors"
+            className="flex items-center gap-2 px-2 py-1.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-md no-underline transition-colors"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
             {run.pipeline_name}
           </Link>
         ))}
@@ -80,40 +79,55 @@ export function NamespacePage() {
   return (
     <Layout breadcrumbs={[{ label: nsConfig.display_name }]} sidebar={sidebar}>
       <div>
-        <h1 className="text-lg font-semibold mb-4">{nsConfig.display_name}</h1>
+        <h1 className="text-xl font-semibold tracking-tight mb-5">{nsConfig.display_name}</h1>
         {nsConfig.pipelines.length === 0 ? (
-          <EmptyState icon={<GitBranch size={40} />} title="No pipelines" description="This namespace has no pipelines configured." />
+          <EmptyState icon={<GitBranch size={48} />} title="No pipelines" description="This namespace has no pipelines configured." />
         ) : (
-          <div className="space-y-2">
-            {nsConfig.pipelines.map((p) => {
-              const lastRun = latestRuns.get(p.id);
-              return (
-                <CardLink key={p.id} to={`/${ns}/${p.id}`} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center shrink-0">
-                      <GitBranch size={16} className="text-gray-400" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-200">{p.name}</div>
-                      {p.description && <div className="text-xs text-gray-500 mt-0.5">{p.description}</div>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs text-gray-600">
-                      {p.steps.length} step{p.steps.length !== 1 ? "s" : ""}
-                    </span>
-                    {lastRun ? (
-                      <>
-                        <span className="text-xs text-gray-500">{formatTime(lastRun.started_at)}</span>
-                        <StatusBadge status={lastRun.status} />
-                      </>
-                    ) : (
-                      <span className="text-xs text-gray-600">No runs</span>
-                    )}
-                  </div>
-                </CardLink>
-              );
-            })}
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-neutral-500 bg-neutral-800/50 text-xs uppercase tracking-wider">
+                  <th className="px-4 py-2.5 font-medium">Pipeline</th>
+                  <th className="px-4 py-2.5 font-medium w-16">Steps</th>
+                  <th className="px-4 py-2.5 font-medium">Last Run</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 font-medium w-20">Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nsConfig.pipelines.map((p) => {
+                  const lastRun = latestRuns.get(p.id);
+                  return (
+                    <tr
+                      key={p.id}
+                      className="border-b border-neutral-800/50 last:border-b-0 hover:bg-neutral-800/40 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/${ns}/${p.id}`)}
+                    >
+                      <td className="px-4 py-2.5">
+                        <Link to={`/${ns}/${p.id}`} className="text-neutral-200 hover:text-white no-underline font-medium">
+                          {p.name}
+                        </Link>
+                        {p.description && <div className="text-xs text-neutral-500 mt-0.5">{p.description}</div>}
+                      </td>
+                      <td className="px-4 py-2.5 text-neutral-500 text-xs font-mono">{p.steps.length}</td>
+                      <td className="px-4 py-2.5 text-neutral-500 text-xs">
+                        {lastRun ? (
+                          <span title={lastRun.started_at}>{timeAgo(lastRun.started_at)}</span>
+                        ) : (
+                          <span className="text-neutral-600">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {lastRun ? <StatusDot status={lastRun.status} /> : <span className="text-xs text-neutral-600">-</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-neutral-500 text-xs font-mono">
+                        {lastRun?.finished_at ? formatDuration(lastRun.started_at, lastRun.finished_at) : lastRun ? "..." : "-"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

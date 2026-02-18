@@ -10,8 +10,8 @@ const levelColors: Record<string, string> = {
 };
 
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }): ReactNode {
-  if (value === null) return <span className="text-blue-400">null</span>;
-  if (typeof value === "boolean") return <span className="text-blue-400">{String(value)}</span>;
+  if (value === null) return <span className="text-neutral-400">null</span>;
+  if (typeof value === "boolean") return <span className="text-neutral-400">{String(value)}</span>;
   if (typeof value === "number") return <span className="text-orange-300">{value}</span>;
   if (typeof value === "string") return <span className="text-green-400">"{value}"</span>;
 
@@ -19,7 +19,7 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }): Re
   const closeIndent = "  ".repeat(depth);
 
   if (Array.isArray(value)) {
-    if (value.length === 0) return <span className="text-gray-500">[]</span>;
+    if (value.length === 0) return <span className="text-neutral-500">[]</span>;
     return (
       <>
         {"[\n"}
@@ -38,7 +38,7 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }): Re
 
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>);
-    if (entries.length === 0) return <span className="text-gray-500">{"{}"}</span>;
+    if (entries.length === 0) return <span className="text-neutral-500">{"{}"}</span>;
     return (
       <>
         {"{\n"}
@@ -66,9 +66,16 @@ function JsonLine({ entry }: { entry: LogLine }) {
   );
 }
 
-export function LogViewer({ lines }: { lines: LogLine[] }) {
+interface LogViewerProps {
+  lines: LogLine[];
+  stepFilter?: string | null;
+  fullHeight?: boolean;
+}
+
+export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
   const [search, setSearch] = useState("");
 
   const handleScroll = useCallback(() => {
@@ -76,6 +83,7 @@ export function LogViewer({ lines }: { lines: LogLine[] }) {
     if (!el) return;
     const { scrollTop, scrollHeight, clientHeight } = el;
     setUserScrolledUp(scrollHeight - scrollTop - clientHeight > 50);
+    setHasScrolled(scrollTop > 0);
   }, []);
 
   useEffect(() => {
@@ -92,16 +100,18 @@ export function LogViewer({ lines }: { lines: LogLine[] }) {
   }, []);
 
   const filteredLines = useMemo(() => {
-    const indexed = lines.map((entry, i) => ({ entry, num: i + 1 }));
+    let filtered = lines;
+    if (stepFilter) filtered = filtered.filter((entry) => entry.stepId === stepFilter);
+    const indexed = filtered.map((entry, i) => ({ entry, num: i + 1 }));
     if (!search) return indexed;
     const lower = search.toLowerCase();
     return indexed.filter(({ entry }) => JSON.stringify(entry).toLowerCase().includes(lower));
-  }, [lines, search]);
+  }, [lines, search, stepFilter]);
 
   if (lines.length === 0) {
     return (
-      <div className="bg-gray-900 border border-gray-800 rounded-lg">
-        <div className="flex flex-col items-center justify-center py-12 text-gray-600">
+      <div className={`bg-neutral-900 border border-neutral-800 rounded-xl ${fullHeight ? "flex-1" : ""}`}>
+        <div className="flex flex-col items-center justify-center py-12 text-neutral-600">
           <FileText size={32} className="mb-2" />
           <span className="text-sm">No logs yet</span>
         </div>
@@ -110,43 +120,54 @@ export function LogViewer({ lines }: { lines: LogLine[] }) {
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-gray-800">
-        <span className="text-xs text-gray-500">{lines.length} lines</span>
-        <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter logs..."
-            className="w-full bg-gray-800 border border-gray-700 rounded-md pl-8 pr-8 py-1 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors"
-          />
+    <div className={`bg-neutral-900 border border-neutral-800 rounded-xl ${fullHeight ? "flex flex-col h-full" : ""}`}>
+      <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-neutral-800 shrink-0">
+        <span className="text-xs text-neutral-500 font-mono tabular-nums shrink-0">
+          {stepFilter ? `${filteredLines.length} / ${lines.length}` : lines.length} lines
+        </span>
+        <div className="flex items-center gap-2 flex-1 justify-end">
           {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-            >
-              <X size={12} />
-            </button>
+            <span className="text-[10px] text-neutral-500 shrink-0 font-mono tabular-nums">
+              {filteredLines.length} match{filteredLines.length !== 1 ? "es" : ""}
+            </span>
           )}
+          <div className="relative max-w-xs w-full">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter logs..."
+              className="w-full bg-neutral-800 border border-neutral-700 rounded-md pl-8 pr-8 py-1 text-xs text-neutral-300 placeholder-neutral-600 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500/30 transition-colors"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="relative">
+      <div className={`relative ${fullHeight ? "flex-1 min-h-0" : ""}`}>
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="font-mono text-[11px] leading-snug max-h-[60vh] overflow-y-auto divide-y divide-gray-800/50"
+          className={`font-mono text-[11px] leading-snug overflow-y-auto divide-y divide-neutral-800/50 ${fullHeight ? "h-full" : "max-h-[60vh]"} ${hasScrolled ? "log-fade-top" : ""}`}
         >
           {filteredLines.map(({ entry, num }) => (
             <div
               key={num}
-              className={`flex gap-2 px-3 py-1.5 border-l-2 hover:bg-gray-800/30 ${levelColors[entry.level] ?? "border-l-transparent"}`}
+              className={`flex gap-2 px-3 py-1.5 border-l-2 hover:bg-neutral-800/30 ${levelColors[entry.level] ?? "border-l-transparent"}`}
             >
-              <span className="text-gray-700 select-none w-6 shrink-0 text-right pt-0.5">{num}</span>
-              <div className="text-gray-300 min-w-0 flex-1">
+              <span className="text-neutral-700 select-none shrink-0 text-right pt-0.5 tabular-nums">
+                {new Date(entry.time).toLocaleTimeString("en", { hour12: false })}
+              </span>
+              <div className="text-neutral-300 min-w-0 flex-1">
                 <JsonLine entry={entry} />
               </div>
             </div>
@@ -157,7 +178,7 @@ export function LogViewer({ lines }: { lines: LogLine[] }) {
           <button
             type="button"
             onClick={scrollToBottom}
-            className="absolute bottom-3 right-3 bg-gray-800 border border-gray-700 rounded-full p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors shadow-lg shadow-black/30"
+            className="absolute bottom-3 right-3 bg-neutral-800 border border-neutral-700 rounded-full p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors shadow-lg shadow-black/30"
             title="Scroll to bottom"
           >
             <ArrowDown size={14} />

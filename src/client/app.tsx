@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { SWRConfig } from "swr";
+import { CommandPalette } from "./components/CommandPalette.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { ToastProvider } from "./components/Toast.tsx";
@@ -29,7 +30,7 @@ function NotFound() {
         description={
           <>
             The page you're looking for doesn't exist.{" "}
-            <Link to="/" className="text-blue-400 hover:text-blue-300 no-underline">
+            <Link to="/" className="text-neutral-300 hover:text-white no-underline">
               Go home
             </Link>
           </>
@@ -43,6 +44,7 @@ createRoot(document.getElementById("root")!).render(
   <SWRConfig value={{ fetcher }}>
     <ToastProvider>
       <RouterProvider routes={routes} fallback={NotFound} />
+      <CommandPalette />
     </ToastProvider>
   </SWRConfig>,
 );

@@ -23,7 +23,7 @@ export function useToast() {
 const variantConfig: Record<ToastVariant, { style: string; icon: typeof CheckCircle2; iconColor: string }> = {
   success: { style: "border-green-800/50 bg-green-950/90", icon: CheckCircle2, iconColor: "text-green-400" },
   error: { style: "border-red-800/50 bg-red-950/90", icon: XCircle, iconColor: "text-red-400" },
-  info: { style: "border-blue-800/50 bg-blue-950/90", icon: Info, iconColor: "text-blue-400" },
+  info: { style: "border-neutral-700 bg-neutral-900/90", icon: Info, iconColor: "text-neutral-400" },
 };
 
 let nextId = 0;
@@ -60,11 +60,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg shadow-black/30 backdrop-blur-sm text-sm text-gray-200 ${style} ${t.removing ? "animate-fade-out" : "animate-slide-up"}`}
+              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg shadow-black/30 backdrop-blur-sm text-sm text-neutral-200 ${style} ${t.removing ? "animate-fade-out" : "animate-slide-up"}`}
             >
               <Icon size={16} className={iconColor} />
               <span className="flex-1">{t.message}</span>
-              <button type="button" onClick={() => dismiss(t.id)} className="text-gray-500 hover:text-gray-300 transition-colors">
+              <button type="button" onClick={() => dismiss(t.id)} className="text-neutral-500 hover:text-neutral-300 transition-colors">
                 <X size={14} />
               </button>
             </div>

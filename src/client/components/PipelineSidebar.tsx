@@ -7,8 +7,8 @@ interface PipelineSidebarProps {
 }
 
 const base = "block px-3 py-1.5 text-sm rounded-md no-underline border-l-2 transition-colors";
-const activeStyle = `${base} bg-gray-800 text-white border-blue-500`;
-const inactiveStyle = `${base} text-gray-400 hover:text-white hover:bg-gray-800 border-transparent`;
+const activeStyle = `${base} bg-neutral-800 text-white border-neutral-400`;
+const inactiveStyle = `${base} text-neutral-400 hover:text-white hover:bg-neutral-800 border-transparent`;
 
 export function PipelineSidebar({ ns, pipelineId, active }: PipelineSidebarProps) {
   return (

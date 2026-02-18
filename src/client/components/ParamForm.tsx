@@ -1,6 +1,6 @@
 import { AlertCircle } from "lucide-react";
-import { useState } from "react";
-import { errorMessage, type ParamDef, type PipelineDefSummary } from "../../types.ts";
+import { useEffect, useState } from "react";
+import { errorMessage, type ParamDef, type PipelineDefSummary, type RunRow } from "../../types.ts";
 import { handleUnauthorized } from "../utils.ts";
 import { Button } from "./Button.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
@@ -18,7 +18,7 @@ function defaultParams(params: ParamDef[]): Record<string, string | boolean> {
 }
 
 const inputBase =
-  "w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors";
+  "w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500/30 transition-colors";
 
 function ParamField({ param, value, onChange }: { param: ParamDef; value: string | boolean; onChange: (value: string | boolean) => void }) {
   if (param.type === "boolean") {
@@ -28,9 +28,9 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
           type="checkbox"
           checked={value as boolean}
           onChange={(e) => onChange(e.target.checked)}
-          className="w-4 h-4 rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500/30 focus:ring-offset-0"
+          className="w-4 h-4 rounded bg-neutral-800 border-neutral-600 text-white focus:ring-neutral-500/30 focus:ring-offset-0"
         />
-        <span className="text-gray-300 group-hover:text-gray-200 transition-colors">{param.label}</span>
+        <span className="text-neutral-300 group-hover:text-neutral-200 transition-colors">{param.label}</span>
       </label>
     );
   }
@@ -38,7 +38,7 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
   if (param.type === "select") {
     return (
       <div>
-        <label className="block text-sm text-gray-400 mb-1.5 font-medium">{param.label}</label>
+        <label className="block text-sm text-neutral-400 mb-1.5 font-medium">{param.label}</label>
         <select value={value as string} onChange={(e) => onChange(e.target.value)} className={inputBase}>
           {param.options.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -52,7 +52,7 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
 
   return (
     <div>
-      <label className="block text-sm text-gray-400 mb-1.5 font-medium">
+      <label className="block text-sm text-neutral-400 mb-1.5 font-medium">
         {param.label}
         {param.required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
@@ -71,14 +71,33 @@ interface ParamFormProps {
   pipeline: PipelineDefSummary;
   ns: string;
   onRunStarted: (runId: string) => void;
+  rerunId?: string | null;
 }
 
-export function ParamForm({ pipeline, ns, onRunStarted }: ParamFormProps) {
+export function ParamForm({ pipeline, ns, onRunStarted, rerunId }: ParamFormProps) {
   const [params, setParams] = useState<Record<string, string | boolean>>(() => defaultParams(pipeline.params ?? []));
   const [dryRun, setDryRun] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Pre-fill params from a previous run (re-run)
+  useEffect(() => {
+    if (!rerunId) return;
+    fetch(`/api/runs/${rerunId}`)
+      .then((r) => r.json())
+      .then((data: { run: RunRow }) => {
+        if (data.run.params) {
+          try {
+            const parsed = JSON.parse(data.run.params) as Record<string, string | boolean>;
+            setParams((prev) => ({ ...prev, ...parsed }));
+          } catch {
+            // ignore invalid JSON
+          }
+        }
+      })
+      .catch(() => {});
+  }, [rerunId]);
 
   const doRun = async () => {
     setSubmitting(true);
@@ -134,14 +153,14 @@ export function ParamForm({ pipeline, ns, onRunStarted }: ParamFormProps) {
           <Button variant="primary" size="md" type="submit" loading={submitting}>
             {pipeline.confirm && !dryRun ? "Confirm & Run" : "Run Pipeline"}
           </Button>
-          <label className="inline-flex items-center gap-2 text-sm text-gray-400 select-none cursor-pointer group">
+          <label className="inline-flex items-center gap-2 text-sm text-neutral-400 select-none cursor-pointer group">
             <input
               type="checkbox"
               checked={dryRun}
               onChange={(e) => setDryRun(e.target.checked)}
-              className="w-4 h-4 rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500/30 focus:ring-offset-0"
+              className="w-4 h-4 rounded bg-neutral-800 border-neutral-600 text-white focus:ring-neutral-500/30 focus:ring-offset-0"
             />
-            <span className="group-hover:text-gray-300 transition-colors">Dry run</span>
+            <span className="group-hover:text-neutral-300 transition-colors">Dry run</span>
           </label>
           {pipeline.confirm && !dryRun && <span className="text-xs text-yellow-500">Requires confirmation</span>}
         </div>
