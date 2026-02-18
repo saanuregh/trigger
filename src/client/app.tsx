@@ -11,6 +11,7 @@ import { NamespacePage } from "./namespace.tsx";
 import { PipelinePage } from "./pipeline.tsx";
 import { Link, RouterProvider } from "./router.tsx";
 import { RunPage } from "./run.tsx";
+import { WebSocketProvider } from "./ws.tsx";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   override state: { error: Error | null } = { error: null };
@@ -75,8 +76,10 @@ function NotFound() {
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <ToastProvider>
-      <RouterProvider routes={routes} fallback={NotFound} />
-      <CommandPalette />
+      <WebSocketProvider>
+        <RouterProvider routes={routes} fallback={NotFound} />
+        <CommandPalette />
+      </WebSocketProvider>
     </ToastProvider>
   </ErrorBoundary>,
 );

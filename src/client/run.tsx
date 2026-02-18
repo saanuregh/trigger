@@ -19,6 +19,7 @@ import {
   timeAgo,
   useLiveDuration,
 } from "./utils.ts";
+import { useSubscription } from "./ws.tsx";
 
 function StepProgress({ steps }: { steps: StepRow[] }) {
   const runningIdx = steps.findIndex((s) => s.status === "running");
@@ -93,64 +94,34 @@ export function RunPage() {
 
   useEffect(() => {
     if (isTerminal !== false) return;
-
-    const es = new EventSource(`/sse/runs/${runId}`);
     requestNotificationPermission();
+  }, [isTerminal]);
 
-    es.addEventListener("log", (e) => {
-      try {
-        const entry = JSON.parse(e.data) as LogLine;
-        logBufferRef.current.push(entry);
-        if (!rafRef.current) {
-          rafRef.current = requestAnimationFrame(flushLogs);
-        }
-      } catch {
-        console.warn("Failed to parse SSE log event:", e.data);
+  useSubscription(isTerminal === false ? `run:${runId}` : null, {
+    onLog(entry) {
+      logBufferRef.current.push(entry);
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(flushLogs);
       }
-    });
-
-    es.addEventListener("step", (e) => {
-      try {
-        const stepData = JSON.parse(e.data) as { stepId: string; status: string };
-        mutate(
-          (prev) =>
-            prev && {
-              ...prev,
-              steps: prev.steps.map((s) => (s.step_id === stepData.stepId ? { ...s, status: stepData.status as StepRow["status"] } : s)),
-            },
-        );
-      } catch {
-        console.warn("Failed to parse SSE step event:", e.data);
+    },
+    onStep(stepData) {
+      mutate(
+        (prev) =>
+          prev && {
+            ...prev,
+            steps: prev.steps.map((s) => (s.step_id === stepData.stepId ? { ...s, status: stepData.status as StepRow["status"] } : s)),
+          },
+      );
+    },
+    onRunStatus({ status }) {
+      mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } });
+      if (TERMINAL_STATUSES.has(status)) {
+        showRunNotification(pipelineNameRef.current, status);
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        flushLogs();
       }
-    });
-
-    es.addEventListener("run", (e) => {
-      try {
-        const { status } = JSON.parse(e.data) as { status: string };
-        mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } });
-        if (TERMINAL_STATUSES.has(status)) {
-          showRunNotification(pipelineNameRef.current, status);
-          if (rafRef.current) cancelAnimationFrame(rafRef.current);
-          flushLogs();
-          es.close();
-        }
-      } catch {
-        console.warn("Failed to parse SSE run event:", e.data);
-      }
-    });
-
-    es.onerror = () => {
-      // Reconnection is handled by the browser's EventSource; close only if we know it's terminal
-      mutate().then((data) => {
-        if (data && TERMINAL_STATUSES.has(data.run.status)) es.close();
-      });
-    };
-
-    return () => {
-      es.close();
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [isTerminal, runId, flushLogs, mutate]);
+    },
+  });
 
   useEffect(() => {
     if (!autoFollow) return;

@@ -22,7 +22,7 @@ Use Bun for everything. Bun auto-loads `.env`.
 - **Auth:** Opt-in OIDC SSO (`src/auth/`). When `OIDC_ISSUER` is set, auth code flow + HMAC-signed session cookies + group-based ACLs. Super admin bypass via `TRIGGER_ADMINS`.
 - **Logging:** Structured JSON logging via Pino (`src/logger.ts`).
 - **Database:** `bun:sqlite` with WAL mode. Schema in `src/db/index.ts`, queries in `src/db/queries.ts`.
-- **Real-time:** SSE via raw `ReadableStream` on server, `EventSource` on client. In-memory pub/sub in `src/events.ts`. Browser notifications (Web Notifications API) fire on pipeline completion.
+- **Real-time:** WebSocket via Bun's native `websocket` handler on server (`src/server/ws.ts`), React context + hooks on client (`src/client/ws.tsx`). In-memory pub/sub in `src/events.ts`. Single persistent connection per client — broadcasts system status and run lifecycle events to all clients, per-run log/step streaming via subscribe/unsubscribe messages. Browser notifications (Web Notifications API) fire on pipeline completion.
 - **Config:** Declarative YAML pipeline configs fetched from GitHub raw content API (single HTTP request per file). Local paths also supported. Validated at load time via Zod schemas (`src/config/schema.ts`) with cross-field template reference validation. Template strings resolved at execution time.
 - **Actions:** Unified `defineAction({ name, schema, handler })` API for both built-in and custom actions. Each action file is self-contained with its own Zod schema. Discovered via action registry at startup.
 
@@ -45,12 +45,13 @@ packages/
 src/
   server/
     index.ts                  # startServer(): Bun.serve lifecycle, startup, shutdown
-    routes.ts                 # Route map (path → controller handler) + fetch/error fallbacks
+    routes.ts                 # Route map (path → controller handler) + fetch/error/WS upgrade fallbacks
+    ws.ts                     # WebSocket manager: connection tracking, broadcast, per-run subscriptions
     controllers/
-      helpers.ts              # Shared utilities: getConfigs, findNsConfig, SSE helpers, types
+      helpers.ts              # Shared utilities: getConfigs, findNsConfig, access checks, types
       auth.ts                 # Auth flow handlers (login, callback, logout, me)
       pipelines.ts            # Pipeline CRUD + trigger + config listing
-      runs.ts                 # Run listing, detail, logs, cancel, SSE streaming
+      runs.ts                 # Run listing, detail, logs, cancel, retry
       config.ts               # Dynamic JSON Schema endpoint + config refresh
   types.ts                    # Shared types (imported by server + client)
   env.ts                      # Env var access
@@ -83,9 +84,10 @@ src/
       trigger-pipeline.ts     # Trigger another pipeline (uses app internals)
       aws-utils.ts            # Shared AWS helpers (sleep, log streaming)
   client/
-    app.tsx                   # SPA root: React 19, SWR provider, route definitions
+    app.tsx                   # SPA root: React 19, WebSocket provider, route definitions
     router.tsx                # Custom client-side router (pattern matching, Link, navigate)
-    swr.tsx                   # SWR config, fetcher, shared hooks
+    ws.tsx                    # WebSocket context, useStatus, useSubscription, useGlobalEvents hooks
+    hooks.tsx                 # Data fetching hooks (useFetch, useConfigs, useUser)
     home.tsx                  # Home page (namespace grid)
     namespace.tsx             # Namespace page (pipeline list)
     pipeline.tsx              # Pipeline page (param form + trigger)

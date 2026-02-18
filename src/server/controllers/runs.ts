@@ -1,10 +1,9 @@
 import { authed } from "../../auth/access.ts";
 import * as db from "../../db/queries.ts";
-import { subscribe } from "../../events.ts";
 import { logger } from "../../logger.ts";
 import { cancelPipeline, PipelineError, retryRun as retryRunFn } from "../../pipeline/executor.ts";
-import { errorMessage, type LogLine, type PaginatedResponse, type RunRow, TERMINAL_STATUSES } from "../../types.ts";
-import { checkNamespaceAccess, getRunWithAccess, MAX_LOG_LINES, SSE_HEADERS, sseFormat, terminalSSEResponse } from "./helpers.ts";
+import { errorMessage, type LogLine, type PaginatedResponse, type RunRow } from "../../types.ts";
+import { checkNamespaceAccess, getRunWithAccess, MAX_LOG_LINES } from "./helpers.ts";
 
 export const listRuns = authed(async (req, session) => {
   const url = new URL(req.url);
@@ -114,89 +113,4 @@ export const retryRun = authed(async (req, session) => {
     }
     return Response.json({ error: msg }, { status });
   }
-});
-
-export const sseRun = authed(async (req, session) => {
-  const { runId } = req.params;
-  const result = await getRunWithAccess(runId!, session);
-  if ("error" in result) return result.error;
-
-  if (TERMINAL_STATUSES.has(result.run.status)) return terminalSSEResponse(result.run.status);
-
-  logger.info({ runId, status: result.run.status }, "SSE client connected");
-  const ac = new AbortController();
-
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-
-      function send(event: string, data: object) {
-        try {
-          controller.enqueue(encoder.encode(sseFormat(event, data)));
-        } catch (err) {
-          if (!(err instanceof TypeError)) logger.warn({ runId, error: errorMessage(err) }, "SSE send failed");
-          ac.abort();
-        }
-      }
-
-      function closeStream() {
-        ac.abort();
-        try {
-          controller.close();
-        } catch (err) {
-          if (!(err instanceof TypeError)) logger.warn({ runId, error: errorMessage(err) }, "SSE close failed");
-        }
-      }
-
-      const heartbeatTimer = setInterval(() => {
-        try {
-          controller.enqueue(encoder.encode(": keepalive\n\n"));
-        } catch {
-          clearInterval(heartbeatTimer);
-          ac.abort();
-        }
-      }, 30_000);
-
-      let unsubscribe: () => void;
-      try {
-        unsubscribe = subscribe(runId!, (message) => {
-          const { type, ...payload } = message;
-
-          if (type === "log") send("log", payload);
-          else if (type === "step:status") send("step", payload);
-          else if (type === "run:status") {
-            send("run", { status: payload.status });
-            if (TERMINAL_STATUSES.has(payload.status as string)) closeStream();
-          }
-        });
-      } catch (err) {
-        logger.warn({ runId, error: errorMessage(err) }, "SSE subscribe failed");
-        controller.enqueue(encoder.encode(sseFormat("error", { message: "Too many connections" })));
-        controller.close();
-        return;
-      }
-
-      ac.signal.addEventListener(
-        "abort",
-        () => {
-          unsubscribe();
-          clearInterval(heartbeatTimer);
-        },
-        { once: true },
-      );
-
-      // Race condition guard: run may have finished between initial check and subscribe
-      const freshRun = db.getRun(runId!);
-      if (freshRun && TERMINAL_STATUSES.has(freshRun.status)) {
-        send("run", { status: freshRun.status });
-        closeStream();
-      }
-    },
-    cancel() {
-      logger.info({ runId }, "SSE client disconnected");
-      ac.abort();
-    },
-  });
-
-  return new Response(stream, { headers: SSE_HEADERS });
 });

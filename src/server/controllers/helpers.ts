@@ -71,17 +71,3 @@ export async function getRunWithAccess(runId: string, session: AuthSession): Pro
 export const MAX_LOG_LINES = 50_000;
 
 export const OAUTH_STATE_COOKIE = "trigger_oauth_state";
-
-export const SSE_HEADERS = {
-  "Content-Type": "text/event-stream",
-  "Cache-Control": "no-cache",
-  Connection: "keep-alive",
-} as const;
-
-export function sseFormat(event: string, data: object): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
-
-export function terminalSSEResponse(status: string): Response {
-  return new Response(sseFormat("run", { status }), { headers: SSE_HEADERS });
-}

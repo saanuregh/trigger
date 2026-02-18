@@ -9,9 +9,10 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { PipelineSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useFetch, useNsDisplayName, useStatus } from "./hooks.tsx";
+import { useFetch, useNsDisplayName } from "./hooks.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
 import { formatDuration, timeAgo, useLiveDuration } from "./utils.ts";
+import { useGlobalEvents, useStatus } from "./ws.tsx";
 
 const PER_PAGE = 20;
 
@@ -31,10 +32,13 @@ export function PipelinePage() {
   const { data: status } = useStatus();
 
   const { data: pipeline, error } = useFetch<PipelineDefSummary>(`/api/pipelines/${ns}/${pipelineId}`);
-  const { data: runsData } = useFetch<PaginatedResponse<RunRow>>(
+  const { data: runsData, mutate: mutateRuns } = useFetch<PaginatedResponse<RunRow>>(
     `/api/runs?ns=${ns}&pipeline_id=${pipelineId}&page=${page}&per_page=${PER_PAGE}`,
-    { refreshInterval: 5000 },
   );
+
+  useGlobalEvents((event) => {
+    if (event.namespace === ns && event.pipelineId === pipelineId) mutateRuns();
+  });
 
   const runs = runsData?.data ?? [];
   const totalPages = Math.ceil((runsData?.total ?? 0) / PER_PAGE);
