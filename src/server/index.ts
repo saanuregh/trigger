@@ -46,10 +46,8 @@ export async function startServer(): Promise<void> {
 
     logger.info("server shutting down");
 
-    shutdownAll();
     server.stop();
-
-    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    await shutdownAll();
 
     closeDb();
 

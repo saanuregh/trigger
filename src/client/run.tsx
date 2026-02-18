@@ -70,18 +70,23 @@ export function RunPage() {
     return () => setFaviconStatus(null);
   }, [run?.status]);
 
+  const isTerminal = run ? TERMINAL_STATUSES.has(run.status) : null;
   const liveDuration = useLiveDuration(run?.started_at ?? null, run?.status === "running");
+  const pipelineNameRef = useRef(run?.pipeline_name ?? "");
+  pipelineNameRef.current = run?.pipeline_name ?? "";
 
+  // Fetch logs via HTTP when run is already terminal (or becomes terminal via SWR revalidation)
   useEffect(() => {
-    if (!run) return;
+    if (!isTerminal) return;
+    fetch(`/api/runs/${runId}/logs`)
+      .then((r) => r.json())
+      .then((data: { lines: LogLine[] }) => setLogs(data.lines))
+      .catch(console.error);
+  }, [isTerminal, runId]);
 
-    if (TERMINAL_STATUSES.has(run.status)) {
-      fetch(`/api/runs/${runId}/logs`)
-        .then((r) => r.json())
-        .then((data: { lines: LogLine[] }) => setLogs(data.lines))
-        .catch(console.error);
-      return;
-    }
+  // SSE connection — only depends on runId and isTerminal (boolean), not the specific status string
+  useEffect(() => {
+    if (isTerminal !== false) return; // null = loading, true = already terminal
 
     const es = new EventSource(`/sse/runs/${runId}`);
     requestNotificationPermission();
@@ -119,7 +124,7 @@ export function RunPage() {
         const { status } = JSON.parse(e.data) as { status: string };
         mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } }, { revalidate: false });
         if (TERMINAL_STATUSES.has(status)) {
-          showRunNotification(run.pipeline_name, status);
+          showRunNotification(pipelineNameRef.current, status);
           if (rafRef.current) cancelAnimationFrame(rafRef.current);
           flushLogs();
           es.close();
@@ -130,16 +135,17 @@ export function RunPage() {
     });
 
     es.onerror = () => {
-      if (run && TERMINAL_STATUSES.has(run.status)) {
-        es.close();
-      }
+      // Reconnection is handled by the browser's EventSource; close only if we know it's terminal
+      mutate().then((data) => {
+        if (data && TERMINAL_STATUSES.has(data.run.status)) es.close();
+      });
     };
 
     return () => {
       es.close();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [run?.status, runId, flushLogs, mutate]);
+  }, [isTerminal, runId, flushLogs, mutate]);
 
   // Auto-follow: select the running step's logs
   useEffect(() => {

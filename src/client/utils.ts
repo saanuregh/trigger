@@ -1,6 +1,7 @@
 export function handleUnauthorized(res: Response): void {
   if (res.status === 401) {
     window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}&error=session_expired`;
+    throw new Error("Session expired");
   }
 }
 

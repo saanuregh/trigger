@@ -49,13 +49,12 @@ export async function pollUntil<T>(opts: {
     if (opts.signal.aborted) throw new Error("Aborted");
     if (Date.now() >= opts.deadline) throw new Error(opts.timeoutMessage);
 
-    await sleep(Math.min(opts.intervalMs, opts.deadline - Date.now()), opts.signal);
-
     const result = await opts.poll();
     const status = await opts.check(result);
 
     if (status === "continue") {
       await opts.onProgress?.(result);
+      await sleep(Math.min(opts.intervalMs, opts.deadline - Date.now()), opts.signal);
       continue;
     }
     if ("error" in status) throw new Error(status.error);

@@ -1,3 +1,4 @@
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { SWRConfig } from "swr";
 import { CommandPalette } from "./components/CommandPalette.tsx";
@@ -12,6 +13,39 @@ import { PipelinePage } from "./pipeline.tsx";
 import { Link, RouterProvider } from "./router.tsx";
 import { RunPage } from "./run.tsx";
 import { fetcher } from "./swr.tsx";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  override state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  override componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Uncaught render error:", error, info.componentStack);
+  }
+
+  override render() {
+    if (this.state.error) {
+      return (
+        <Layout>
+          <EmptyState
+            title="Something went wrong"
+            description={
+              <>
+                <p className="mb-3 font-mono text-xs text-red-400">{this.state.error.message}</p>
+                <button type="button" onClick={() => window.location.reload()} className="text-neutral-300 hover:text-white underline">
+                  Reload page
+                </button>
+              </>
+            }
+          />
+        </Layout>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const routes = [
   { pattern: "/", component: HomePage },
@@ -41,10 +75,12 @@ function NotFound() {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <SWRConfig value={{ fetcher }}>
-    <ToastProvider>
-      <RouterProvider routes={routes} fallback={NotFound} />
-      <CommandPalette />
-    </ToastProvider>
-  </SWRConfig>,
+  <ErrorBoundary>
+    <SWRConfig value={{ fetcher }}>
+      <ToastProvider>
+        <RouterProvider routes={routes} fallback={NotFound} />
+        <CommandPalette />
+      </ToastProvider>
+    </SWRConfig>
+  </ErrorBoundary>,
 );

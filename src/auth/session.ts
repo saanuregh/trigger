@@ -21,10 +21,19 @@ export interface AuthSession {
 
 const encoder = new TextEncoder();
 
-async function hmacSign(data: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", encoder.encode(env.OIDC_CLIENT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, [
+let cachedKey: CryptoKey | null = null;
+
+async function getHmacKey(): Promise<CryptoKey> {
+  if (cachedKey) return cachedKey;
+  cachedKey = await crypto.subtle.importKey("raw", encoder.encode(env.OIDC_CLIENT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, [
     "sign",
+    "verify",
   ]);
+  return cachedKey;
+}
+
+async function hmacSign(data: string): Promise<string> {
+  const key = await getHmacKey();
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
   return btoa(String.fromCharCode(...new Uint8Array(sig)))
     .replace(/\+/g, "-")
@@ -33,8 +42,16 @@ async function hmacSign(data: string): Promise<string> {
 }
 
 async function hmacVerify(data: string, signature: string): Promise<boolean> {
-  const expected = await hmacSign(data);
-  return expected === signature;
+  const key = await getHmacKey();
+  let sigBytes: Uint8Array;
+  try {
+    const decoded = atob(signature.replace(/-/g, "+").replace(/_/g, "/"));
+    sigBytes = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) sigBytes[i] = decoded.charCodeAt(i);
+  } catch {
+    return false; // malformed base64
+  }
+  return crypto.subtle.verify("HMAC", key, sigBytes.buffer as ArrayBuffer, encoder.encode(data));
 }
 
 export async function signSession(user: { email: string; name: string; groups: string[] }): Promise<string> {

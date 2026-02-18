@@ -1,6 +1,9 @@
 import { ArrowDown, FileText, Search, X } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LogLine } from "../../types.ts";
+
+const CHUNK_SIZE = 50;
+const chunkStyle: CSSProperties = { contentVisibility: "auto", containIntrinsicSize: "auto none" };
 
 const levelColors: Record<string, string> = {
   error: "border-l-red-500 bg-red-950/20",
@@ -159,19 +162,27 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
           onScroll={handleScroll}
           className={`font-mono text-[11px] leading-snug overflow-y-auto divide-y divide-neutral-800/50 ${fullHeight ? "h-full" : "max-h-[60vh]"} ${hasScrolled ? "log-fade-top" : ""}`}
         >
-          {filteredLines.map(({ entry, num }) => (
-            <div
-              key={num}
-              className={`flex gap-2 px-3 py-1.5 border-l-2 hover:bg-neutral-800/30 ${levelColors[entry.level] ?? "border-l-transparent"}`}
-            >
-              <span className="text-neutral-700 select-none shrink-0 text-right pt-0.5 tabular-nums">
-                {new Date(entry.time).toLocaleTimeString("en", { hour12: false })}
-              </span>
-              <div className="text-neutral-300 min-w-0 flex-1">
-                <JsonLine entry={entry} />
+          {Array.from({ length: Math.ceil(filteredLines.length / CHUNK_SIZE) }, (_, ci) => {
+            const start = ci * CHUNK_SIZE;
+            const chunk = filteredLines.slice(start, start + CHUNK_SIZE);
+            return (
+              <div key={start} style={chunkStyle}>
+                {chunk.map(({ entry, num }) => (
+                  <div
+                    key={num}
+                    className={`flex gap-2 px-3 py-1.5 border-l-2 hover:bg-neutral-800/30 ${levelColors[entry.level] ?? "border-l-transparent"}`}
+                  >
+                    <span className="text-neutral-700 select-none shrink-0 text-right pt-0.5 tabular-nums">
+                      {new Date(entry.time).toLocaleTimeString("en", { hour12: false })}
+                    </span>
+                    <div className="text-neutral-300 min-w-0 flex-1">
+                      <JsonLine entry={entry} />
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {userScrolledUp && (
