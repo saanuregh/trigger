@@ -79,12 +79,9 @@ export default defineAction({
 
     const status = await waitForRun(runId, ctx.signal, ctx.log);
 
-    if (status === "failed") {
-      const childRun = db.getRun(runId);
-      throw new Error(childRun?.error ?? "child pipeline failed");
-    }
-    if (status === "cancelled") {
-      throw new Error("child pipeline was cancelled");
+    if (status !== "success") {
+      const msg = status === "failed" ? (db.getRun(runId)?.error ?? "child pipeline failed") : "child pipeline was cancelled";
+      throw new Error(msg);
     }
 
     ctx.log("child pipeline completed");

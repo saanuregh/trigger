@@ -1,5 +1,6 @@
 import { AlertTriangle, ChevronRight, FolderOpen, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import type { NamespaceConfigSummary } from "../types.ts";
 import { Button } from "./components/Button.tsx";
 import { Card, CardLink } from "./components/Card.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
@@ -8,6 +9,28 @@ import { HomeSkeleton } from "./components/Skeleton.tsx";
 import { useToast } from "./components/Toast.tsx";
 import { useConfigs, useUser } from "./swr.tsx";
 import { handleUnauthorized, nsColor } from "./utils.ts";
+
+function NamespaceCard({ ns }: { ns: NamespaceConfigSummary }) {
+  const color = nsColor(ns.namespace);
+  return (
+    <CardLink to={`/${ns.namespace}`} className={`group relative overflow-hidden p-5 border-l-2 ${color.border}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-lg ${color.bg} flex items-center justify-center shrink-0`}>
+            <FolderOpen size={18} className={color.text} />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-neutral-200">{ns.display_name}</h2>
+            <span className="inline-flex items-center mt-1 text-[11px] bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded-full font-mono">
+              {ns.pipelines.length} pipeline{ns.pipelines.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+        <ChevronRight size={16} className="text-neutral-700 group-hover:text-neutral-400 transition-colors" />
+      </div>
+    </CardLink>
+  );
+}
 
 export function HomePage() {
   const { data: configs, mutate } = useConfigs();
@@ -74,31 +97,7 @@ export function HomePage() {
                   </div>
                 </Card>
               ) : (
-                (() => {
-                  const color = nsColor(ns.namespace);
-                  return (
-                    <CardLink
-                      key={ns.namespace}
-                      to={`/${ns.namespace}`}
-                      className={`group relative overflow-hidden p-5 border-l-2 ${color.border}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-lg ${color.bg} flex items-center justify-center shrink-0`}>
-                            <FolderOpen size={18} className={color.text} />
-                          </div>
-                          <div>
-                            <h2 className="text-sm font-semibold text-neutral-200">{ns.display_name}</h2>
-                            <span className="inline-flex items-center mt-1 text-[11px] bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded-full font-mono">
-                              {ns.pipelines.length} pipeline{ns.pipelines.length !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                        </div>
-                        <ChevronRight size={16} className="text-neutral-700 group-hover:text-neutral-400 transition-colors" />
-                      </div>
-                    </CardLink>
-                  );
-                })()
+                <NamespaceCard key={ns.namespace} ns={ns} />
               ),
             )}
           </div>

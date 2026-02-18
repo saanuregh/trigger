@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 export function handleUnauthorized(res: Response): void {
   if (res.status === 401) {
     window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}&error=session_expired`;
@@ -5,12 +7,15 @@ export function handleUnauthorized(res: Response): void {
   }
 }
 
-export function formatDuration(start: string, end: string): string {
-  const ms = new Date(end).getTime() - new Date(start).getTime();
+export function formatDurationMs(ms: number): string {
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
   return `${m}m ${s % 60}s`;
+}
+
+export function formatDuration(start: string, end: string): string {
+  return formatDurationMs(new Date(end).getTime() - new Date(start).getTime());
 }
 
 export function formatTime(iso: string): string {
@@ -30,38 +35,32 @@ export function timeAgo(iso: string): string {
   return formatTime(iso);
 }
 
-export function formatDurationMs(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  return `${m}m ${s % 60}s`;
+function getFaviconLink(): HTMLLinkElement {
+  const existing = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (existing) return existing;
+  const el = document.createElement("link");
+  el.rel = "icon";
+  document.head.appendChild(el);
+  return el;
 }
 
-/** Sets the favicon to a colored dot. Pass null to reset to default. */
+const faviconColors: Record<string, string> = {
+  running: "#ffffff",
+  pending: "#ffffff",
+  success: "#22c55e",
+  failed: "#ef4444",
+  cancelled: "#eab308",
+};
+
 export function setFaviconStatus(status: string | null): void {
-  const link =
-    document.querySelector<HTMLLinkElement>('link[rel="icon"]') ??
-    (() => {
-      const el = document.createElement("link");
-      el.rel = "icon";
-      document.head.appendChild(el);
-      return el;
-    })();
+  const link = getFaviconLink();
 
   if (!status) {
     link.href = "/favicon.ico";
     return;
   }
 
-  const colors: Record<string, string> = {
-    running: "#ffffff",
-    pending: "#ffffff",
-    success: "#22c55e",
-    failed: "#ef4444",
-    cancelled: "#eab308",
-  };
-
-  const color = colors[status] ?? "#6b7280";
+  const color = faviconColors[status] ?? "#6b7280";
   const canvas = document.createElement("canvas");
   canvas.width = 32;
   canvas.height = 32;
@@ -73,9 +72,6 @@ export function setFaviconStatus(status: string | null): void {
   link.href = canvas.toDataURL("image/png");
 }
 
-import { useEffect, useState } from "react";
-
-/** Returns a live-updating duration string for a running timer. */
 export function useLiveDuration(startedAt: string | null, active: boolean): string {
   const [now, setNow] = useState(Date.now());
 
@@ -113,8 +109,6 @@ export function showRunNotification(pipelineName: string, status: string): void 
     n.close();
   };
 }
-
-// --- Namespace accent colors ---
 
 const NAMESPACE_COLORS = [
   { bg: "bg-teal-500/15", border: "border-teal-500/40", dot: "bg-teal-400", text: "text-teal-400" },

@@ -26,21 +26,16 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   useEffect(() => {
     if (!open) return;
+    document.body.style.overflow = "hidden";
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCancel();
     };
     document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", handler);
+    };
   }, [open, onCancel]);
-
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = "";
-      };
-    }
-  }, [open]);
 
   if (!open) return null;
 

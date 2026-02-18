@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { logger } from "../logger.ts";
+import { errorMessage } from "../types.ts";
 import { registerAction } from "./action-registry.ts";
 
 const NAME_RE = /^[a-z][a-z0-9-]*$/;
@@ -15,7 +16,7 @@ export async function loadCustomActions(dir: string): Promise<void> {
     if (code === "ENOENT" || code === "ENOTDIR") {
       logger.info({ dir: absDir }, "custom actions directory does not exist, skipping");
     } else {
-      logger.error({ dir: absDir, error: err instanceof Error ? err.message : String(err) }, "failed to scan custom actions directory");
+      logger.error({ dir: absDir, error: errorMessage(err) }, "failed to scan custom actions directory");
     }
     return;
   }
@@ -50,7 +51,7 @@ export async function loadCustomActions(dir: string): Promise<void> {
         builtin: false,
       });
     } catch (err) {
-      logger.error({ file, error: err instanceof Error ? err.message : String(err) }, "failed to load custom action");
+      logger.error({ file, error: errorMessage(err) }, "failed to load custom action");
     }
   }
 }

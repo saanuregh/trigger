@@ -21,6 +21,14 @@ export interface AuthSession {
 
 const encoder = new TextEncoder();
 
+function toBase64Url(b64: string): string {
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromBase64Url(b64url: string): string {
+  return atob(b64url.replace(/-/g, "+").replace(/_/g, "/"));
+}
+
 let cachedKey: CryptoKey | null = null;
 
 async function getHmacKey(): Promise<CryptoKey> {
@@ -35,34 +43,25 @@ async function getHmacKey(): Promise<CryptoKey> {
 async function hmacSign(data: string): Promise<string> {
   const key = await getHmacKey();
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return toBase64Url(btoa(String.fromCharCode(...new Uint8Array(sig))));
 }
 
 async function hmacVerify(data: string, signature: string): Promise<boolean> {
   const key = await getHmacKey();
   let sigBytes: Uint8Array;
   try {
-    const decoded = atob(signature.replace(/-/g, "+").replace(/_/g, "/"));
+    const decoded = fromBase64Url(signature);
     sigBytes = new Uint8Array(decoded.length);
     for (let i = 0; i < decoded.length; i++) sigBytes[i] = decoded.charCodeAt(i);
   } catch {
-    return false; // malformed base64
+    return false;
   }
   return crypto.subtle.verify("HMAC", key, sigBytes.buffer as ArrayBuffer, encoder.encode(data));
 }
 
 export async function signSession(user: { email: string; name: string; groups: string[] }): Promise<string> {
-  const payload: SessionPayload = {
-    email: user.email,
-    name: user.name,
-    groups: user.groups,
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_S,
-  };
-
-  const payloadB64 = btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const payload: SessionPayload = { ...user, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_S };
+  const payloadB64 = toBase64Url(btoa(JSON.stringify(payload)));
   const signature = await hmacSign(payloadB64);
   return `${payloadB64}.${signature}`;
 }
@@ -77,7 +76,7 @@ export async function verifySession(cookie: string): Promise<AuthSession | null>
   if (!(await hmacVerify(payloadB64, signature))) return null;
 
   try {
-    const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
+    const json = fromBase64Url(payloadB64);
     const payload = JSON.parse(json) as SessionPayload;
 
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
@@ -95,17 +94,16 @@ export async function verifySession(cookie: string): Promise<AuthSession | null>
   }
 }
 
-export function getSessionCookie(req: Request): string | null {
-  const header = req.headers.get("cookie") ?? "";
-  for (const part of header.split(";")) {
+export function getCookie(req: Request, name: string): string | null {
+  for (const part of (req.headers.get("cookie") ?? "").split(";")) {
     const [key, ...rest] = part.trim().split("=");
-    if (key === COOKIE_NAME) return rest.join("=");
+    if (key === name) return rest.join("=");
   }
   return null;
 }
 
 export async function getSession(req: Request): Promise<AuthSession | null> {
-  const cookie = getSessionCookie(req);
+  const cookie = getCookie(req, COOKIE_NAME);
   if (!cookie) return null;
   return verifySession(cookie);
 }

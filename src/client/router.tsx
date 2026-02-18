@@ -29,10 +29,7 @@ function matchRoutes(path: string, routes: Route[]): { route: Route; params: Rec
     const { regex, paramNames } = compilePath(route.pattern);
     const match = path.match(regex);
     if (match) {
-      const params: Record<string, string> = {};
-      for (let i = 0; i < paramNames.length; i++) {
-        params[paramNames[i]!] = decodeURIComponent(match[i + 1]!);
-      }
+      const params = Object.fromEntries(paramNames.map((name, i) => [name, decodeURIComponent(match[i + 1]!)]));
       return { route, params };
     }
   }
@@ -59,12 +56,8 @@ export function RouterProvider({ routes, fallback: Fallback }: { routes: Route[]
 
   const matched = matchRoutes(path, routes);
   const Page = matched?.route.component ?? Fallback;
-  const routeValue: RouteMatch = {
-    path,
-    params: matched?.params ?? {},
-  };
 
-  return <RouteContext value={routeValue}>{Page ? <Page /> : null}</RouteContext>;
+  return <RouteContext value={{ path, params: matched?.params ?? {} }}>{Page ? <Page /> : null}</RouteContext>;
 }
 
 export function useRoute() {

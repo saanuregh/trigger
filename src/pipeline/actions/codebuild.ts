@@ -61,22 +61,21 @@ export default defineAction({
     const timeoutMinutes = startResult.build?.timeoutInMinutes ?? 60;
     const deadline = Date.now() + timeoutMinutes * 60_000;
 
-    const onAbort = async () => {
+    const onAbort = () => {
       ctx.log("cancelling build");
-      try {
-        await getCodeBuildClient(ctx.region).send(new StopBuildCommand({ id: buildId }));
-        ctx.log("build cancel requested");
-      } catch (e) {
-        ctx.warn("failed to cancel build", { error: errorMessage(e) });
-      }
+      getCodeBuildClient(ctx.region)
+        .send(new StopBuildCommand({ id: buildId }))
+        .then(() => ctx.log("build cancel requested"))
+        .catch((e) => ctx.warn("failed to cancel build", { error: errorMessage(e) }));
     };
     ctx.signal.addEventListener("abort", onAbort, { once: true });
 
-    try {
-      let logNextToken: string | undefined;
-      let logGroupName: string | undefined;
-      let logStreamName: string | undefined;
+    const TERMINAL_STATUSES = new Set(["FAILED", "FAULT", "TIMED_OUT", "STOPPED"]);
+    let logNextToken: string | undefined;
+    let logGroupName: string | undefined;
+    let logStreamName: string | undefined;
 
+    try {
       return await pollUntil({
         deadline,
         intervalMs: 5000,
@@ -100,14 +99,13 @@ export default defineAction({
             logNextToken = await streamLogs(logGroupName, logStreamName, logNextToken, ctx);
           }
 
-          const status = build.buildStatus;
-          if (status === "SUCCEEDED") {
+          if (build.buildStatus === "SUCCEEDED") {
             ctx.log("build completed successfully");
             return { done: true, output: { buildId, status: "SUCCEEDED" } };
           }
-          if (status === "FAILED" || status === "FAULT" || status === "TIMED_OUT" || status === "STOPPED") {
+          if (TERMINAL_STATUSES.has(build.buildStatus!)) {
             return {
-              error: build.phases?.find((p) => p.phaseStatus === "FAILED")?.contexts?.[0]?.message ?? `build ${status}`,
+              error: build.phases?.find((p) => p.phaseStatus === "FAILED")?.contexts?.[0]?.message ?? `build ${build.buildStatus}`,
             };
           }
           return "continue";

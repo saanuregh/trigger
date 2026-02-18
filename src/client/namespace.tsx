@@ -19,21 +19,13 @@ export function NamespacePage() {
   const { data: runningData } = useSWR<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&status=running&per_page=50`);
 
   const latestRuns = new Map<string, RunRow>();
-  if (runsData) {
-    for (const run of runsData.data) {
-      if (!latestRuns.has(run.pipeline_id)) latestRuns.set(run.pipeline_id, run);
-    }
+  for (const run of runsData?.data ?? []) {
+    if (!latestRuns.has(run.pipeline_id)) latestRuns.set(run.pipeline_id, run);
   }
 
-  const runningPipelines: RunRow[] = [];
-  if (runningData) {
-    const seen = new Set<string>();
-    for (const run of runningData.data) {
-      if (!seen.has(run.pipeline_id)) {
-        seen.add(run.pipeline_id);
-        runningPipelines.push(run);
-      }
-    }
+  const runningPipelines = new Map<string, RunRow>();
+  for (const run of runningData?.data ?? []) {
+    if (!runningPipelines.has(run.pipeline_id)) runningPipelines.set(run.pipeline_id, run);
   }
 
   let error = "";
@@ -57,13 +49,13 @@ export function NamespacePage() {
   }
 
   const sidebar =
-    runningPipelines.length > 0 ? (
+    runningPipelines.size > 0 ? (
       <div>
         <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
           <Loader2 size={12} className="animate-spin text-neutral-400" />
           Running
         </div>
-        {runningPipelines.map((run) => (
+        {[...runningPipelines.values()].map((run) => (
           <Link
             key={run.pipeline_id}
             to={`/${ns}/${run.pipeline_id}`}

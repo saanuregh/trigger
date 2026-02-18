@@ -71,7 +71,6 @@ export function PipelinePage() {
 
   const activeRun = runs.find((r) => r.status === "running");
 
-  // Read rerun param from URL for pre-filling
   const rerunId = new URLSearchParams(window.location.search).get("rerun");
 
   return (

@@ -1,6 +1,11 @@
 import { Ban, CheckCircle2, Circle, Loader2, MinusCircle, XCircle } from "lucide-react";
 
-const statusConfig: Record<string, { bg: string; icon: typeof Circle; iconClass?: string }> = {
+interface IconConfig {
+  icon: typeof Circle;
+  iconClass?: string;
+}
+
+const statusConfig: Record<string, IconConfig & { bg: string }> = {
   pending: { bg: "bg-neutral-700 text-neutral-300", icon: Circle },
   running: { bg: "bg-neutral-700 text-neutral-200 shadow-[0_0_12px_rgba(255,255,255,0.15)]", icon: Loader2, iconClass: "animate-spin" },
   success: { bg: "bg-green-900/80 text-green-300 shadow-[0_0_12px_rgba(74,222,128,0.25)]", icon: CheckCircle2 },
@@ -9,10 +14,10 @@ const statusConfig: Record<string, { bg: string; icon: typeof Circle; iconClass?
   skipped: { bg: "bg-neutral-800 text-neutral-500", icon: MinusCircle },
 };
 
-const defaultConfig = { bg: "bg-neutral-700 text-neutral-300", icon: Circle, iconClass: undefined };
+const defaultStatusConfig: IconConfig & { bg: string } = { bg: "bg-neutral-700 text-neutral-300", icon: Circle };
 
 export function StatusBadge({ status }: { status: string }) {
-  const config = statusConfig[status] ?? defaultConfig;
+  const config = statusConfig[status] ?? defaultStatusConfig;
   const Icon = config.icon;
 
   return (
@@ -23,7 +28,7 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-const stepIconConfig: Record<string, { color: string; icon: typeof Circle; iconClass?: string }> = {
+const stepIconConfig: Record<string, IconConfig & { color: string }> = {
   pending: { color: "text-neutral-600", icon: Circle },
   running: { color: "text-white", icon: Loader2, iconClass: "animate-spin" },
   success: { color: "text-green-400", icon: CheckCircle2 },
@@ -32,7 +37,7 @@ const stepIconConfig: Record<string, { color: string; icon: typeof Circle; iconC
   skipped: { color: "text-neutral-600", icon: MinusCircle },
 };
 
-const defaultStepConfig = { color: "text-neutral-600", icon: Circle, iconClass: undefined };
+const defaultStepConfig: IconConfig & { color: string } = { color: "text-neutral-600", icon: Circle };
 
 export function StepIcon({ status, size = 16 }: { status: string; size?: number }) {
   const config = stepIconConfig[status] ?? defaultStepConfig;

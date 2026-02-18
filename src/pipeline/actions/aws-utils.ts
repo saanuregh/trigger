@@ -20,7 +20,7 @@ export const getEcsClient = lazyClient((region) => new ECSClient({ region }));
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) return Promise.reject(new Error("Aborted"));
-  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  if (!signal) return Bun.sleep(ms);
   return new Promise((resolve, reject) => {
     const onAbort = () => {
       clearTimeout(timer);
