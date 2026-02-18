@@ -72,17 +72,22 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
 
   const mutate = useCallback(
     async (updater?: T | ((prev: T | undefined) => T | undefined)): Promise<T | undefined> => {
-      if (updater !== undefined) {
-        const next = typeof updater === "function" ? (updater as (prev: T | undefined) => T | undefined)(data) : updater;
-        if (next !== undefined) {
-          setData(next);
-          if (urlRef.current) cache.set(urlRef.current, next);
-        }
+      if (updater === undefined) return doFetch();
+      if (typeof updater === "function") {
+        const fn = updater as (prev: T | undefined) => T | undefined;
+        let next: T | undefined;
+        setData((prev) => {
+          next = fn(prev);
+          if (next !== undefined && urlRef.current) cache.set(urlRef.current, next);
+          return next ?? prev;
+        });
         return next;
       }
-      return doFetch();
+      setData(updater);
+      if (urlRef.current) cache.set(urlRef.current, updater);
+      return updater;
     },
-    [data, doFetch],
+    [doFetch],
   );
 
   return { data, error, isLoading, mutate };
