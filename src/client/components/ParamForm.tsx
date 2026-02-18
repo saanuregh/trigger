@@ -149,20 +149,24 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId }: ParamFormProp
           />
         ))}
 
-        <div className="flex items-center gap-3 pt-1">
-          <Button variant="primary" size="md" type="submit" loading={submitting}>
-            {pipeline.confirm && !dryRun ? "Confirm & Run" : "Run Pipeline"}
-          </Button>
-          <label className="inline-flex items-center gap-2 text-sm text-neutral-400 select-none cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={dryRun}
-              onChange={(e) => setDryRun(e.target.checked)}
-              className="w-4 h-4 rounded bg-white/[0.04] border-white/[0.08] text-white focus:ring-white/[0.08] focus:ring-offset-0"
-            />
-            <span className="group-hover:text-neutral-300 transition-colors">Dry run</span>
-          </label>
-          {pipeline.confirm && !dryRun && <span className="text-xs text-yellow-500">Requires confirmation</span>}
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-center gap-3">
+            <Button variant="primary" size="md" type="submit" loading={submitting}>
+              Run Pipeline
+            </Button>
+            <label className="inline-flex items-center gap-2 text-sm text-neutral-400 select-none cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={dryRun}
+                onChange={(e) => setDryRun(e.target.checked)}
+                className="w-4 h-4 rounded bg-white/[0.04] border-white/[0.08] text-white focus:ring-white/[0.08] focus:ring-offset-0"
+              />
+              <span className="group-hover:text-neutral-300 transition-colors">Dry run</span>
+            </label>
+          </div>
+          {pipeline.confirm && !dryRun && (
+            <span className="text-[11px] text-yellow-500/80">This pipeline requires confirmation before running.</span>
+          )}
         </div>
 
         {error && (
