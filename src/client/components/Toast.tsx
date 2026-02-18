@@ -60,7 +60,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg shadow-black/30 backdrop-blur-sm text-sm text-neutral-200 ${style} ${t.removing ? "animate-fade-out" : "animate-slide-up"}`}
+              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border shadow-[0_4px_12px_rgba(0,0,0,0.4),0_1px_3px_rgba(0,0,0,0.3)] backdrop-blur-md text-sm text-neutral-200 ${style} ${t.removing ? "animate-fade-out" : "animate-slide-up"}`}
             >
               <Icon size={16} className={iconColor} />
               <span className="flex-1">{t.message}</span>

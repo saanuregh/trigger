@@ -110,7 +110,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
 
   if (lines.length === 0) {
     return (
-      <div className={`bg-neutral-900 border border-neutral-800 rounded-xl ${fullHeight ? "flex-1" : ""}`}>
+      <div className={`bg-neutral-900 border border-neutral-700/50 rounded-xl card-surface ${fullHeight ? "flex-1" : ""}`}>
         <div className="flex flex-col items-center justify-center py-12 text-neutral-600">
           <FileText size={32} className="mb-2" />
           <span className="text-sm">No logs yet</span>
@@ -120,7 +120,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
   }
 
   return (
-    <div className={`bg-neutral-900 border border-neutral-800 rounded-xl ${fullHeight ? "flex flex-col h-full" : ""}`}>
+    <div className={`bg-neutral-900 border border-neutral-700/50 rounded-xl card-surface ${fullHeight ? "flex flex-col h-full" : ""}`}>
       <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-neutral-800 shrink-0">
         <span className="text-xs text-neutral-500 font-mono tabular-nums shrink-0">
           {stepFilter ? `${filteredLines.length} / ${lines.length}` : lines.length} lines

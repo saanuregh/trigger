@@ -78,7 +78,7 @@ export function PipelinePage() {
     <Layout breadcrumbs={[{ label: nsDisplayName, href: `/${ns}` }, { label: pipeline.name }]} sidebar={sidebar}>
       <div className="space-y-8">
         {/* Trigger section */}
-        <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+        <div className="bg-neutral-900 border border-neutral-700/50 rounded-xl overflow-hidden card-surface">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-800 bg-neutral-800/30">
             <Play size={14} className="text-neutral-400" />
             <h2 className="text-sm font-medium text-neutral-200">Run Pipeline</h2>
@@ -111,7 +111,7 @@ export function PipelinePage() {
               </Link>
             )}
 
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+            <div className="bg-neutral-900 border border-neutral-700/50 rounded-xl overflow-hidden card-surface">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-neutral-500 bg-neutral-800/50 text-xs uppercase tracking-wider">

@@ -70,10 +70,14 @@
   }
 }
 
-/* Dot grid background */
+/* Dot grid background with subtle top bloom */
 .dot-grid {
-  background-image: radial-gradient(circle, rgba(255 255 255 / 0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255 255 255 / 0.03) 0%, transparent 50%),
+    radial-gradient(circle, rgba(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    24px 24px;
 }
 
 /* Skeleton shimmer effect */
@@ -88,4 +92,70 @@
 .log-fade-top {
   mask-image: linear-gradient(to bottom, transparent, black 24px);
   -webkit-mask-image: linear-gradient(to bottom, transparent, black 24px);
+}
+
+/* --- Custom scrollbar --- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255 255 255 / 0.08) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255 255 255 / 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255 255 255 / 0.18);
+}
+
+/* --- Depth system --- */
+
+/* Card surface — gradient overlay + bright top-edge highlight + deep layered shadow */
+.card-surface {
+  background-image: linear-gradient(180deg, rgba(255 255 255 / 0.05), transparent 60%);
+  box-shadow:
+    inset 0 1px 0 rgba(255 255 255 / 0.1),
+    0 1px 3px rgba(0 0 0 / 0.4),
+    0 6px 20px rgba(0 0 0 / 0.2);
+}
+
+/* Interactive card — animated hover elevation */
+.card-interactive {
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+.card-interactive:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255 255 255 / 0.15),
+    0 8px 16px rgba(0 0 0 / 0.5),
+    0 24px 48px rgba(0 0 0 / 0.25);
+}
+
+/* Elevated surface — dialogs, popovers, command palette */
+.depth-elevated {
+  background-image: linear-gradient(180deg, rgba(255 255 255 / 0.06), transparent 50%);
+  box-shadow:
+    inset 0 1px 0 rgba(255 255 255 / 0.12),
+    0 16px 32px rgba(0 0 0 / 0.6),
+    0 40px 80px rgba(0 0 0 / 0.35);
+}
+
+/* Header bottom glow line */
+.header-glow::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255 255 255 / 0.06), transparent);
+  pointer-events: none;
 }

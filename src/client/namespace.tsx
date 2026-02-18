@@ -83,7 +83,7 @@ export function NamespacePage() {
         {nsConfig.pipelines.length === 0 ? (
           <EmptyState icon={<GitBranch size={48} />} title="No pipelines" description="This namespace has no pipelines configured." />
         ) : (
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+          <div className="bg-neutral-900 border border-neutral-700/50 rounded-xl overflow-hidden card-surface">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-800/50 text-xs uppercase tracking-wider">

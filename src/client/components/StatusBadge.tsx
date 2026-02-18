@@ -2,10 +2,10 @@ import { Ban, CheckCircle2, Circle, Loader2, MinusCircle, XCircle } from "lucide
 
 const statusConfig: Record<string, { bg: string; icon: typeof Circle; iconClass?: string }> = {
   pending: { bg: "bg-neutral-700 text-neutral-300", icon: Circle },
-  running: { bg: "bg-neutral-700 text-neutral-200", icon: Loader2, iconClass: "animate-spin" },
-  success: { bg: "bg-green-900/80 text-green-300", icon: CheckCircle2 },
-  failed: { bg: "bg-red-900/80 text-red-300", icon: XCircle },
-  cancelled: { bg: "bg-yellow-900/80 text-yellow-300", icon: Ban },
+  running: { bg: "bg-neutral-700 text-neutral-200 shadow-[0_0_12px_rgba(255,255,255,0.15)]", icon: Loader2, iconClass: "animate-spin" },
+  success: { bg: "bg-green-900/80 text-green-300 shadow-[0_0_12px_rgba(74,222,128,0.25)]", icon: CheckCircle2 },
+  failed: { bg: "bg-red-900/80 text-red-300 shadow-[0_0_12px_rgba(248,113,113,0.25)]", icon: XCircle },
+  cancelled: { bg: "bg-yellow-900/80 text-yellow-300 shadow-[0_0_12px_rgba(250,204,21,0.2)]", icon: Ban },
   skipped: { bg: "bg-neutral-800 text-neutral-500", icon: MinusCircle },
 };
 

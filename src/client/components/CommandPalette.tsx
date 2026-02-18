@@ -109,7 +109,7 @@ export function CommandPalette() {
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" onClick={close}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
       <div
-        className="relative w-full max-w-lg bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl shadow-black/50 animate-scale-in overflow-hidden"
+        className="relative w-full max-w-lg bg-neutral-900 border border-neutral-700/50 rounded-xl depth-elevated animate-scale-in overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
