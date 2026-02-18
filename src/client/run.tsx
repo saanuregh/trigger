@@ -324,8 +324,8 @@ export function RunPage() {
               onClick={() => selectStep(null)}
               className={`w-full text-left text-xs px-2.5 py-2 rounded-lg transition-all duration-150 active:scale-[0.98] ${
                 selectedStepId === null
-                  ? "bg-white text-neutral-950 font-medium"
-                  : "bg-white/[0.04] text-neutral-400 hover:text-white hover:bg-white/[0.06]"
+                  ? "bg-white/[0.08] text-white font-medium"
+                  : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
               }`}
             >
               All steps
