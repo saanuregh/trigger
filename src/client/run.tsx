@@ -20,12 +20,6 @@ import {
   useLiveDuration,
 } from "./utils.ts";
 
-const stepCircleStyles: Record<string, string> = {
-  running: "border-white/[0.15] bg-white/[0.04]",
-  success: "border-green-500/30 bg-green-500/[0.08]",
-  failed: "border-red-500/30 bg-red-500/[0.08]",
-};
-
 function StepProgress({ steps }: { steps: StepRow[] }) {
   const runningIdx = steps.findIndex((s) => s.status === "running");
   if (runningIdx >= 0) {
@@ -337,29 +331,20 @@ export function RunPage() {
               All steps
             </button>
 
-            {steps.map((step, i) => {
-              const isLast = i === steps.length - 1;
+            {steps.map((step) => {
               const isSelected = selectedStepId === step.step_id;
-              const circleStyle = stepCircleStyles[step.status] ?? "border-white/[0.06] bg-neutral-900";
 
               return (
-                <div key={step.step_id} className="flex gap-2.5">
-                  <div className="flex flex-col items-center">
-                    <div className={`relative z-10 flex items-center justify-center w-6 h-6 rounded-full border-2 ${circleStyle}`}>
-                      <StepIcon status={step.status} size={12} />
-                    </div>
-                    {!isLast && (
-                      <div className={`w-0.5 flex-1 min-h-4 ${step.status === "success" ? "bg-green-500/20" : "bg-white/[0.04]"}`} />
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
-                    className={`pb-3 pt-0.5 flex-1 min-w-0 px-1.5 rounded-lg transition-colors text-left ${
-                      isSelected ? "bg-white/[0.06] ring-1 ring-white/[0.08]" : "hover:bg-white/[0.03]"
-                    }`}
-                  >
+                <button
+                  key={step.step_id}
+                  type="button"
+                  onClick={() => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors text-left ${
+                    isSelected ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
+                  }`}
+                >
+                  <StepIcon status={step.status} size={14} />
+                  <div className="min-w-0 flex-1">
                     <div className={`text-xs font-medium truncate ${step.status === "skipped" ? "text-neutral-600" : "text-neutral-200"}`}>
                       {step.step_name}
                     </div>
@@ -369,8 +354,8 @@ export function RunPage() {
                         <span className="text-[10px] text-neutral-600 font-mono">{formatDuration(step.started_at, step.finished_at)}</span>
                       )}
                     </div>
-                  </button>
-                </div>
+                  </div>
+                </button>
               );
             })}
           </div>
