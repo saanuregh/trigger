@@ -49,7 +49,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
               key={p}
               onClick={() => onPageChange(p)}
               className={`min-w-7 h-7 rounded-lg text-xs font-medium transition-all duration-150 active:scale-[0.98] ${
-                p === page ? "bg-white text-neutral-950" : "text-neutral-400 hover:text-white hover:bg-white/[0.06]"
+                p === page ? "bg-white/[0.12] text-white" : "text-neutral-400 hover:text-white hover:bg-white/[0.06]"
               }`}
             >
               {p}
