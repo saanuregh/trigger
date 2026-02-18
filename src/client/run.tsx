@@ -324,7 +324,7 @@ export function RunPage() {
         {/* Side-by-side: Steps + Logs */}
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Steps panel */}
-          <div className="w-60 shrink-0 overflow-y-auto">
+          <div className="w-60 shrink-0 overflow-y-auto pr-3">
             <button
               type="button"
               onClick={() => selectStep(null)}
