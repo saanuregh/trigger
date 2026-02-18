@@ -1,6 +1,6 @@
 import { authed } from "../../auth/access.ts";
 import { exchangeCode, getAuthUrl, getOIDCConfig } from "../../auth/oidc.ts";
-import { clearSessionCookie, sessionCookieHeader, signSession } from "../../auth/session.ts";
+import { clearSessionCookie, getCookie, sessionCookieHeader, signSession } from "../../auth/session.ts";
 import { env } from "../../env.ts";
 import { logger } from "../../logger.ts";
 import { errorMessage } from "../../types.ts";
@@ -44,16 +44,7 @@ export const callback = async (req: RouteRequest) => {
     return new Response(null, { status: 302, headers: { Location: "/login?error=missing_params" } });
   }
 
-  const cookies = req.headers.get("cookie") ?? "";
-  let savedState = "";
-  for (const part of cookies.split(";")) {
-    const [key, ...rest] = part.trim().split("=");
-    if (key === OAUTH_STATE_COOKIE) {
-      savedState = rest.join("=");
-      break;
-    }
-  }
-
+  const savedState = getCookie(req, OAUTH_STATE_COOKIE);
   if (savedState !== state) {
     return new Response(null, { status: 302, headers: { Location: "/login?error=invalid_state" } });
   }
@@ -91,10 +82,5 @@ export const me = authed(async (_req, session) => {
 });
 
 export const logout = (_req: RouteRequest) => {
-  return new Response(JSON.stringify({ ok: true }), {
-    headers: {
-      "Content-Type": "application/json",
-      "Set-Cookie": clearSessionCookie(),
-    },
-  });
+  return Response.json({ ok: true }, { headers: { "Set-Cookie": clearSessionCookie() } });
 };

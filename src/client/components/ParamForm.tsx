@@ -8,11 +8,7 @@ import { ConfirmDialog } from "./ConfirmDialog.tsx";
 function defaultParams(params: ParamDef[]): Record<string, string | boolean> {
   const defaults: Record<string, string | boolean> = {};
   for (const p of params) {
-    if (p.type === "boolean") {
-      defaults[p.name] = p.default ?? false;
-    } else {
-      defaults[p.name] = p.default ?? "";
-    }
+    defaults[p.name] = p.default ?? (p.type === "boolean" ? false : "");
   }
   return defaults;
 }
@@ -81,13 +77,11 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId }: ParamFormProp
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // Reset params when pipeline changes (e.g. client-side navigation without unmount)
   useEffect(() => {
     setParams(defaultParams(pipeline.params ?? []));
     setError("");
   }, [pipeline.id]);
 
-  // Pre-fill params from a previous run (re-run)
   useEffect(() => {
     if (!rerunId) return;
     fetch(`/api/runs/${rerunId}`)

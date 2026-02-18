@@ -79,6 +79,9 @@ export default defineAction({
     ctx.log("task started", { taskArn });
 
     const taskId = taskArn.split("/").pop()!;
+    const logGroup = config.log_group != null ? expectString(config.log_group, "log_group") : `/ecs/${task_definition.split(":")[0]}`;
+    const logStreamPrefix =
+      config.log_stream_prefix != null ? expectString(config.log_stream_prefix, "log_stream_prefix") : `ecs/${container_name}`;
     let logNextToken: string | undefined;
 
     return pollUntil({
@@ -96,9 +99,6 @@ export default defineAction({
         if (!task) return { error: "Task not found" };
 
         if (task.containers?.[0]) {
-          const logGroup = config.log_group != null ? expectString(config.log_group, "log_group") : `/ecs/${task_definition.split(":")[0]}`;
-          const logStreamPrefix =
-            config.log_stream_prefix != null ? expectString(config.log_stream_prefix, "log_stream_prefix") : `ecs/${container_name}`;
           logNextToken = await streamLogs(logGroup, `${logStreamPrefix}/${taskId}`, logNextToken, ctx);
         }
 

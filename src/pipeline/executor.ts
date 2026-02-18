@@ -33,6 +33,25 @@ export class PipelineError extends Error {
 const DEFAULT_RUN_TIMEOUT_S = 3600;
 const activePipelines = new Map<string, ActivePipeline>();
 
+function assertNotActive(key: string, dryRun: boolean): void {
+  if (!dryRun && activePipelines.has(key)) {
+    throw new PipelineError(`Pipeline ${key} is already running (run: ${activePipelines.get(key)!.runId})`, 409);
+  }
+}
+
+async function loadPipeline(namespace: string, pipelineId: string) {
+  const configs = await loadAllConfigs();
+  const nsConfig = configs.find((c) => c.namespace === namespace);
+  if (!nsConfig) throw new PipelineError(`Namespace not found: ${namespace}`, 404);
+  const pipeline = nsConfig.pipelines.find((p) => p.id === pipelineId);
+  if (!pipeline) throw new PipelineError(`Pipeline not found: ${pipelineId} in namespace ${namespace}`, 404);
+  return { nsConfig, pipeline };
+}
+
+function wireAbort(parentSignal: AbortSignal | undefined, abort: AbortController): void {
+  parentSignal?.addEventListener("abort", () => abort.abort(), { once: true });
+}
+
 export async function executePipeline(
   namespace: string,
   pipelineId: string,
@@ -41,26 +60,15 @@ export async function executePipeline(
 ): Promise<string> {
   const key = `${namespace}:${pipelineId}`;
   const dryRun = options?.dryRun ?? false;
-
-  if (!dryRun && activePipelines.has(key)) {
-    throw new PipelineError(`Pipeline ${key} is already running (run: ${activePipelines.get(key)!.runId})`, 409);
-  }
+  assertNotActive(key, dryRun);
 
   const runId = Bun.randomUUIDv7();
   const abort = new AbortController();
   if (!dryRun) activePipelines.set(key, { runId, abort });
 
   try {
-    if (options?.signal) {
-      options.signal.addEventListener("abort", () => abort.abort(), { once: true });
-    }
-
-    const configs = await loadAllConfigs();
-    const nsConfig = configs.find((c) => c.namespace === namespace);
-    if (!nsConfig) throw new PipelineError(`Namespace not found: ${namespace}`, 404);
-
-    const pipeline = nsConfig.pipelines.find((p) => p.id === pipelineId);
-    if (!pipeline) throw new PipelineError(`Pipeline not found: ${pipelineId} in namespace ${namespace}`, 404);
+    wireAbort(options?.signal, abort);
+    const { nsConfig, pipeline } = await loadPipeline(namespace, pipelineId);
 
     db.createRun({
       id: runId,
@@ -136,41 +144,30 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
 
   const key = `${run.namespace}:${run.pipeline_id}`;
   const dryRun = run.dry_run === 1;
+  assertNotActive(key, dryRun);
 
-  if (!dryRun && activePipelines.has(key)) {
-    throw new PipelineError(`Pipeline ${key} is already running (run: ${activePipelines.get(key)!.runId})`, 409);
-  }
-
-  // Claim the slot before any await to prevent TOCTOU race
   const abort = new AbortController();
   if (!dryRun) activePipelines.set(key, { runId, abort });
 
   try {
-    const configs = await loadAllConfigs();
-    const nsConfig = configs.find((c) => c.namespace === run.namespace);
-    if (!nsConfig) throw new PipelineError(`Namespace not found: ${run.namespace}`, 404);
-
-    const pipeline = nsConfig.pipelines.find((p) => p.id === run.pipeline_id);
-    if (!pipeline) throw new PipelineError(`Pipeline not found: ${run.pipeline_id} in namespace ${run.namespace}`, 404);
+    const { nsConfig, pipeline } = await loadPipeline(run.namespace, run.pipeline_id);
 
     const existingSteps = db.getStepsForRun(runId);
     const failedIndex = existingSteps.findIndex((s) => s.status === "failed");
     if (failedIndex === -1) throw new PipelineError("No failed step found in this run", 400);
 
-    // Build stepRecords for ALL steps (correct step indexing in logs)
     const stepRecords = existingSteps.map((dbStep) => {
       const def = pipeline.steps.find((s) => s.id === dbStep.step_id);
       if (!def) throw new PipelineError(`Step "${dbStep.step_id}" no longer exists in pipeline config`, 400);
       return { dbId: dbStep.id, def };
     });
 
-    // Reset failed + subsequent steps in DB
-    const stepsToReset = existingSteps.slice(failedIndex).map((s) => s.id);
-    db.resetStepsForRetry(runId, stepsToReset);
+    db.resetStepsForRetry(
+      runId,
+      existingSteps.slice(failedIndex).map((s) => s.id),
+    );
     db.resetRunForRetry(runId);
-    if (options?.signal) {
-      options.signal.addEventListener("abort", () => abort.abort(), { once: true });
-    }
+    wireAbort(options?.signal, abort);
 
     const params: ParamValues = run.params ? JSON.parse(run.params) : {};
     const logDir = `${env.DATA_DIR}/logs/${runId}`;
@@ -226,12 +223,8 @@ function publishStepStatus(runId: string, log: Logger, def: StepDef, status: str
 function finishRun(runId: string, log: Logger, status: "success" | "failed" | "cancelled", opts?: { error?: string; durationMs?: number }) {
   db.updateRunStatus(runId, status, opts?.error);
   publish(runId, { type: "run:status", runId, status });
-  const fields = { status, ...opts };
-  if (status === "failed") {
-    log.error(fields, "pipeline finished");
-  } else {
-    log.info(fields, "pipeline finished");
-  }
+  const logFn = status === "failed" ? log.error.bind(log) : log.info.bind(log);
+  logFn({ status, ...opts }, "pipeline finished");
 }
 
 function skipRemainingSteps(runId: string, log: Logger, stepRecords: Array<{ dbId: string; def: StepDef }>, fromIndex: number) {
@@ -282,6 +275,10 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
     totalSteps,
   });
 
+  function makeLogFn(level: "info" | "warn") {
+    return (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog[level](fields, msg) : stepLog[level](msg));
+  }
+
   return {
     stepLog,
     flush() {
@@ -292,8 +289,8 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
         logger.warn({ runId, stepId: def.id, error: errorMessage(err) }, "failed to flush step log file");
       }
     },
-    log: (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog.info(fields, msg) : stepLog.info(msg)),
-    warn: (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog.warn(fields, msg) : stepLog.warn(msg)),
+    log: makeLogFn("info"),
+    warn: makeLogFn("warn"),
   };
 }
 
@@ -319,7 +316,7 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
     if (dryRun) {
       sl.stepLog.info("dry run, skipping action execution");
       sl.stepLog.info({ resolvedConfig }, "dry run resolved config");
-      await new Promise((r) => setTimeout(r, 1000 + Math.random() * 3000));
+      await Bun.sleep(1000 + Math.random() * 3000);
       if (Math.random() < 0.05) throw new Error("simulated dry run failure");
       db.updateStepStatus(dbId, "success");
     } else {
@@ -382,14 +379,13 @@ async function runSteps(opts: RunStepsOptions) {
       const { dbId, def } = stepRecords[i]!;
       const result = await executeStep(opts, dbId, def, i + 1);
 
-      if (result === "cancelled") {
+      if (result !== "success") {
         skipRemainingSteps(runId, log, stepRecords, i + 1);
-        finishRun(runId, log, "cancelled", { durationMs: Date.now() - startedAt });
-        return;
-      }
-      if (typeof result === "object") {
-        skipRemainingSteps(runId, log, stepRecords, i + 1);
-        finishRun(runId, log, "failed", { error: result.failed, durationMs: Date.now() - startedAt });
+        const status = result === "cancelled" ? "cancelled" : "failed";
+        finishRun(runId, log, status, {
+          error: typeof result === "object" ? result.failed : undefined,
+          durationMs: Date.now() - startedAt,
+        });
         return;
       }
     }
@@ -409,40 +405,28 @@ async function runSteps(opts: RunStepsOptions) {
 export function initBuiltinActions(): void {
   clearRegistry();
   for (const action of [codebuild, ecsRestart, ecsTask, cloudflare, triggerPipeline]) {
-    registerAction({
-      name: action.name,
-      schema: action.schema,
-      handler: action.handler as RegisteredAction["handler"],
-      builtin: true,
-    });
+    registerAction({ ...action, handler: action.handler as RegisteredAction["handler"], builtin: true });
   }
 }
 
 export function cancelPipeline(runId: string): boolean {
-  for (const [, active] of activePipelines) {
-    if (active.runId === runId) {
-      active.abort.abort();
-      return true;
-    }
-  }
-  return false;
+  const active = [...activePipelines.values()].find((a) => a.runId === runId);
+  if (!active) return false;
+  active.abort.abort();
+  return true;
 }
 
 export async function shutdownAll(): Promise<void> {
   if (activePipelines.size === 0) return;
 
   logger.info({ active: activePipelines.size }, "aborting active pipelines");
-  for (const active of activePipelines.values()) {
-    active.abort.abort();
-  }
+  for (const active of activePipelines.values()) active.abort.abort();
 
-  // Wait for runSteps to clean up (they delete from activePipelines in their finally block)
   const deadline = Date.now() + 10_000;
   while (activePipelines.size > 0 && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 100));
+    await Bun.sleep(100);
   }
 
-  // Force-mark any remaining pipelines that didn't clean up in time
   for (const active of activePipelines.values()) {
     db.updateRunStatus(active.runId, "cancelled", "Server shutdown");
     db.markStaleSteps(active.runId);
@@ -452,20 +436,16 @@ export async function shutdownAll(): Promise<void> {
 
 export function recoverStaleRuns(): void {
   for (const status of ["running", "pending"] as const) {
-    const BATCH = 100;
     let recovered = 0;
-    for (;;) {
-      const runs = db.listRuns({ status, limit: BATCH });
-      if (runs.length === 0) break;
-      for (const run of runs) {
+    let batch: ReturnType<typeof db.listRuns>;
+    do {
+      batch = db.listRuns({ status, limit: 100 });
+      for (const run of batch) {
         db.updateRunStatus(run.id, "failed", `Server crashed while ${status}`);
         db.markStaleSteps(run.id);
         recovered++;
       }
-      if (runs.length < BATCH) break;
-    }
-    if (recovered > 0) {
-      logger.warn({ status, count: recovered }, "stale runs recovered");
-    }
+    } while (batch.length === 100);
+    if (recovered > 0) logger.warn({ status, count: recovered }, "stale runs recovered");
   }
 }

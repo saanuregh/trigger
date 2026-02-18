@@ -130,9 +130,7 @@ function toRawUrl(url: string): string {
 async function fetchConfigText(config: string): Promise<string> {
   if (config.startsWith("https://")) {
     const url = toRawUrl(config);
-    const headers: Record<string, string> = {};
-    if (env.GITHUB_TOKEN) headers.Authorization = `token ${env.GITHUB_TOKEN}`;
-
+    const headers = env.GITHUB_TOKEN ? { Authorization: `token ${env.GITHUB_TOKEN}` } : undefined;
     const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) {
       const body = await res.text().catch(() => "");

@@ -8,15 +8,14 @@ export interface User {
   isSuperAdmin: boolean;
 }
 
-export function fetcher(url: string) {
-  return fetch(url).then((r) => {
-    if (r.status === 401) {
-      window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}&error=session_expired`;
-      throw new Error("Unauthorized");
-    }
-    if (!r.ok) throw new Error(r.statusText || `HTTP ${r.status}`);
-    return r.json();
-  });
+export async function fetcher(url: string) {
+  const r = await fetch(url);
+  if (r.status === 401) {
+    window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}&error=session_expired`;
+    throw new Error("Unauthorized");
+  }
+  if (!r.ok) throw new Error(r.statusText || `HTTP ${r.status}`);
+  return r.json();
 }
 
 export function useConfigs() {

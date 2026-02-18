@@ -56,7 +56,7 @@ const MAX_RESOLVE_DEPTH = 50;
 export function resolveConfig(value: unknown, ctx: ResolveContext, depth = 0): unknown {
   if (depth > MAX_RESOLVE_DEPTH)
     throw new Error(`Template resolution exceeded maximum depth of ${MAX_RESOLVE_DEPTH} — possible circular $switch`);
-  if (value === null || value === undefined) return value;
+  if (value == null) return value;
 
   if (typeof value === "string") {
     const fullMatch = value.match(FULL_TEMPLATE_RE);
@@ -67,7 +67,7 @@ export function resolveConfig(value: unknown, ctx: ResolveContext, depth = 0): u
     if (value.includes("{{")) {
       return value.replace(TEMPLATE_RE, (_, expr) => {
         const resolved = resolveExpression(expr, ctx);
-        if (resolved === null || resolved === undefined) {
+        if (resolved == null) {
           throw new Error(`Template {{${expr.trim()}}} resolved to ${String(resolved)} in a string interpolation context`);
         }
         if (typeof resolved === "object") {
@@ -102,11 +102,7 @@ export function resolveConfig(value: unknown, ctx: ResolveContext, depth = 0): u
       return resolveConfig(selected, ctx, depth + 1);
     }
 
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      result[k] = resolveConfig(v, ctx, depth + 1);
-    }
-    return result;
+    return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, resolveConfig(v, ctx, depth + 1)]));
   }
 
   return value;

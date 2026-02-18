@@ -1,22 +1,12 @@
 import pino from "pino";
 
-const isoTimestamp = () => `,"time":"${new Date().toISOString()}"`;
-const levelLabel: pino.LoggerOptions["formatters"] = {
-  level(label) {
-    return { level: label };
-  },
+const timestamp = () => `,"time":"${new Date().toISOString()}"`;
+const formatters: pino.LoggerOptions["formatters"] = {
+  level: (label) => ({ level: label }),
 };
 
-export const logger = pino({
-  base: {},
-  timestamp: isoTimestamp,
-  formatters: levelLabel,
-});
+export const logger = pino({ base: {}, timestamp, formatters });
 
-export const stepLoggerOpts: pino.LoggerOptions = {
-  base: null,
-  timestamp: isoTimestamp,
-  formatters: levelLabel,
-};
+export const stepLoggerOpts: pino.LoggerOptions = { base: null, timestamp, formatters };
 
 export type Logger = pino.Logger;

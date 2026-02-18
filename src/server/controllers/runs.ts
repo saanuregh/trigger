@@ -3,9 +3,8 @@ import * as db from "../../db/queries.ts";
 import { subscribe } from "../../events.ts";
 import { logger } from "../../logger.ts";
 import { cancelPipeline, PipelineError, retryRun as retryRunFn } from "../../pipeline/executor.ts";
-import type { LogLine, PaginatedResponse, RunRow } from "../../types.ts";
-import { errorMessage, TERMINAL_STATUSES } from "../../types.ts";
-import { checkNamespaceAccess, MAX_LOG_LINES, SSE_HEADERS, sseFormat, terminalSSEResponse } from "./helpers.ts";
+import { errorMessage, type LogLine, type PaginatedResponse, type RunRow, TERMINAL_STATUSES } from "../../types.ts";
+import { checkNamespaceAccess, getRunWithAccess, MAX_LOG_LINES, SSE_HEADERS, sseFormat, terminalSSEResponse } from "./helpers.ts";
 
 export const listRuns = authed(async (req, session) => {
   const url = new URL(req.url);
@@ -37,25 +36,17 @@ export const listRuns = authed(async (req, session) => {
 });
 
 export const getRun = authed(async (req, session) => {
-  const { runId } = req.params;
-  const run = db.getRun(runId!);
-  if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
+  const result = await getRunWithAccess(req.params.runId!, session);
+  if ("error" in result) return result.error;
 
-  const denied = await checkNamespaceAccess(session, run.namespace);
-  if (denied) return denied;
-
-  const steps = db.getStepsForRun(runId!);
-  return Response.json({ run, steps });
+  const steps = db.getStepsForRun(req.params.runId!);
+  return Response.json({ run: result.run, steps });
 });
 
 export const getRunLogs = authed(async (req, session) => {
   const { runId } = req.params;
-
-  const run = db.getRun(runId!);
-  if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
-
-  const denied = await checkNamespaceAccess(session, run.namespace);
-  if (denied) return denied;
+  const result = await getRunWithAccess(runId!, session);
+  if ("error" in result) return result.error;
 
   const steps = db.getStepsForRun(runId!);
   const lines: LogLine[] = [];
@@ -92,14 +83,8 @@ export const getRunLogs = authed(async (req, session) => {
 
 export const cancelRun = authed(async (req, session) => {
   const { runId } = req.params;
-
-  const run = db.getRun(runId!);
-  if (!run) {
-    return Response.json({ error: "Run not found" }, { status: 404 });
-  }
-
-  const denied = await checkNamespaceAccess(session, run.namespace);
-  if (denied) return denied;
+  const result = await getRunWithAccess(runId!, session);
+  if ("error" in result) return result.error;
 
   const cancelled = cancelPipeline(runId!);
   if (!cancelled) {
@@ -112,12 +97,8 @@ export const cancelRun = authed(async (req, session) => {
 
 export const retryRun = authed(async (req, session) => {
   const { runId } = req.params;
-
-  const run = db.getRun(runId!);
-  if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
-
-  const denied = await checkNamespaceAccess(session, run.namespace);
-  if (denied) return denied;
+  const result = await getRunWithAccess(runId!, session);
+  if ("error" in result) return result.error;
 
   try {
     const resultId = await retryRunFn(runId!, { triggeredBy: session.email || undefined });
@@ -137,19 +118,12 @@ export const retryRun = authed(async (req, session) => {
 
 export const sseRun = authed(async (req, session) => {
   const { runId } = req.params;
+  const result = await getRunWithAccess(runId!, session);
+  if ("error" in result) return result.error;
 
-  const run = db.getRun(runId!);
-  if (!run) {
-    logger.warn({ runId }, "SSE connection for unknown run");
-    return new Response("Run not found", { status: 404 });
-  }
+  if (TERMINAL_STATUSES.has(result.run.status)) return terminalSSEResponse(result.run.status);
 
-  const denied = await checkNamespaceAccess(session, run.namespace);
-  if (denied) return denied;
-
-  if (TERMINAL_STATUSES.has(run.status)) return terminalSSEResponse(run.status);
-
-  logger.info({ runId, status: run.status }, "SSE client connected");
+  logger.info({ runId, status: result.run.status }, "SSE client connected");
   const ac = new AbortController();
 
   const stream = new ReadableStream({

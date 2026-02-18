@@ -43,8 +43,7 @@ export function expectStringArray(value: unknown, field: string): string[] {
 }
 
 export function expectNumber(value: unknown, field: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value))
-    throw new Error(`Expected ${field} to be a finite number, got ${typeof value === "number" ? String(value) : typeof value}`);
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`Expected ${field} to be a finite number, got ${value}`);
   return value;
 }
 

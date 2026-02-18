@@ -103,8 +103,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
   }, []);
 
   const filteredLines = useMemo(() => {
-    let filtered = lines;
-    if (stepFilter) filtered = filtered.filter((entry) => entry.stepId === stepFilter);
+    const filtered = stepFilter ? lines.filter((entry) => entry.stepId === stepFilter) : lines;
     const indexed = filtered.map((entry, i) => ({ entry, num: i + 1 }));
     if (!search) return indexed;
     const lower = search.toLowerCase();

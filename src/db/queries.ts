@@ -67,11 +67,9 @@ export function listRuns(filters: {
 
 export function countRuns(filters: { namespace?: string; pipeline_id?: string; status?: string }): number {
   const { where, values } = buildRunFilters(filters);
-  const row = getDb()
+  return getDb()
     .query<{ count: number }, string[]>(`SELECT COUNT(*) as count FROM pipeline_runs ${where}`)
-    .get(...values);
-  if (!row) throw new Error("Failed to count runs — database query returned no result");
-  return row.count;
+    .get(...values)!.count;
 }
 
 export function createStep(step: Pick<StepRow, "id" | "run_id" | "step_id" | "step_name" | "action">): void {

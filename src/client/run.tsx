@@ -1,8 +1,7 @@
 import { AlertCircle, Download, Play, RotateCcw, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
-import type { LogLine, RunRow, StepRow } from "../types.ts";
-import { TERMINAL_STATUSES } from "../types.ts";
+import { type LogLine, type RunRow, type StepRow, TERMINAL_STATUSES } from "../types.ts";
 import { Button } from "./components/Button.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
 import { Layout } from "./components/Layout.tsx";
@@ -27,6 +26,23 @@ const stepCircleStyles: Record<string, string> = {
   success: "border-green-800/50 bg-green-950/30 shadow-[0_0_10px_rgba(74,222,128,0.25)]",
   failed: "border-red-800/50 bg-red-950/30 shadow-[0_0_10px_rgba(248,113,113,0.25)]",
 };
+
+function StepProgress({ steps }: { steps: StepRow[] }) {
+  const runningIdx = steps.findIndex((s) => s.status === "running");
+  if (runningIdx >= 0) {
+    return (
+      <span className="text-xs text-neutral-400 font-mono">
+        {runningIdx + 1}/{steps.length}
+      </span>
+    );
+  }
+  const done = steps.filter((s) => s.status === "success" || s.status === "failed" || s.status === "skipped").length;
+  return (
+    <span className="text-xs text-neutral-500 font-mono">
+      {done}/{steps.length}
+    </span>
+  );
+}
 
 export function RunPage() {
   const [logs, setLogs] = useState<LogLine[]>([]);
@@ -64,7 +80,6 @@ export function RunPage() {
     };
   }, [run, runId]);
 
-  // Dynamic favicon based on run status
   useEffect(() => {
     if (run) setFaviconStatus(run.status);
     return () => setFaviconStatus(null);
@@ -75,7 +90,6 @@ export function RunPage() {
   const pipelineNameRef = useRef(run?.pipeline_name ?? "");
   pipelineNameRef.current = run?.pipeline_name ?? "";
 
-  // Fetch logs via HTTP when run is already terminal (or becomes terminal via SWR revalidation)
   useEffect(() => {
     if (!isTerminal) return;
     fetch(`/api/runs/${runId}/logs`)
@@ -84,9 +98,8 @@ export function RunPage() {
       .catch(console.error);
   }, [isTerminal, runId]);
 
-  // SSE connection — only depends on runId and isTerminal (boolean), not the specific status string
   useEffect(() => {
-    if (isTerminal !== false) return; // null = loading, true = already terminal
+    if (isTerminal !== false) return;
 
     const es = new EventSource(`/sse/runs/${runId}`);
     requestNotificationPermission();
@@ -147,25 +160,15 @@ export function RunPage() {
     };
   }, [isTerminal, runId, flushLogs, mutate]);
 
-  // Auto-follow: select the running step's logs
   useEffect(() => {
     if (!autoFollow) return;
     const runningStep = steps.find((s) => s.status === "running");
     if (runningStep) setSelectedStepId(runningStep.step_id);
   }, [steps, autoFollow]);
 
-  const handleStepClick = (stepId: string) => {
+  const selectStep = (stepId: string | null) => {
     setAutoFollow(false);
-    setSelectedStepId(selectedStepId === stepId ? null : stepId);
-  };
-
-  const handleShowAllLogs = () => {
-    setAutoFollow(false);
-    setSelectedStepId(null);
-  };
-
-  const handleRerun = () => {
-    navigate(`/${ns}/${pipelineId}?rerun=${runId}`);
+    setSelectedStepId(stepId);
   };
 
   const handleStop = useCallback(async () => {
@@ -291,24 +294,7 @@ export function RunPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {steps.length > 0 &&
-              (() => {
-                const done = steps.filter((s) => s.status === "success" || s.status === "failed" || s.status === "skipped").length;
-                const runningStep = steps.find((s) => s.status === "running");
-                if (runningStep) {
-                  const idx = steps.indexOf(runningStep) + 1;
-                  return (
-                    <span className="text-xs text-neutral-400 font-mono">
-                      {idx}/{steps.length}
-                    </span>
-                  );
-                }
-                return (
-                  <span className="text-xs text-neutral-500 font-mono">
-                    {done}/{steps.length}
-                  </span>
-                );
-              })()}
+            {steps.length > 0 && <StepProgress steps={steps} />}
             {isActive && (
               <Button variant="danger" onClick={() => setShowStopConfirm(true)} loading={cancelling} icon={<Square size={12} />}>
                 Stop
@@ -320,7 +306,7 @@ export function RunPage() {
               </Button>
             )}
             {!isActive && (
-              <Button onClick={handleRerun} icon={<RotateCcw size={14} />}>
+              <Button onClick={() => navigate(`/${ns}/${pipelineId}?rerun=${runId}`)} icon={<RotateCcw size={14} />}>
                 Re-run
               </Button>
             )}
@@ -344,7 +330,7 @@ export function RunPage() {
           <div className="w-60 shrink-0 overflow-y-auto">
             <button
               type="button"
-              onClick={handleShowAllLogs}
+              onClick={() => selectStep(null)}
               className={`w-full text-left text-xs px-2.5 py-1.5 rounded-md transition-colors mb-2 ${
                 selectedStepId === null ? "bg-white text-neutral-900 font-medium" : "bg-neutral-800/50 text-neutral-400 hover:text-white"
               }`}
@@ -370,7 +356,7 @@ export function RunPage() {
 
                   <button
                     type="button"
-                    onClick={() => handleStepClick(step.step_id)}
+                    onClick={() => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
                     className={`pb-3 pt-0.5 flex-1 min-w-0 px-1.5 rounded-md transition-colors text-left ${
                       isSelected ? "bg-neutral-800/50 ring-1 ring-neutral-600/30" : "hover:bg-neutral-800/30"
                     }`}

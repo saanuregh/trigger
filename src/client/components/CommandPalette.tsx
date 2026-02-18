@@ -50,7 +50,6 @@ export function CommandPalette() {
     return items.filter((item) => item.label.toLowerCase().includes(lower) || item.description?.toLowerCase().includes(lower));
   }, [items, query]);
 
-  // Global keyboard listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -62,7 +61,6 @@ export function CommandPalette() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Focus input when opening
   useEffect(() => {
     if (open) {
       setQuery("");
@@ -83,25 +81,25 @@ export function CommandPalette() {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        close();
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.max(prev - 1, 0));
-      } else if (e.key === "Enter" && filtered[selectedIndex]) {
-        handleSelect(filtered[selectedIndex]);
+      switch (e.key) {
+        case "Escape":
+          close();
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          setSelectedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setSelectedIndex((prev) => Math.max(prev - 1, 0));
+          break;
+        case "Enter":
+          if (filtered[selectedIndex]) handleSelect(filtered[selectedIndex]);
+          break;
       }
     },
     [close, filtered, selectedIndex, handleSelect],
   );
-
-  // Reset selection when filter changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
 
   if (!open) return null;
 
@@ -113,21 +111,22 @@ export function CommandPalette() {
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-800">
           <Search size={16} className="text-neutral-500 shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
             placeholder="Search namespaces and pipelines..."
             className="flex-1 bg-transparent text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none"
           />
           <kbd className="text-[10px] text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">ESC</kbd>
         </div>
 
-        {/* Results */}
         <div className="max-h-72 overflow-y-auto py-2">
           {filtered.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-neutral-500">No results found</div>

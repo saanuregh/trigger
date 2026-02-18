@@ -102,11 +102,8 @@ function migrate(db: Database) {
   }
 
   for (let i = currentVersion; i < migrations.length; i++) {
-    const txn = db.transaction(() => {
-      migrations[i]!(db);
-    });
     try {
-      txn();
+      db.transaction(() => migrations[i]!(db))();
       db.run(`PRAGMA user_version = ${i + 1}`);
       logger.info({ from: i, to: i + 1 }, "migration applied");
     } catch (err) {
