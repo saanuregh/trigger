@@ -1,7 +1,8 @@
-import { ChevronRight, Command, LogOut, Workflow } from "lucide-react";
+import { ChevronRight, LogOut, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { useUser } from "../hooks.tsx";
 import { Link } from "../router.tsx";
+import { isMac } from "../utils.ts";
 
 interface Breadcrumb {
   label: string;
@@ -70,11 +71,11 @@ export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps)
           {actions}
           <button
             type="button"
-            onClick={() => dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: isMac, ctrlKey: !isMac }))}
             className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-neutral-500 hover:text-neutral-300 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1 transition-colors"
-            title="Search (\u2318K)"
+            title={`Search (${isMac ? "\u2318" : "Ctrl+"}K)`}
           >
-            <Command size={11} />
+            <kbd className="text-[11px]">{isMac ? "\u2318" : "Ctrl"}</kbd>
             <span>K</span>
           </button>
           <UserMenu />
