@@ -2,7 +2,7 @@ import { authed } from "../../auth/access.ts";
 import * as db from "../../db/queries.ts";
 import { subscribe } from "../../events.ts";
 import { logger } from "../../logger.ts";
-import { cancelPipeline } from "../../pipeline/executor.ts";
+import { cancelPipeline, PipelineError, retryRun as retryRunFn } from "../../pipeline/executor.ts";
 import type { LogLine, PaginatedResponse, RunRow } from "../../types.ts";
 import { errorMessage, TERMINAL_STATUSES } from "../../types.ts";
 import { checkNamespaceAccess, MAX_LOG_LINES, SSE_HEADERS, sseFormat, terminalSSEResponse } from "./helpers.ts";
@@ -108,6 +108,31 @@ export const cancelRun = authed(async (req, session) => {
   }
   logger.info({ runId, cancelledBy: session.email }, "pipeline cancellation requested");
   return Response.json({ ok: true });
+});
+
+export const retryRun = authed(async (req, session) => {
+  const { runId } = req.params;
+
+  const run = db.getRun(runId!);
+  if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
+
+  const denied = await checkNamespaceAccess(session, run.namespace);
+  if (denied) return denied;
+
+  try {
+    const resultId = await retryRunFn(runId!, { triggeredBy: session.email || undefined });
+    logger.info({ runId, retriedBy: session.email }, "pipeline retry requested");
+    return Response.json({ runId: resultId });
+  } catch (err) {
+    const msg = errorMessage(err);
+    const status = err instanceof PipelineError ? err.statusCode : 500;
+    if (status >= 500) {
+      logger.error({ runId, error: msg, status }, "pipeline retry failed");
+    } else {
+      logger.warn({ runId, error: msg, status }, "pipeline retry rejected");
+    }
+    return Response.json({ error: msg }, { status });
+  }
 });
 
 export const sseRun = authed(async (req, session) => {

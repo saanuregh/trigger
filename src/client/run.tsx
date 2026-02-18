@@ -1,4 +1,4 @@
-import { AlertCircle, Download, RotateCcw, Square } from "lucide-react";
+import { AlertCircle, Download, Play, RotateCcw, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import type { LogLine, RunRow, StepRow } from "../types.ts";
@@ -31,7 +31,9 @@ const stepCircleStyles: Record<string, string> = {
 export function RunPage() {
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [cancelling, setCancelling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [showRetryConfirm, setShowRetryConfirm] = useState(false);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [autoFollow, setAutoFollow] = useState(true);
   const { toast } = useToast();
@@ -180,6 +182,42 @@ export function RunPage() {
     }
   }, [runId, toast]);
 
+  const handleRetry = useCallback(async () => {
+    setRetrying(true);
+    setShowRetryConfirm(false);
+    try {
+      const res = await fetch(`/api/runs/${runId}/retry`, { method: "POST" });
+      handleUnauthorized(res);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Retry failed" }));
+        if (res.status === 409) {
+          toast("Pipeline already has an active run — wait for it to finish or cancel it first", "error");
+        } else {
+          toast(data.error ?? "Retry failed", "error");
+        }
+        return;
+      }
+      toast("Retrying from failed step", "success");
+      setLogs([]);
+      mutate(
+        (prev) =>
+          prev && {
+            ...prev,
+            run: { ...prev.run, status: "running" as RunRow["status"], error: null },
+            steps: prev.steps.map((s) =>
+              s.status === "failed" || s.status === "skipped" ? { ...s, status: "pending" as StepRow["status"], error: null } : s,
+            ),
+          },
+        { revalidate: false },
+      );
+    } catch (err) {
+      console.error("Retry failed:", err);
+      toast("Failed to retry run", "error");
+    } finally {
+      setRetrying(false);
+    }
+  }, [runId, toast, mutate]);
+
   const handleDownloadLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/runs/${runId}/logs`);
@@ -270,6 +308,11 @@ export function RunPage() {
                 Stop
               </Button>
             )}
+            {run.status === "failed" && (
+              <Button onClick={() => setShowRetryConfirm(true)} loading={retrying} icon={<Play size={14} />}>
+                Retry
+              </Button>
+            )}
             {!isActive && (
               <Button onClick={handleRerun} icon={<RotateCcw size={14} />}>
                 Re-run
@@ -356,6 +399,15 @@ export function RunPage() {
           confirmLabel="Stop Run"
           variant="danger"
           loading={cancelling}
+        />
+        <ConfirmDialog
+          open={showRetryConfirm}
+          onCancel={() => setShowRetryConfirm(false)}
+          onConfirm={handleRetry}
+          title="Retry from failed step?"
+          description={`This will re-run "${steps.find((s) => s.status === "failed")?.step_name ?? "the failed step"}" and all subsequent steps using the same parameters. Already succeeded steps will not be re-executed.`}
+          confirmLabel="Retry"
+          loading={retrying}
         />
       </div>
     </Layout>

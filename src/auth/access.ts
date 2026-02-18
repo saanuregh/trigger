@@ -4,7 +4,12 @@ import { type AuthSession, getSession } from "./session.ts";
 
 type AuthedHandler = (req: Request & { params: Record<string, string> }, session: AuthSession) => Response | Promise<Response>;
 
-const STUB_SESSION = Object.freeze({ email: "", name: "", groups: Object.freeze([] as string[]), isSuperAdmin: true }) as AuthSession;
+const STUB_SESSION = Object.freeze({
+  email: "demo",
+  name: "Demo User",
+  groups: Object.freeze([] as string[]),
+  isSuperAdmin: true,
+}) as AuthSession;
 
 export function authed(handler: AuthedHandler) {
   return async (req: Request & { params: Record<string, string> }) => {

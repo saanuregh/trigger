@@ -29,6 +29,7 @@ export const routes = {
   "/api/runs/:runId": runs.getRun,
   "/api/runs/:runId/logs": runs.getRunLogs,
   "/api/runs/:runId/cancel": { POST: runs.cancelRun },
+  "/api/runs/:runId/retry": { POST: runs.retryRun },
 
   // Config management
   "/api/config/schema": config.getConfigSchema,
