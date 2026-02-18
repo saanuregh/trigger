@@ -1,6 +1,5 @@
 import { Clock, Loader2, Play } from "lucide-react";
 import { useEffect, useState } from "react";
-import useSWR from "swr";
 import type { PaginatedResponse, PipelineDefSummary, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
@@ -10,8 +9,8 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { PipelineSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
+import { useFetch, useNsDisplayName } from "./hooks.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
-import { useNsDisplayName } from "./swr.tsx";
 import { formatDuration, timeAgo, useLiveDuration } from "./utils.ts";
 
 const PER_PAGE = 20;
@@ -30,8 +29,8 @@ export function PipelinePage() {
   const [page, setPage] = useState(1);
   const { toast } = useToast();
 
-  const { data: pipeline, error } = useSWR<PipelineDefSummary>(`/api/pipelines/${ns}/${pipelineId}`);
-  const { data: runsData } = useSWR<PaginatedResponse<RunRow>>(
+  const { data: pipeline, error } = useFetch<PipelineDefSummary>(`/api/pipelines/${ns}/${pipelineId}`);
+  const { data: runsData } = useFetch<PaginatedResponse<RunRow>>(
     `/api/runs?ns=${ns}&pipeline_id=${pipelineId}&page=${page}&per_page=${PER_PAGE}`,
     { refreshInterval: 5000 },
   );

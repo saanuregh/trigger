@@ -1,6 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { SWRConfig } from "swr";
 import { CommandPalette } from "./components/CommandPalette.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
@@ -12,7 +11,6 @@ import { NamespacePage } from "./namespace.tsx";
 import { PipelinePage } from "./pipeline.tsx";
 import { Link, RouterProvider } from "./router.tsx";
 import { RunPage } from "./run.tsx";
-import { fetcher } from "./swr.tsx";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   override state: { error: Error | null } = { error: null };
@@ -76,11 +74,9 @@ function NotFound() {
 
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
-    <SWRConfig value={{ fetcher }}>
-      <ToastProvider>
-        <RouterProvider routes={routes} fallback={NotFound} />
-        <CommandPalette />
-      </ToastProvider>
-    </SWRConfig>
+    <ToastProvider>
+      <RouterProvider routes={routes} fallback={NotFound} />
+      <CommandPalette />
+    </ToastProvider>
   </ErrorBoundary>,
 );

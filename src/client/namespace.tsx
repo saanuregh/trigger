@@ -1,12 +1,11 @@
 import { GitBranch, Loader2 } from "lucide-react";
-import useSWR from "swr";
 import type { PaginatedResponse, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { NamespaceSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
+import { useConfigs, useFetch } from "./hooks.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
-import { useConfigs } from "./swr.tsx";
 import { formatDuration, timeAgo } from "./utils.ts";
 
 export function NamespacePage() {
@@ -15,8 +14,8 @@ export function NamespacePage() {
   const { data: configs, error: configsError } = useConfigs();
   const nsConfig = configs?.find((c) => c.namespace === ns);
 
-  const { data: runsData } = useSWR<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&per_page=100`);
-  const { data: runningData } = useSWR<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&status=running&per_page=50`);
+  const { data: runsData } = useFetch<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&per_page=100`);
+  const { data: runningData } = useFetch<PaginatedResponse<RunRow>>(`/api/runs?ns=${ns}&status=running&per_page=50`);
 
   const latestRuns = new Map<string, RunRow>();
   for (const run of runsData?.data ?? []) {

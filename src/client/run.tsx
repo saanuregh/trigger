@@ -1,6 +1,5 @@
 import { AlertCircle, Download, Play, RotateCcw, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import useSWR from "swr";
 import { type LogLine, type RunRow, type StepRow, TERMINAL_STATUSES } from "../types.ts";
 import { Button } from "./components/Button.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
@@ -9,8 +8,8 @@ import { LogViewer } from "./components/LogViewer.tsx";
 import { RunSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
+import { useFetch, useNsDisplayName } from "./hooks.tsx";
 import { navigate, useRoute } from "./router.tsx";
-import { useNsDisplayName } from "./swr.tsx";
 import {
   formatDuration,
   handleUnauthorized,
@@ -69,7 +68,7 @@ export function RunPage() {
 
   const nsDisplayName = useNsDisplayName(ns);
 
-  const { data, error, mutate } = useSWR<{ run: RunRow; steps: StepRow[] }>(`/api/runs/${runId}`, { revalidateOnFocus: false });
+  const { data, error, mutate } = useFetch<{ run: RunRow; steps: StepRow[] }>(`/api/runs/${runId}`);
   const run = data?.run ?? null;
   const steps = data?.steps ?? [];
 
@@ -125,7 +124,6 @@ export function RunPage() {
               ...prev,
               steps: prev.steps.map((s) => (s.step_id === stepData.stepId ? { ...s, status: stepData.status as StepRow["status"] } : s)),
             },
-          { revalidate: false },
         );
       } catch {
         console.warn("Failed to parse SSE step event:", e.data);
@@ -135,7 +133,7 @@ export function RunPage() {
     es.addEventListener("run", (e) => {
       try {
         const { status } = JSON.parse(e.data) as { status: string };
-        mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } }, { revalidate: false });
+        mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } });
         if (TERMINAL_STATUSES.has(status)) {
           showRunNotification(pipelineNameRef.current, status);
           if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -217,7 +215,6 @@ export function RunPage() {
               s.status === "failed" || s.status === "skipped" ? { ...s, status: "pending" as StepRow["status"], error: null } : s,
             ),
           },
-        { revalidate: false },
       );
     } catch (err) {
       console.error("Retry failed:", err);

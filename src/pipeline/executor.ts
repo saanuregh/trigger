@@ -1,12 +1,11 @@
 import { mkdirSync } from "node:fs";
-import pino from "pino";
 import { loadAllConfigs } from "../config/loader.ts";
 import { resolveConfig } from "../config/template.ts";
 import type { StepDef } from "../config/types.ts";
 import * as db from "../db/queries.ts";
 import { env } from "../env.ts";
 import { publish } from "../events.ts";
-import { type Logger, logger, stepLoggerOpts } from "../logger.ts";
+import { createLogger, type Logger, logger } from "../logger.ts";
 import { errorMessage, type ParamValues } from "../types.ts";
 import { clearRegistry, getAction, type RegisteredAction, registerAction } from "./action-registry.ts";
 import cloudflare from "./actions/cloudflare.ts";
@@ -254,26 +253,18 @@ interface RunStepsOptions {
 type StepResult = "success" | { failed: string } | "cancelled";
 
 function createStepLogger(runId: string, def: StepDef, logFile: string, stepIndex: number, totalSteps: number) {
-  const fileDest = pino.destination({ dest: logFile, sync: false, minLength: 4096 });
-  const sseSink = {
-    write(data: string) {
-      try {
-        publish(runId, { type: "log", ...JSON.parse(data) });
-      } catch (err) {
-        if (err instanceof SyntaxError) return; // malformed log line — skip
-        logger.warn({ runId, error: errorMessage(err) }, "SSE sink write failed");
-      }
-    },
-    end() {},
+  const file = Bun.file(logFile).writer();
+  const write = (line: string) => {
+    file.write(`${line}\n`);
+    try {
+      publish(runId, { type: "log", ...JSON.parse(line) });
+    } catch (err) {
+      if (err instanceof SyntaxError) return;
+      logger.warn({ runId, error: errorMessage(err) }, "SSE sink write failed");
+    }
   };
-  const stepLog = pino(stepLoggerOpts, pino.multistream([{ stream: fileDest }, { stream: sseSink }])).child({
-    runId,
-    stepId: def.id,
-    step: def.name,
-    action: def.action,
-    stepIndex,
-    totalSteps,
-  });
+
+  const stepLog = createLogger({ runId, stepId: def.id, step: def.name, action: def.action, stepIndex, totalSteps }, write);
 
   function makeLogFn(level: "info" | "warn") {
     return (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog[level](fields, msg) : stepLog[level](msg));
@@ -283,8 +274,8 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
     stepLog,
     flush() {
       try {
-        fileDest.flushSync();
-        fileDest.end();
+        file.flush();
+        file.end();
       } catch (err) {
         logger.warn({ runId, stepId: def.id, error: errorMessage(err) }, "failed to flush step log file");
       }
