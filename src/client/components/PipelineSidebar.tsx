@@ -6,9 +6,9 @@ interface PipelineSidebarProps {
   active: "runs" | "config";
 }
 
-const base = "block px-3 py-1.5 text-sm rounded-md no-underline border-l-2 transition-colors";
-const activeStyle = `${base} bg-neutral-800 text-white border-neutral-400`;
-const inactiveStyle = `${base} text-neutral-400 hover:text-white hover:bg-neutral-800 border-transparent`;
+const base = "block px-3 py-1.5 text-sm rounded-lg no-underline transition-colors";
+const activeStyle = `${base} bg-white/[0.08] text-white font-medium`;
+const inactiveStyle = `${base} text-neutral-400 hover:text-white hover:bg-white/[0.04]`;
 
 export function PipelineSidebar({ ns, pipelineId, active }: PipelineSidebarProps) {
   return (

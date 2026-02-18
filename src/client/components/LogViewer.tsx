@@ -6,8 +6,8 @@ const CHUNK_SIZE = 50;
 const chunkStyle: CSSProperties = { contentVisibility: "auto", containIntrinsicSize: "auto none" };
 
 const levelColors: Record<string, string> = {
-  error: "border-l-red-500 bg-red-950/20",
-  warn: "border-l-yellow-500 bg-yellow-950/20",
+  error: "border-l-red-500 bg-red-500/[0.05]",
+  warn: "border-l-yellow-500 bg-yellow-500/[0.05]",
   info: "border-l-transparent",
   debug: "border-l-transparent opacity-60",
 };
@@ -112,7 +112,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
 
   if (lines.length === 0) {
     return (
-      <div className={`bg-neutral-900 border border-neutral-700/50 rounded-xl card-surface ${fullHeight ? "flex-1" : ""}`}>
+      <div className={`bg-neutral-900/50 border border-white/[0.06] rounded-xl ${fullHeight ? "flex-1" : ""}`}>
         <div className="flex flex-col items-center justify-center py-12 text-neutral-600">
           <FileText size={32} className="mb-2" />
           <span className="text-sm">No logs yet</span>
@@ -122,8 +122,8 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
   }
 
   return (
-    <div className={`bg-neutral-900 border border-neutral-700/50 rounded-xl card-surface ${fullHeight ? "flex flex-col h-full" : ""}`}>
-      <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-neutral-800 shrink-0">
+    <div className={`bg-neutral-900/50 border border-white/[0.06] rounded-xl ${fullHeight ? "flex flex-col h-full" : ""}`}>
+      <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/[0.04] shrink-0">
         <span className="text-xs text-neutral-500 font-mono tabular-nums shrink-0">
           {stepFilter ? `${filteredLines.length} / ${lines.length}` : lines.length} lines
         </span>
@@ -140,7 +140,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter logs..."
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-md pl-8 pr-8 py-1 text-xs text-neutral-300 placeholder-neutral-600 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500/30 transition-colors"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-8 py-1 text-xs text-neutral-300 placeholder-neutral-500 focus:outline-none focus:border-white/[0.2] focus:ring-1 focus:ring-white/[0.08] transition-colors"
             />
             {search && (
               <button
@@ -159,7 +159,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className={`font-mono text-[11px] leading-snug overflow-y-auto divide-y divide-neutral-800/50 ${fullHeight ? "h-full" : "max-h-[60vh]"} ${hasScrolled ? "log-fade-top" : ""}`}
+          className={`font-mono text-[11px] leading-snug overflow-y-auto divide-y divide-white/[0.03] ${fullHeight ? "h-full" : "max-h-[60vh]"} ${hasScrolled ? "log-fade-top" : ""}`}
         >
           {Array.from({ length: Math.ceil(filteredLines.length / CHUNK_SIZE) }, (_, ci) => {
             const start = ci * CHUNK_SIZE;
@@ -169,7 +169,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
                 {chunk.map(({ entry, num }) => (
                   <div
                     key={num}
-                    className={`flex gap-2 px-3 py-1.5 border-l-2 hover:bg-neutral-800/30 ${levelColors[entry.level] ?? "border-l-transparent"}`}
+                    className={`flex gap-2 px-3 py-1.5 border-l-2 hover:bg-white/[0.02] ${levelColors[entry.level] ?? "border-l-transparent"}`}
                   >
                     <span className="text-neutral-700 select-none shrink-0 text-right pt-0.5 tabular-nums">
                       {new Date(entry.time).toLocaleTimeString("en", { hour12: false })}
@@ -188,7 +188,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
           <button
             type="button"
             onClick={scrollToBottom}
-            className="absolute bottom-3 right-3 bg-neutral-800 border border-neutral-700 rounded-full p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors shadow-lg shadow-black/30"
+            className="absolute bottom-3 right-3 bg-neutral-800 border border-white/[0.08] rounded-full p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors shadow-lg shadow-black/30"
             title="Scroll to bottom"
           >
             <ArrowDown size={14} />

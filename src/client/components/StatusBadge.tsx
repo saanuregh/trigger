@@ -6,15 +6,18 @@ interface IconConfig {
 }
 
 const statusConfig: Record<string, IconConfig & { bg: string }> = {
-  pending: { bg: "bg-neutral-700 text-neutral-300", icon: Circle },
-  running: { bg: "bg-neutral-700 text-neutral-200 shadow-[0_0_12px_rgba(255,255,255,0.15)]", icon: Loader2, iconClass: "animate-spin" },
-  success: { bg: "bg-green-900/80 text-green-300 shadow-[0_0_12px_rgba(74,222,128,0.25)]", icon: CheckCircle2 },
-  failed: { bg: "bg-red-900/80 text-red-300 shadow-[0_0_12px_rgba(248,113,113,0.25)]", icon: XCircle },
-  cancelled: { bg: "bg-yellow-900/80 text-yellow-300 shadow-[0_0_12px_rgba(250,204,21,0.2)]", icon: Ban },
-  skipped: { bg: "bg-neutral-800 text-neutral-500", icon: MinusCircle },
+  pending: { bg: "bg-neutral-500/15 text-neutral-400 border border-neutral-500/15", icon: Circle },
+  running: { bg: "bg-white/[0.08] text-neutral-200 border border-white/[0.1]", icon: Loader2, iconClass: "animate-spin" },
+  success: { bg: "bg-green-500/15 text-green-400 border border-green-500/15", icon: CheckCircle2 },
+  failed: { bg: "bg-red-500/15 text-red-400 border border-red-500/15", icon: XCircle },
+  cancelled: { bg: "bg-yellow-500/15 text-yellow-400 border border-yellow-500/15", icon: Ban },
+  skipped: { bg: "bg-neutral-500/10 text-neutral-500 border border-neutral-500/10", icon: MinusCircle },
 };
 
-const defaultStatusConfig: IconConfig & { bg: string } = { bg: "bg-neutral-700 text-neutral-300", icon: Circle };
+const defaultStatusConfig: IconConfig & { bg: string } = {
+  bg: "bg-neutral-500/15 text-neutral-400 border border-neutral-500/15",
+  icon: Circle,
+};
 
 export function StatusBadge({ status }: { status: string }) {
   const config = statusConfig[status] ?? defaultStatusConfig;

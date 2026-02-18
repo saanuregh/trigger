@@ -43,12 +43,12 @@ export function ConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative bg-neutral-900 border border-neutral-700/50 rounded-xl depth-elevated p-6 max-w-md w-full mx-4 animate-scale-in"
+        className="relative bg-neutral-900 border border-white/[0.08] rounded-xl p-6 max-w-md w-full mx-4 animate-scale-in shadow-2xl shadow-black/40"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex gap-4">
           {variant === "danger" && (
-            <div className="shrink-0 w-10 h-10 rounded-full bg-red-900/50 flex items-center justify-center">
+            <div className="shrink-0 w-10 h-10 rounded-full bg-red-500/15 border border-red-500/15 flex items-center justify-center">
               <AlertTriangle size={20} className="text-red-400" />
             </div>
           )}
