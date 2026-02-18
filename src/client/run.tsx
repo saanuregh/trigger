@@ -318,11 +318,11 @@ export function RunPage() {
         {/* Side-by-side: Steps + Logs */}
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Steps panel */}
-          <div className="w-60 shrink-0 overflow-y-auto pr-3">
+          <div className="w-60 shrink-0 overflow-y-auto pr-3 flex flex-col gap-0.5">
             <button
               type="button"
               onClick={() => selectStep(null)}
-              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg transition-all duration-150 active:scale-[0.98] mb-2 ${
+              className={`w-full text-left text-xs px-2.5 py-2 rounded-lg transition-all duration-150 active:scale-[0.98] ${
                 selectedStepId === null
                   ? "bg-white text-neutral-950 font-medium"
                   : "bg-white/[0.04] text-neutral-400 hover:text-white hover:bg-white/[0.06]"
