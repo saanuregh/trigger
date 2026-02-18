@@ -81,6 +81,12 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId }: ParamFormProp
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // Reset params when pipeline changes (e.g. client-side navigation without unmount)
+  useEffect(() => {
+    setParams(defaultParams(pipeline.params ?? []));
+    setError("");
+  }, [pipeline.id]);
+
   // Pre-fill params from a previous run (re-run)
   useEffect(() => {
     if (!rerunId) return;

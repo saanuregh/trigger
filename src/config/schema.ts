@@ -74,11 +74,12 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
       const switchResult = switchConfig.safeParse(step.config);
       if (switchResult.success) return; // $switch config is always valid
 
-      if (hasTemplateRefs(step.config)) return; // templates resolve at runtime
-
       const result = schema.safeParse(step.config);
       if (!result.success) {
         for (const issue of result.error.issues) {
+          // Skip errors for fields whose value contains template refs (resolved at runtime)
+          const val = getAtPath(step.config, issue.path as (string | number)[]);
+          if (hasTemplateRefs(val)) continue;
           ctx.addIssue({ ...issue, path: ["config", ...issue.path] });
         }
       }
@@ -130,6 +131,15 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
         }
       }
     });
+}
+
+function getAtPath(obj: unknown, path: (string | number)[]): unknown {
+  let current = obj;
+  for (const key of path) {
+    if (current == null || typeof current !== "object") return current;
+    current = (current as Record<string | number, unknown>)[key];
+  }
+  return current;
 }
 
 const HAS_TEMPLATE = /\{\{.+?\}\}/;

@@ -135,38 +135,39 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
   if (run.status !== "failed") throw new PipelineError("Only failed runs can be retried", 400);
 
   const key = `${run.namespace}:${run.pipeline_id}`;
-  if (run.dry_run !== 1 && activePipelines.has(key)) {
+  const dryRun = run.dry_run === 1;
+
+  if (!dryRun && activePipelines.has(key)) {
     throw new PipelineError(`Pipeline ${key} is already running (run: ${activePipelines.get(key)!.runId})`, 409);
   }
 
-  const configs = await loadAllConfigs();
-  const nsConfig = configs.find((c) => c.namespace === run.namespace);
-  if (!nsConfig) throw new PipelineError(`Namespace not found: ${run.namespace}`, 404);
-
-  const pipeline = nsConfig.pipelines.find((p) => p.id === run.pipeline_id);
-  if (!pipeline) throw new PipelineError(`Pipeline not found: ${run.pipeline_id} in namespace ${run.namespace}`, 404);
-
-  const existingSteps = db.getStepsForRun(runId);
-  const failedIndex = existingSteps.findIndex((s) => s.status === "failed");
-  if (failedIndex === -1) throw new PipelineError("No failed step found in this run", 400);
-
-  // Build stepRecords for ALL steps (correct step indexing in logs)
-  const stepRecords = existingSteps.map((dbStep) => {
-    const def = pipeline.steps.find((s) => s.id === dbStep.step_id);
-    if (!def) throw new PipelineError(`Step "${dbStep.step_id}" no longer exists in pipeline config`, 400);
-    return { dbId: dbStep.id, def };
-  });
-
-  // Reset failed + subsequent steps in DB
-  const stepsToReset = existingSteps.slice(failedIndex).map((s) => s.id);
-  db.resetStepsForRetry(runId, stepsToReset);
-  db.resetRunForRetry(runId);
-
-  const dryRun = run.dry_run === 1;
+  // Claim the slot before any await to prevent TOCTOU race
   const abort = new AbortController();
   if (!dryRun) activePipelines.set(key, { runId, abort });
 
   try {
+    const configs = await loadAllConfigs();
+    const nsConfig = configs.find((c) => c.namespace === run.namespace);
+    if (!nsConfig) throw new PipelineError(`Namespace not found: ${run.namespace}`, 404);
+
+    const pipeline = nsConfig.pipelines.find((p) => p.id === run.pipeline_id);
+    if (!pipeline) throw new PipelineError(`Pipeline not found: ${run.pipeline_id} in namespace ${run.namespace}`, 404);
+
+    const existingSteps = db.getStepsForRun(runId);
+    const failedIndex = existingSteps.findIndex((s) => s.status === "failed");
+    if (failedIndex === -1) throw new PipelineError("No failed step found in this run", 400);
+
+    // Build stepRecords for ALL steps (correct step indexing in logs)
+    const stepRecords = existingSteps.map((dbStep) => {
+      const def = pipeline.steps.find((s) => s.id === dbStep.step_id);
+      if (!def) throw new PipelineError(`Step "${dbStep.step_id}" no longer exists in pipeline config`, 400);
+      return { dbId: dbStep.id, def };
+    });
+
+    // Reset failed + subsequent steps in DB
+    const stepsToReset = existingSteps.slice(failedIndex).map((s) => s.id);
+    db.resetStepsForRetry(runId, stepsToReset);
+    db.resetRunForRetry(runId);
     if (options?.signal) {
       options.signal.addEventListener("abort", () => abort.abort(), { once: true });
     }
@@ -427,21 +428,44 @@ export function cancelPipeline(runId: string): boolean {
   return false;
 }
 
-export function shutdownAll(): void {
+export async function shutdownAll(): Promise<void> {
+  if (activePipelines.size === 0) return;
+
+  logger.info({ active: activePipelines.size }, "aborting active pipelines");
   for (const active of activePipelines.values()) {
     active.abort.abort();
+  }
+
+  // Wait for runSteps to clean up (they delete from activePipelines in their finally block)
+  const deadline = Date.now() + 10_000;
+  while (activePipelines.size > 0 && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  // Force-mark any remaining pipelines that didn't clean up in time
+  for (const active of activePipelines.values()) {
     db.updateRunStatus(active.runId, "cancelled", "Server shutdown");
+    db.markStaleSteps(active.runId);
   }
   activePipelines.clear();
 }
 
 export function recoverStaleRuns(): void {
   for (const status of ["running", "pending"] as const) {
-    const runs = db.listRuns({ status, limit: 100 });
-    for (const run of runs) {
-      db.updateRunStatus(run.id, "failed", `Server crashed while ${status}`);
-      db.markStaleSteps(run.id);
-      logger.warn({ runId: run.id, namespace: run.namespace, pipelineId: run.pipeline_id, previousStatus: status }, "stale run recovered");
+    const BATCH = 100;
+    let recovered = 0;
+    for (;;) {
+      const runs = db.listRuns({ status, limit: BATCH });
+      if (runs.length === 0) break;
+      for (const run of runs) {
+        db.updateRunStatus(run.id, "failed", `Server crashed while ${status}`);
+        db.markStaleSteps(run.id);
+        recovered++;
+      }
+      if (runs.length < BATCH) break;
+    }
+    if (recovered > 0) {
+      logger.warn({ status, count: recovered }, "stale runs recovered");
     }
   }
 }

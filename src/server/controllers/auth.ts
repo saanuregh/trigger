@@ -8,6 +8,10 @@ import { OAUTH_STATE_COOKIE, type RouteRequest } from "./helpers.ts";
 
 const SECURE_SUFFIX = env.development ? "" : "; Secure";
 
+function safeReturnUrl(url: string): string {
+  return url.startsWith("/") && !url.startsWith("//") ? url : "/";
+}
+
 export const info = () => Response.json({ enabled: env.authEnabled });
 
 export const login = (req: RouteRequest) => {
@@ -16,7 +20,7 @@ export const login = (req: RouteRequest) => {
   }
 
   const url = new URL(req.url);
-  const returnUrl = url.searchParams.get("return") ?? "/";
+  const returnUrl = safeReturnUrl(url.searchParams.get("return") ?? "/");
   const state = btoa(JSON.stringify({ returnUrl, nonce: crypto.randomUUID() }));
 
   const redirectUri = `${url.origin}/auth/callback`;
@@ -61,7 +65,7 @@ export const callback = async (req: RouteRequest) => {
 
     let returnUrl = "/";
     try {
-      returnUrl = (JSON.parse(atob(state)).returnUrl as string) ?? "/";
+      returnUrl = safeReturnUrl((JSON.parse(atob(state)).returnUrl as string) ?? "/");
     } catch {
       logger.warn("failed to parse returnUrl from OAuth state, defaulting to /");
     }
