@@ -4,7 +4,7 @@ import { CommandPalette } from "./components/CommandPalette.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts.tsx";
 import { Layout } from "./components/Layout.tsx";
-import { ToastProvider } from "./components/Toast.tsx";
+import { ToastProvider, useToast } from "./components/Toast.tsx";
 import { ConfigPage } from "./config.tsx";
 import { HomePage } from "./home.tsx";
 import { LoginPage } from "./login.tsx";
@@ -12,7 +12,29 @@ import { NamespacePage } from "./namespace.tsx";
 import { PipelinePage } from "./pipeline.tsx";
 import { Link, RouterProvider } from "./router.tsx";
 import { RunPage } from "./run.tsx";
-import { WebSocketProvider } from "./ws.tsx";
+import { requestNotificationPermission, showRunNotification } from "./utils.ts";
+import { useGlobalEvents, WebSocketProvider } from "./ws.tsx";
+
+const statusVerb: Record<string, string> = { success: "succeeded", cancelled: "cancelled" };
+const statusVariant: Record<string, "success" | "error" | "info"> = { success: "success", cancelled: "info" };
+
+function GlobalNotifications() {
+  const { toast } = useToast();
+
+  useGlobalEvents((event) => {
+    if (event.type === "run:started") {
+      requestNotificationPermission();
+      return;
+    }
+    if (event.type === "run:completed") {
+      const verb = statusVerb[event.status] ?? "failed";
+      toast(`${event.pipelineName} ${verb}`, statusVariant[event.status] ?? "error");
+      showRunNotification(event.pipelineName, event.status);
+    }
+  });
+
+  return null;
+}
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   override state: { error: Error | null } = { error: null };
@@ -78,6 +100,7 @@ createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <ToastProvider>
       <WebSocketProvider>
+        <GlobalNotifications />
         <RouterProvider routes={routes} fallback={NotFound} />
         <CommandPalette />
         <KeyboardShortcuts />

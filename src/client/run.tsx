@@ -12,15 +12,7 @@ import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
 import { useConfigs, useFetch } from "./hooks.tsx";
 import { navigate, useRoute } from "./router.tsx";
-import {
-  formatDuration,
-  handleUnauthorized,
-  requestNotificationPermission,
-  setFaviconStatus,
-  showRunNotification,
-  timeAgo,
-  useLiveDuration,
-} from "./utils.ts";
+import { formatDuration, handleUnauthorized, setFaviconStatus, timeAgo, useLiveDuration } from "./utils.ts";
 import { useSubscription } from "./ws.tsx";
 
 function StepProgress({ steps }: { steps: StepRow[] }) {
@@ -111,9 +103,6 @@ export function RunPage() {
 
   const isTerminal = run ? TERMINAL_STATUSES.has(run.status) : null;
   const liveDuration = useLiveDuration(run?.started_at ?? null, run?.status === "running");
-  const pipelineNameRef = useRef(run?.pipeline_name ?? "");
-  pipelineNameRef.current = run?.pipeline_name ?? "";
-
   useEffect(() => {
     if (!isTerminal) return;
     fetch(`/api/runs/${runId}/logs`)
@@ -121,11 +110,6 @@ export function RunPage() {
       .then((data: { lines: LogLine[] }) => setLogs(data.lines))
       .catch(console.error);
   }, [isTerminal, runId]);
-
-  useEffect(() => {
-    if (isTerminal !== false) return;
-    requestNotificationPermission();
-  }, [isTerminal]);
 
   useSubscription(isTerminal === false ? `run:${runId}` : null, {
     onLog(entry) {
@@ -139,14 +123,13 @@ export function RunPage() {
         (prev) =>
           prev && {
             ...prev,
-            steps: prev.steps.map((s) => (s.step_id === stepData.stepId ? { ...s, status: stepData.status as StepRow["status"] } : s)),
+            steps: prev.steps.map((s) => (s.step_id === stepData.stepId ? { ...s, status: stepData.status } : s)),
           },
       );
     },
     onRunStatus({ status }) {
-      mutate((prev) => prev && { ...prev, run: { ...prev.run, status: status as RunRow["status"] } });
+      mutate((prev) => prev && { ...prev, run: { ...prev.run, status } });
       if (TERMINAL_STATUSES.has(status)) {
-        showRunNotification(pipelineNameRef.current, status);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         flushLogs();
       }

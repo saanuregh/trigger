@@ -6,7 +6,7 @@ import * as db from "../db/queries.ts";
 import { env } from "../env.ts";
 import { publish } from "../events.ts";
 import { createLogger, type Logger, logger } from "../logger.ts";
-import { errorMessage, type ParamValues } from "../types.ts";
+import { errorMessage, type ParamValues, type StepStatus } from "../types.ts";
 import { clearRegistry, getAction, type RegisteredAction, registerAction } from "./action-registry.ts";
 import cloudflare from "./actions/cloudflare.ts";
 import codebuild from "./actions/codebuild.ts";
@@ -122,7 +122,7 @@ export async function executePipeline(
       region: nsConfig.aws_region,
     });
 
-    publish("global", { type: "run:started", runId, namespace, pipelineId });
+    publish("global", { type: "run:started", runId, namespace, pipelineId, pipelineName: pipeline.name });
     db.updateRunStatus(runId, "running");
     publish(runId, { type: "run:status", runId, status: "running" });
     log.info("pipeline started");
@@ -132,7 +132,9 @@ export async function executePipeline(
 
     runSteps({
       runId,
-      key,
+      namespace,
+      pipelineId,
+      pipelineName: pipeline.name,
       log,
       stepRecords,
       abort,
@@ -201,13 +203,21 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
       retryFromStep: existingSteps[failedIndex]!.step_id,
     });
 
-    publish("global", { type: "run:started", runId, namespace: run.namespace, pipelineId: run.pipeline_id });
+    publish("global", {
+      type: "run:started",
+      runId,
+      namespace: run.namespace,
+      pipelineId: run.pipeline_id,
+      pipelineName: run.pipeline_name,
+    });
     publish(runId, { type: "run:status", runId, status: "running" });
     log.info("pipeline retry started");
 
     runSteps({
       runId,
-      key,
+      namespace: run.namespace,
+      pipelineId: run.pipeline_id,
+      pipelineName: run.pipeline_name,
       log,
       stepRecords,
       abort,
@@ -232,7 +242,7 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
   }
 }
 
-function publishStepStatus(runId: string, log: Logger, def: StepDef, status: string) {
+function publishStepStatus(runId: string, log: Logger, def: StepDef, status: StepStatus) {
   publish(runId, { type: "step:status", runId, stepId: def.id, stepName: def.name, action: def.action, status });
   log.info({ step: def.name, action: def.action, status }, "step status changed");
 }
@@ -253,7 +263,9 @@ function skipRemainingSteps(runId: string, log: Logger, stepRecords: Array<{ dbI
 
 interface RunStepsOptions {
   runId: string;
-  key: string;
+  namespace: string;
+  pipelineId: string;
+  pipelineName: string;
   log: Logger;
   stepRecords: Array<{ dbId: string; def: StepDef }>;
   abort: AbortController;
@@ -369,7 +381,8 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
 }
 
 async function runSteps(opts: RunStepsOptions) {
-  const { runId, key, log, stepRecords, abort, timeoutS } = opts;
+  const { runId, namespace, pipelineId, log, stepRecords, abort, timeoutS } = opts;
+  const key = `${namespace}:${pipelineId}`;
   const startedAt = Date.now();
   let finalStatus: "success" | "failed" | "cancelled" | null = null;
   const timeoutTimer = setTimeout(() => {
@@ -412,8 +425,7 @@ async function runSteps(opts: RunStepsOptions) {
     clearTimeout(timeoutTimer);
     untrackRun(key, runId);
     if (finalStatus) {
-      const [namespace, pipelineId] = key.split(":");
-      publish("global", { type: "run:completed", runId, namespace, pipelineId, status: finalStatus });
+      publish("global", { type: "run:completed", runId, namespace, pipelineId, pipelineName: opts.pipelineName, status: finalStatus });
     }
   }
 }

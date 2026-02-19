@@ -95,3 +95,29 @@ export interface SystemStatus {
   maxConcurrentRuns: number;
   pipelines: ActiveRunInfo[];
 }
+
+// --- WebSocket message types ---
+
+/** Server → Client messages (wire format) */
+export type WSServerMessage =
+  | ({ type: "status" } & SystemStatus)
+  | { type: "run:started"; runId: string; namespace: string; pipelineId: string; pipelineName: string }
+  | { type: "run:completed"; runId: string; namespace: string; pipelineId: string; pipelineName: string; status: RunStatus }
+  | ({ type: "log" } & LogLine)
+  | { type: "step"; runId: string; stepId: string; stepName: string; action: string; status: StepStatus }
+  | { type: "run:status"; runId: string; status: RunStatus }
+  | { type: "error"; message: string };
+
+/** Client → Server messages (wire format) */
+export type WSClientMessage = { type: "subscribe"; topic: string } | { type: "unsubscribe"; topic: string };
+
+/** Internal pub/sub event bus messages */
+export type PubSubMessage =
+  | { type: "run:started"; runId: string; namespace: string; pipelineId: string; pipelineName: string }
+  | { type: "run:completed"; runId: string; namespace: string; pipelineId: string; pipelineName: string; status: RunStatus }
+  | ({ type: "log" } & LogLine)
+  | { type: "step:status"; runId: string; stepId: string; stepName: string; action: string; status: StepStatus }
+  | { type: "run:status"; runId: string; status: RunStatus };
+
+/** Extract a specific variant from a message union by type */
+export type MessageOf<T, K extends string> = Extract<T, { type: K }>;
