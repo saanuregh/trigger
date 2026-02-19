@@ -4,7 +4,7 @@ import type { ParamDef } from "../types.ts";
 import { Card } from "./components/Card.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
-import { useFetch } from "./hooks.tsx";
+import { useConfigs, useFetch } from "./hooks.tsx";
 import { useRoute } from "./router.tsx";
 
 interface StepConfig {
@@ -176,9 +176,10 @@ export function ConfigPage() {
   const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
   const { data: config, error } = useFetch<PipelineConfig>(`/api/pipelines/${ns}/${pipelineId}/config`);
+  const { data: configs } = useConfigs();
+  const nsDisplayName = configs?.find((c) => c.namespace === ns)?.display_name ?? ns;
 
-  const pipelineName = config?.name ?? pipelineId;
-  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} pipelineName={pipelineName} active="config" />;
+  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="config" />;
 
   if (error) {
     return (
@@ -197,12 +198,12 @@ export function ConfigPage() {
   }
 
   return (
-    <Layout sidebar={sidebar}>
+    <Layout
+      sidebar={sidebar}
+      breadcrumbs={[{ label: nsDisplayName, to: `/${ns}` }, { label: config.name, to: `/${ns}/${pipelineId}` }, { label: "Config" }]}
+    >
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">{config.name}</h1>
-          {config.description && <p className="text-sm text-neutral-400 mt-1">{config.description}</p>}
-        </div>
+        {config.description && <p className="text-sm text-neutral-400">{config.description}</p>}
 
         {config.params && config.params.length > 0 && (
           <div>

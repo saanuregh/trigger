@@ -57,7 +57,7 @@ export function RouterProvider({ routes, fallback: Fallback }: { routes: Route[]
   const matched = matchRoutes(path, routes);
   const Page = matched?.route.component ?? Fallback;
 
-  return <RouteContext value={{ path, params: matched?.params ?? {} }}>{Page ? <Page /> : null}</RouteContext>;
+  return <RouteContext value={{ path, params: matched?.params ?? {} }}>{Page ? <Page key={path} /> : null}</RouteContext>;
 }
 
 export function useRoute() {

@@ -59,9 +59,8 @@ export function NamespacePage() {
   }
 
   return (
-    <Layout sidebar={<NamespaceNav current={ns} />}>
+    <Layout sidebar={<NamespaceNav current={ns} />} breadcrumbs={[{ label: nsConfig.display_name }]}>
       <div>
-        <h1 className="text-xl font-semibold tracking-tight mb-5">{nsConfig.display_name}</h1>
         {nsConfig.pipelines.length === 0 ? (
           <EmptyState icon={<GitBranch size={48} />} title="No pipelines" description="This namespace has no pipelines configured." />
         ) : (
