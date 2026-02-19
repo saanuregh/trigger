@@ -9,7 +9,7 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { RunSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useFetch } from "./hooks.tsx";
+import { useConfigs, useFetch } from "./hooks.tsx";
 import { navigate, useRoute } from "./router.tsx";
 import {
   formatDuration,
@@ -65,6 +65,9 @@ export function RunPage() {
   const { data, error, mutate } = useFetch<{ run: RunRow; steps: StepRow[] }>(`/api/runs/${runId}`);
   const run = data?.run ?? null;
   const steps = data?.steps ?? [];
+
+  const { data: configs } = useConfigs();
+  const nsDisplayName = configs?.find((c) => c.namespace === ns)?.display_name ?? ns;
 
   useEffect(() => {
     if (run) document.title = `Run #${runId.slice(0, 8)} — ${run.pipeline_name} — Trigger`;
@@ -208,7 +211,7 @@ export function RunPage() {
   }, [runId, toast]);
 
   const pipelineName = run?.pipeline_name ?? pipelineId;
-  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} pipelineName={pipelineName} active="runs" />;
+  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="runs" />;
 
   if (error) {
     return (
@@ -229,49 +232,53 @@ export function RunPage() {
   const isActive = run.status === "running" || run.status === "pending";
 
   return (
-    <Layout sidebar={sidebar}>
-      <div className="h-full flex flex-col">
-        {/* Metadata bar */}
-        <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/[0.06] shrink-0">
-          <div className="flex items-center gap-3">
-            <StatusBadge status={run.status} />
-            <div>
-              <h1 className="text-base font-semibold tracking-tight">{run.pipeline_name}</h1>
-              <p className="text-xs text-neutral-500">
-                <span className="font-mono" title={run.started_at}>
-                  {timeAgo(run.started_at)}
-                </span>
-                {run.triggered_by && <span className="ml-2">by {run.triggered_by}</span>}
-                {liveDuration && <span className="ml-2 font-mono text-white">{liveDuration}</span>}
-              </p>
-            </div>
-            {run.dry_run === 1 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/15">
-                DRY RUN
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {steps.length > 0 && <StepProgress steps={steps} />}
-            {isActive && (
-              <Button variant="danger" onClick={() => setShowStopConfirm(true)} loading={cancelling} icon={<Square size={12} />}>
-                Stop
-              </Button>
-            )}
-            {run.status === "failed" && (
-              <Button onClick={() => setShowRetryConfirm(true)} loading={retrying} icon={<Play size={14} />}>
-                Retry
-              </Button>
-            )}
-            {!isActive && (
-              <Button onClick={() => navigate(`/${ns}/${pipelineId}?rerun=${runId}`)} icon={<RotateCcw size={14} />}>
-                Re-run
-              </Button>
-            )}
-            <Button onClick={handleDownloadLogs} icon={<Download size={14} />}>
-              Logs
+    <Layout
+      sidebar={sidebar}
+      breadcrumbs={[
+        { label: nsDisplayName, to: `/${ns}` },
+        { label: pipelineName, to: `/${ns}/${pipelineId}` },
+        { label: `Run #${runId.slice(0, 8)}` },
+      ]}
+      actions={
+        <div className="flex items-center gap-2">
+          {steps.length > 0 && <StepProgress steps={steps} />}
+          {isActive && (
+            <Button variant="danger" onClick={() => setShowStopConfirm(true)} loading={cancelling} icon={<Square size={12} />}>
+              Stop
             </Button>
+          )}
+          {run.status === "failed" && (
+            <Button onClick={() => setShowRetryConfirm(true)} loading={retrying} icon={<Play size={14} />}>
+              Retry
+            </Button>
+          )}
+          {!isActive && (
+            <Button onClick={() => navigate(`/${ns}/${pipelineId}?rerun=${runId}`)} icon={<RotateCcw size={14} />}>
+              Re-run
+            </Button>
+          )}
+          <Button onClick={handleDownloadLogs} icon={<Download size={14} />}>
+            Logs
+          </Button>
+        </div>
+      }
+    >
+      <div className="h-full flex flex-col">
+        {/* Run info bar */}
+        <div className="flex items-center gap-3 mb-4 shrink-0">
+          <StatusBadge status={run.status} />
+          <div className="text-xs text-neutral-500">
+            <span className="font-mono" title={run.started_at}>
+              {timeAgo(run.started_at)}
+            </span>
+            {run.triggered_by && <span className="ml-2">by {run.triggered_by}</span>}
+            {liveDuration && <span className="ml-2 font-mono text-white">{liveDuration}</span>}
           </div>
+          {run.dry_run === 1 && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/15">
+              DRY RUN
+            </span>
+          )}
         </div>
 
         {/* Error banner */}

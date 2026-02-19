@@ -9,7 +9,7 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { PipelineSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useFetch } from "./hooks.tsx";
+import { useConfigs, useFetch } from "./hooks.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
 import { formatDuration, timeAgo, useLiveDuration } from "./utils.ts";
 import { useGlobalEvents, useStatus } from "./ws.tsx";
@@ -29,6 +29,8 @@ export function PipelinePage() {
   const [page, setPage] = useState(1);
   const { toast } = useToast();
   const { data: status } = useStatus();
+  const { data: configs } = useConfigs();
+  const nsDisplayName = configs?.find((c) => c.namespace === ns)?.display_name ?? ns;
 
   const { data: pipeline, error } = useFetch<PipelineDefSummary>(`/api/pipelines/${ns}/${pipelineId}`);
   const { data: runsData, mutate: mutateRuns } = useFetch<PaginatedResponse<RunRow>>(
@@ -54,8 +56,7 @@ export function PipelinePage() {
     navigate(`/${ns}/${pipelineId}/runs/${runId}`);
   };
 
-  const pipelineName = pipeline?.name ?? pipelineId;
-  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} pipelineName={pipelineName} active="runs" />;
+  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="runs" />;
 
   if (error && !pipeline) {
     return (
@@ -78,7 +79,7 @@ export function PipelinePage() {
   const rerunId = new URLSearchParams(window.location.search).get("rerun");
 
   return (
-    <Layout sidebar={sidebar}>
+    <Layout sidebar={sidebar} breadcrumbs={[{ label: nsDisplayName, to: `/${ns}` }, { label: pipeline.name }]}>
       <div className="space-y-8">
         {/* Trigger section */}
         <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">

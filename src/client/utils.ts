@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 export const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 
@@ -132,3 +132,37 @@ export function nsColor(namespace: string): NsColor {
   }
   return NAMESPACE_COLORS[Math.abs(hash) % NAMESPACE_COLORS.length]!;
 }
+
+// --- localStorage-backed state ---
+
+export function useLocalStorage(key: string, defaultValue: boolean): [boolean, (v: boolean) => void] {
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored !== null ? stored === "true" : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  });
+
+  const set = (v: boolean) => {
+    setValue(v);
+    try {
+      localStorage.setItem(key, String(v));
+    } catch {
+      // ignore
+    }
+  };
+
+  return [value, set];
+}
+
+// --- Sidebar context ---
+
+interface SidebarContextValue {
+  collapsed: boolean;
+  toggle: () => void;
+}
+
+export const SidebarContext = createContext<SidebarContextValue>({ collapsed: false, toggle: () => {} });
+export const useSidebar = () => useContext(SidebarContext);

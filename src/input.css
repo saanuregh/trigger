@@ -100,3 +100,19 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255 255 255 / 0.18);
 }
+
+/* Sidebar collapse transition */
+.sidebar-transition {
+  transition: width 200ms ease;
+}
+
+/* Tooltip for collapsed sidebar items */
+.sidebar-tooltip {
+  @apply invisible opacity-0 absolute left-full ml-2 px-2 py-1 text-xs text-neutral-200 bg-neutral-800 border border-white/[0.08] rounded-lg whitespace-nowrap z-50 shadow-lg shadow-black/30;
+  transition:
+    opacity 150ms ease,
+    visibility 150ms ease;
+}
+.group:hover > .sidebar-tooltip {
+  @apply visible opacity-100;
+}
