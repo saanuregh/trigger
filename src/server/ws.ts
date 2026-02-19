@@ -78,7 +78,14 @@ async function handleSubscribe(ws: WS, topic: string) {
 
     if (type === "log") send(ws, { type: "log", ...payload });
     else if (type === "step:status") {
-      send(ws, { type: "step", stepId: payload.stepId, stepName: payload.stepName, action: payload.action, status: payload.status });
+      send(ws, {
+        type: "step",
+        runId: payload.runId,
+        stepId: payload.stepId,
+        stepName: payload.stepName,
+        action: payload.action,
+        status: payload.status,
+      });
     } else if (type === "run:status") {
       send(ws, { type: "run:status", runId: payload.runId, status: payload.status });
     }
