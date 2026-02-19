@@ -47,7 +47,6 @@ export const routes = {
 
   // Config management
   "/api/config/schema": config.getConfigSchema,
-  "/api/config/refresh": { POST: config.refreshConfig },
 };
 
 export function fetch(req: Request): Response {

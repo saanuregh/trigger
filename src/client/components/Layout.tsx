@@ -99,7 +99,8 @@ function ActiveRuns() {
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
               <span className="truncate">
-                {p.namespace}/{p.pipelineId}
+                <span className="text-neutral-500">{p.namespace}/</span>
+                {p.pipelineId}
               </span>
             </Link>
           )),
