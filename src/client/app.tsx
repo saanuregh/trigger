@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { CommandPalette } from "./components/CommandPalette.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
+import { KeyboardShortcuts } from "./components/KeyboardShortcuts.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { ToastProvider } from "./components/Toast.tsx";
 import { ConfigPage } from "./config.tsx";
@@ -79,6 +80,7 @@ createRoot(document.getElementById("root")!).render(
       <WebSocketProvider>
         <RouterProvider routes={routes} fallback={NotFound} />
         <CommandPalette />
+        <KeyboardShortcuts />
       </WebSocketProvider>
     </ToastProvider>
   </ErrorBoundary>,

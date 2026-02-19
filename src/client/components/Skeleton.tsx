@@ -78,6 +78,40 @@ export function PipelineSkeleton() {
   );
 }
 
+export function ConfigSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-4 w-64" />
+      <div>
+        <Skeleton className="h-3 w-24 mb-2" />
+        <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="px-3 py-1.5 flex items-center gap-3 border-t border-white/[0.04] first:border-t-0">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-12" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <Skeleton className="h-3 w-16 mb-2" />
+        <div className="space-y-1.5">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-neutral-900/50 border border-white/[0.06] rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-16 rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RunSkeleton() {
   return (
     <div>

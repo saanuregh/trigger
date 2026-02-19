@@ -79,6 +79,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const isDirtyRef = useRef(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -90,6 +91,20 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  // Track dirty state for beforeunload warning
+  useEffect(() => {
+    const defaults = defaultParams(pipeline.params ?? []);
+    isDirtyRef.current = JSON.stringify(params) !== JSON.stringify(defaults);
+  }, [params, pipeline.params]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirtyRef.current) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
   useEffect(() => {
@@ -175,20 +190,22 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
             disabled={activeRunCount >= pipeline.concurrency || atGlobalLimit}
           >
             Run Pipeline
-            <kbd className="hidden sm:inline text-[10px] opacity-60 ml-1.5 bg-white/10 px-1.5 py-0.5 rounded">
+            <kbd className="hidden sm:inline text-[11px] opacity-60 ml-1.5 bg-white/10 px-1.5 py-0.5 rounded">
               {isMac ? "\u2318\u23CE" : "Ctrl+\u23CE"}
             </kbd>
           </Button>
           {atGlobalLimit ? (
-            <span className="text-[11px] text-yellow-500/80">Global concurrency limit reached.</span>
+            <span className="text-xs text-yellow-500/80">Global concurrency limit reached.</span>
           ) : activeRunCount >= pipeline.concurrency ? (
-            <span className="text-[11px] text-yellow-500/80">
+            <span className="text-xs text-yellow-500/80">
               At max concurrency ({activeRunCount}/{pipeline.concurrency}).
             </span>
           ) : (
-            pipeline.confirm && <span className="text-[11px] text-yellow-500/80">Requires confirmation.</span>
+            pipeline.confirm && <span className="text-xs text-yellow-500/80">Requires confirmation.</span>
           )}
         </div>
+
+        <div className="text-xs text-neutral-600">{isMac ? "⇧⌘⏎" : "Shift+Ctrl+⏎"} for dry run</div>
 
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm">

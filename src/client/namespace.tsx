@@ -1,12 +1,13 @@
 import { GitBranch } from "lucide-react";
 import type { PaginatedResponse, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
+import { ErrorMessage } from "./components/ErrorMessage.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { NamespaceNav } from "./components/NamespaceNav.tsx";
 import { NamespaceSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useConfigs, useFetch } from "./hooks.tsx";
-import { Link, navigate, useRoute } from "./router.tsx";
+import { Link, useRoute } from "./router.tsx";
 import { formatDuration, timeAgo } from "./utils.ts";
 import { useGlobalEvents } from "./ws.tsx";
 
@@ -34,7 +35,7 @@ export function NamespacePage() {
   if (error) {
     return (
       <Layout>
-        <div className="text-red-400">{error}</div>
+        <ErrorMessage>{error}</ErrorMessage>
       </Layout>
     );
   }
@@ -53,10 +54,10 @@ export function NamespacePage() {
         {nsConfig.pipelines.length === 0 ? (
           <EmptyState icon={<GitBranch size={48} />} title="No pipelines" description="This namespace has no pipelines configured." />
         ) : (
-          <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
+          <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-neutral-500 text-[11px] font-medium">
+                <tr className="text-left text-neutral-500 text-xs font-medium">
                   <th className="px-3 py-1.5">Pipeline</th>
                   <th className="px-3 py-1.5">Status</th>
                   <th className="px-3 py-1.5">Last Run</th>
@@ -67,13 +68,12 @@ export function NamespacePage() {
                 {nsConfig.pipelines.map((p) => {
                   const lastRun = latestRuns.get(p.id);
                   return (
-                    <tr
-                      key={p.id}
-                      className="border-t border-white/[0.04] hover:bg-white/[0.04] transition-colors cursor-pointer"
-                      onClick={() => navigate(`/${ns}/${p.id}`)}
-                    >
+                    <tr key={p.id} className="border-t border-white/[0.04] hover:bg-white/[0.04] transition-colors relative">
                       <td className="px-3 py-1.5">
-                        <Link to={`/${ns}/${p.id}`} className="text-neutral-200 hover:text-white no-underline font-medium">
+                        <Link
+                          to={`/${ns}/${p.id}`}
+                          className="text-neutral-200 hover:text-white no-underline font-medium after:absolute after:inset-0"
+                        >
                           {p.name}
                         </Link>
                         {p.description && <div className="text-xs text-neutral-500 mt-0.5">{p.description}</div>}

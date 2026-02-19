@@ -5,6 +5,7 @@ import { Link } from "../router.tsx";
 import { isMac, SidebarContext, useLocalStorage, useSidebar } from "../utils.ts";
 import { useStatus } from "../ws.tsx";
 import { Breadcrumb, type BreadcrumbItem } from "./Breadcrumb.tsx";
+import { ConnectionStatus } from "./ConnectionStatus.tsx";
 
 interface LayoutProps {
   children: ReactNode;
@@ -60,7 +61,7 @@ function ActiveRuns() {
 
   if (!status || status.pipelines.length === 0) {
     if (collapsed) return null;
-    return <div className="px-4 pb-2 text-[11px] text-neutral-600 shrink-0">No active runs</div>;
+    return <div className="px-4 pb-2 text-xs text-neutral-600 shrink-0">No active runs</div>;
   }
 
   if (collapsed) {
@@ -82,7 +83,7 @@ function ActiveRuns() {
 
   return (
     <div className="px-3 pb-2 shrink-0">
-      <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-1.5">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1.5">
         <Loader2 size={10} className="animate-spin text-neutral-400" />
         Active
         <span className="font-mono">
@@ -147,6 +148,9 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
       {/* Nav content */}
       <div className={`flex-1 overflow-y-auto ${collapsed ? "px-1" : "px-3"} pt-1 pb-2`}>{sidebar}</div>
 
+      {/* Connection status */}
+      <ConnectionStatus />
+
       {/* Active runs */}
       <ActiveRuns />
 
@@ -172,10 +176,10 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
             <button
               type="button"
               onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: isMac, ctrlKey: !isMac }))}
-              className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500 hover:text-neutral-300 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1 transition-colors"
               title={`Search (${isMac ? "\u2318" : "Ctrl+"}K)`}
             >
-              <kbd className="text-[11px]">{isMac ? "\u2318" : "Ctrl"}</kbd>
+              <kbd className="text-xs">{isMac ? "\u2318" : "Ctrl"}</kbd>
               <span>K</span>
             </button>
             <UserMenu />
@@ -205,9 +209,15 @@ export function Layout({ children, sidebar, actions, breadcrumbs }: LayoutProps)
   return (
     <SidebarContext value={{ collapsed, toggle }}>
       <div className="flex h-screen">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-neutral-900 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:m-2"
+        >
+          Skip to content
+        </a>
         <SidebarContent sidebar={sidebar} />
 
-        <main className="flex-1 overflow-y-auto flex flex-col min-w-0">
+        <main id="main-content" className="flex-1 overflow-y-auto flex flex-col min-w-0">
           {/* Header bar: breadcrumbs (only when sidebar collapsed) + actions */}
           {(breadcrumbs?.length || actions) && (
             <div className="flex items-center justify-between gap-4 px-4 h-10 border-b border-white/[0.06] shrink-0">

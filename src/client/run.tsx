@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type LogLine, type RunRow, type StepRow, TERMINAL_STATUSES } from "../types.ts";
 import { Button } from "./components/Button.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
+import { ErrorMessage } from "./components/ErrorMessage.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { LogViewer } from "./components/LogViewer.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
@@ -259,7 +260,7 @@ export function RunPage() {
   if (error) {
     return (
       <Layout sidebar={sidebar}>
-        <div className="text-red-400">{error.message}</div>
+        <ErrorMessage>{error.message}</ErrorMessage>
       </Layout>
     );
   }
@@ -318,7 +319,7 @@ export function RunPage() {
             {liveDuration && <span className="ml-2 font-mono text-white">{liveDuration}</span>}
           </div>
           {run.dry_run === 1 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/15">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/15">
               DRY RUN
             </span>
           )}
@@ -333,9 +334,9 @@ export function RunPage() {
         )}
 
         {/* Side-by-side: Steps + Logs */}
-        <div className="flex gap-4 flex-1 min-h-0">
+        <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
           {/* Steps panel */}
-          <div className="w-52 shrink-0 overflow-y-auto pr-3 flex flex-col gap-0.5">
+          <div className="lg:w-52 shrink-0 overflow-y-auto lg:pr-3 flex flex-col gap-0.5 max-h-48 lg:max-h-none">
             <StepProgressBar steps={steps} />
             <button
               type="button"
@@ -367,9 +368,9 @@ export function RunPage() {
                       {step.step_name}
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] text-neutral-600 font-mono">{step.action}</span>
+                      <span className="text-[11px] text-neutral-600 font-mono">{step.action}</span>
                       {step.started_at && step.finished_at && (
-                        <span className="text-[10px] text-neutral-600 font-mono">{formatDuration(step.started_at, step.finished_at)}</span>
+                        <span className="text-[11px] text-neutral-600 font-mono">{formatDuration(step.started_at, step.finished_at)}</span>
                       )}
                     </div>
                   </div>
