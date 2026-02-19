@@ -132,7 +132,10 @@ export const wsHandlers = {
       }
 
       if (result.data.type === "subscribe") {
-        handleSubscribe(ws, result.data.topic);
+        handleSubscribe(ws, result.data.topic).catch((err) => {
+          logger.warn({ error: errorMessage(err) }, "ws subscribe failed");
+          send(ws, { type: "error", message: "Subscribe failed" });
+        });
       } else if (result.data.type === "unsubscribe") {
         handleUnsubscribe(ws, result.data.topic);
       }

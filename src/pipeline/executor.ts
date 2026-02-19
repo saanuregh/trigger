@@ -70,6 +70,17 @@ function wireAbort(parentSignal: AbortSignal | undefined, abort: AbortController
   parentSignal?.addEventListener("abort", () => abort.abort(), { once: true });
 }
 
+/** Caller must set DB run status to "running" before calling this. */
+function dispatchRun(opts: RunStepsOptions): void {
+  const { runId, namespace, pipelineId, pipelineName, log, startFromIndex } = opts;
+  publish("global", { type: "run:started", runId, namespace, pipelineId, pipelineName });
+  publish(runId, { type: "run:status", runId, status: "running" });
+  log.info(startFromIndex != null ? "pipeline retry started" : "pipeline started");
+  runSteps(opts).catch((err) => {
+    logger.error({ runId, error: errorMessage(err) }, "runSteps unexpected rejection");
+  });
+}
+
 export async function executePipeline(
   namespace: string,
   pipelineId: string,
@@ -122,15 +133,11 @@ export async function executePipeline(
       region: nsConfig.aws_region,
     });
 
-    publish("global", { type: "run:started", runId, namespace, pipelineId, pipelineName: pipeline.name });
     db.updateRunStatus(runId, "running");
-    publish(runId, { type: "run:status", runId, status: "running" });
-    log.info("pipeline started");
-
     const logDir = `${env.DATA_DIR}/logs/${runId}`;
     mkdirSync(logDir, { recursive: true });
 
-    runSteps({
+    dispatchRun({
       runId,
       namespace,
       pipelineId,
@@ -146,8 +153,6 @@ export async function executePipeline(
       region: nsConfig.aws_region,
       timeoutS: pipeline.timeout ?? DEFAULT_RUN_TIMEOUT_S,
       triggeredBy: options?.triggeredBy,
-    }).catch((err) => {
-      logger.error({ runId, error: errorMessage(err) }, "runSteps unexpected rejection");
     });
 
     return runId;
@@ -203,17 +208,9 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
       retryFromStep: existingSteps[failedIndex]!.step_id,
     });
 
-    publish("global", {
-      type: "run:started",
-      runId,
-      namespace: run.namespace,
-      pipelineId: run.pipeline_id,
-      pipelineName: run.pipeline_name,
-    });
-    publish(runId, { type: "run:status", runId, status: "running" });
-    log.info("pipeline retry started");
+    log.info("retry will use current pipeline config — behavior may differ if config changed since original run");
 
-    runSteps({
+    dispatchRun({
       runId,
       namespace: run.namespace,
       pipelineId: run.pipeline_id,
@@ -230,8 +227,6 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
       timeoutS: pipeline.timeout ?? DEFAULT_RUN_TIMEOUT_S,
       triggeredBy: options?.triggeredBy,
       startFromIndex: failedIndex,
-    }).catch((err) => {
-      logger.error({ runId, error: errorMessage(err) }, "runSteps unexpected rejection");
     });
 
     return runId;
@@ -435,7 +430,7 @@ export function getActiveRunSummary(): { total: number; byPipeline: Record<strin
   for (const [key, arr] of activePipelines) {
     byPipeline[key] = arr.map((a) => a.runId);
   }
-  return { total: [...activePipelines.values()].reduce((sum, arr) => sum + arr.length, 0), byPipeline };
+  return { total: Object.values(byPipeline).reduce((sum, arr) => sum + arr.length, 0), byPipeline };
 }
 
 export function initBuiltinActions(): void {

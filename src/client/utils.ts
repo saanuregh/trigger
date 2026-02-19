@@ -3,11 +3,12 @@ import type { RunStatus } from "../types.ts";
 
 export const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 
-export function handleUnauthorized(res: Response): void {
+export function handleUnauthorized(res: Response): boolean {
   if (res.status === 401) {
     window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}&error=session_expired`;
-    throw new Error("Session expired");
+    return true;
   }
+  return false;
 }
 
 export function formatDurationMs(ms: number): string {
@@ -129,12 +130,16 @@ const NAMESPACE_COLORS = [
 
 export type NsColor = (typeof NAMESPACE_COLORS)[number];
 
-export function nsColor(namespace: string): NsColor {
+export function hashString(str: string): number {
   let hash = 0;
-  for (let i = 0; i < namespace.length; i++) {
-    hash = ((hash << 5) - hash + namespace.charCodeAt(i)) | 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
   }
-  return NAMESPACE_COLORS[Math.abs(hash) % NAMESPACE_COLORS.length]!;
+  return Math.abs(hash);
+}
+
+export function nsColor(namespace: string): NsColor {
+  return NAMESPACE_COLORS[hashString(namespace) % NAMESPACE_COLORS.length]!;
 }
 
 // --- localStorage-backed state ---

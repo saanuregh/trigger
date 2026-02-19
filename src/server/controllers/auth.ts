@@ -52,7 +52,7 @@ export const callback = async (req: RouteRequest) => {
   try {
     const redirectUri = `${url.origin}/auth/callback`;
     const user = await exchangeCode(code, redirectUri);
-    const sessionCookie = await signSession(user);
+    const sessionCookie = signSession(user);
 
     let returnUrl = "/";
     try {

@@ -11,7 +11,7 @@ import { SectionHeader } from "./components/SectionHeader.tsx";
 import { PipelineSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useConfigs, useFetch } from "./hooks.tsx";
+import { useFetch, useNsDisplayName } from "./hooks.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
 import { formatDuration, timeAgo, useLiveDuration } from "./utils.ts";
 import { useGlobalEvents, useStatus } from "./ws.tsx";
@@ -54,16 +54,17 @@ function ActiveRunBanner({ ns, pipelineId, runId }: { ns: string; pipelineId: st
 export function PipelinePage() {
   const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
+  const route = useRoute();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
   const { data: status } = useStatus();
-  const { data: configs } = useConfigs();
-  const nsDisplayName = configs?.find((c) => c.namespace === ns)?.display_name ?? ns;
+  const nsDisplayName = useNsDisplayName(ns);
 
   const { data: pipeline, error } = useFetch<PipelineDefSummary>(`/api/pipelines/${ns}/${pipelineId}`);
+  const statusParam = statusFilter !== "all" ? `&status=${statusFilter}` : "";
   const { data: runsData, mutate: mutateRuns } = useFetch<PaginatedResponse<RunRow>>(
-    `/api/runs?ns=${ns}&pipeline_id=${pipelineId}&page=${page}&per_page=${PER_PAGE}`,
+    `/api/runs?ns=${ns}&pipeline_id=${pipelineId}&page=${page}&per_page=${PER_PAGE}${statusParam}`,
   );
 
   useGlobalEvents((event) => {
@@ -71,8 +72,10 @@ export function PipelinePage() {
   });
 
   const runs = runsData?.data ?? [];
-  const filteredRuns = statusFilter === "all" ? runs : runs.filter((r) => r.status === statusFilter);
   const totalPages = Math.ceil((runsData?.total ?? 0) / PER_PAGE);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => setPage(1), [statusFilter]);
 
   useEffect(() => {
     if (pipeline) document.title = `${pipeline.name} — Trigger`;
@@ -104,9 +107,10 @@ export function PipelinePage() {
     );
   }
 
-  const activeRuns = runs.filter((r) => r.status === "running");
+  // Active runs from real-time WebSocket status (not stale paginated data)
+  const activeRunIds = status?.pipelines.find((p) => p.namespace === ns && p.pipelineId === pipelineId)?.runIds ?? [];
 
-  const rerunId = new URLSearchParams(window.location.search).get("rerun");
+  const rerunId = new URLSearchParams(route.search).get("rerun");
 
   return (
     <Layout sidebar={sidebar} breadcrumbs={[{ label: nsDisplayName, to: `/${ns}` }, { label: pipeline.name }]}>
@@ -116,7 +120,7 @@ export function PipelinePage() {
           <div className="flex items-center justify-between mb-2">
             <SectionHeader>Run Pipeline</SectionHeader>
             <span className="text-xs font-mono text-neutral-500">
-              {activeRuns.length}/{pipeline.concurrency} slots
+              {activeRunIds.length}/{pipeline.concurrency} slots
             </span>
           </div>
           <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg p-3">
@@ -126,7 +130,7 @@ export function PipelinePage() {
               ns={ns}
               onRunStarted={handleRunStarted}
               rerunId={rerunId}
-              activeRunCount={activeRuns.length}
+              activeRunCount={activeRunIds.length}
               atGlobalLimit={status ? status.activeRuns >= status.maxConcurrentRuns : false}
             />
           </div>
@@ -155,10 +159,10 @@ export function PipelinePage() {
               </div>
             </div>
 
-            {activeRuns.length > 0 && (
+            {activeRunIds.length > 0 && (
               <div className="space-y-1.5 mb-3">
-                {activeRuns.map((activeRun) => (
-                  <ActiveRunBanner key={activeRun.id} ns={ns} pipelineId={pipelineId} runId={activeRun.id} />
+                {activeRunIds.map((runId) => (
+                  <ActiveRunBanner key={runId} ns={ns} pipelineId={pipelineId} runId={runId} />
                 ))}
               </div>
             )}
@@ -175,7 +179,7 @@ export function PipelinePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRuns.map((run) => (
+                  {runs.map((run) => (
                     <tr key={run.id} className="border-t border-white/[0.04] hover:bg-white/[0.04] transition-colors">
                       <td className="px-3 py-1.5">
                         <Link

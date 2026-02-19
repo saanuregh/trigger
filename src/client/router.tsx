@@ -7,11 +7,13 @@ interface Route {
 
 interface RouteMatch {
   path: string;
+  search: string;
   params: Record<string, string>;
 }
 
 const RouteContext = createContext<RouteMatch>({
   path: "/",
+  search: "",
   params: {},
 });
 
@@ -43,9 +45,13 @@ export function navigate(to: string) {
 
 export function RouterProvider({ routes, fallback: Fallback }: { routes: Route[]; fallback?: Route["component"] }) {
   const [path, setPath] = useState(location.pathname);
+  const [search, setSearch] = useState(location.search);
 
   useEffect(() => {
-    const onPopState = () => setPath(location.pathname);
+    const onPopState = () => {
+      setPath(location.pathname);
+      setSearch(location.search);
+    };
     addEventListener("popstate", onPopState);
     return () => removeEventListener("popstate", onPopState);
   }, []);
@@ -57,7 +63,7 @@ export function RouterProvider({ routes, fallback: Fallback }: { routes: Route[]
   const matched = matchRoutes(path, routes);
   const Page = matched?.route.component ?? Fallback;
 
-  return <RouteContext value={{ path, params: matched?.params ?? {} }}>{Page ? <Page key={path} /> : null}</RouteContext>;
+  return <RouteContext value={{ path, search, params: matched?.params ?? {} }}>{Page ? <Page key={path} /> : null}</RouteContext>;
 }
 
 export function useRoute() {

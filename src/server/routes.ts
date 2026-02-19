@@ -59,5 +59,6 @@ export function fetch(req: Request): Response {
 
 export function error(err: Error): Response {
   logger.error({ error: err.message }, "server error");
-  return Response.json({ error: err.message, ...(env.development && { stack: err.stack }) }, { status: 500 });
+  const message = env.development ? err.message : "Internal server error";
+  return Response.json({ error: message, ...(env.development && { stack: err.stack }) }, { status: 500 });
 }

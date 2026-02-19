@@ -15,7 +15,7 @@ export function authed(handler: AuthedHandler) {
   return async (req: Request & { params: Record<string, string> }) => {
     if (!env.authEnabled) return handler(req, STUB_SESSION);
 
-    const session = await getSession(req);
+    const session = getSession(req);
     if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     return handler(req, session);

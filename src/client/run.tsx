@@ -10,27 +10,28 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { RunSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useConfigs, useFetch } from "./hooks.tsx";
+import { useFetch, useNsDisplayName } from "./hooks.tsx";
 import { navigate, useRoute } from "./router.tsx";
 import { formatDuration, handleUnauthorized, setFaviconStatus, timeAgo, useLiveDuration } from "./utils.ts";
 import { useSubscription } from "./ws.tsx";
 
 function StepProgress({ steps }: { steps: StepRow[] }) {
   const runningIdx = steps.findIndex((s) => s.status === "running");
-  if (runningIdx >= 0) {
-    return (
-      <span className="text-xs text-neutral-400 font-mono">
-        {runningIdx + 1}/{steps.length}
-      </span>
-    );
-  }
-  const done = steps.filter((s) => s.status === "success" || s.status === "failed" || s.status === "skipped").length;
+  const isRunning = runningIdx >= 0;
+  const count = isRunning ? runningIdx + 1 : steps.filter((s) => s.status !== "pending").length;
   return (
-    <span className="text-xs text-neutral-500 font-mono">
-      {done}/{steps.length}
+    <span className={`text-xs font-mono ${isRunning ? "text-neutral-400" : "text-neutral-500"}`}>
+      {count}/{steps.length}
     </span>
   );
 }
+
+const stepBarColors: Record<string, string> = {
+  success: "bg-green-400",
+  failed: "bg-red-400",
+  running: "bg-white animate-pulse",
+  skipped: "bg-neutral-700",
+};
 
 function StepProgressBar({ steps }: { steps: StepRow[] }) {
   if (steps.length === 0) return null;
@@ -40,17 +41,7 @@ function StepProgressBar({ steps }: { steps: StepRow[] }) {
       {steps.map((step) => (
         <div
           key={step.step_id}
-          className={`h-1 flex-1 rounded-full transition-colors duration-500 ${
-            step.status === "success"
-              ? "bg-green-400"
-              : step.status === "failed"
-                ? "bg-red-400"
-                : step.status === "running"
-                  ? "bg-white animate-pulse"
-                  : step.status === "skipped"
-                    ? "bg-neutral-700"
-                    : "bg-neutral-800"
-          }`}
+          className={`h-1 flex-1 rounded-full transition-colors duration-500 ${stepBarColors[step.status] ?? "bg-neutral-800"}`}
         />
       ))}
     </div>
@@ -86,8 +77,7 @@ export function RunPage() {
   const run = data?.run ?? null;
   const steps = data?.steps ?? [];
 
-  const { data: configs } = useConfigs();
-  const nsDisplayName = configs?.find((c) => c.namespace === ns)?.display_name ?? ns;
+  const nsDisplayName = useNsDisplayName(ns);
 
   useEffect(() => {
     if (run) document.title = `Run #${runId.slice(0, 8)} — ${run.pipeline_name} — Trigger`;
@@ -168,7 +158,7 @@ export function RunPage() {
     setShowStopConfirm(false);
     try {
       const res = await fetch(`/api/runs/${runId}/cancel`, { method: "POST" });
-      handleUnauthorized(res);
+      if (handleUnauthorized(res)) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Stop failed" }));
         toast(data.error ?? "Stop failed", "error");
@@ -188,7 +178,7 @@ export function RunPage() {
     setShowRetryConfirm(false);
     try {
       const res = await fetch(`/api/runs/${runId}/retry`, { method: "POST" });
-      handleUnauthorized(res);
+      if (handleUnauthorized(res)) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Retry failed" }));
         if (res.status === 409) {
