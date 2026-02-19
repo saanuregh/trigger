@@ -1,6 +1,6 @@
 import { AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { errorMessage, type ParamDef, type PipelineDefSummary, type RunRow } from "../../types.ts";
+import { errorMessage, type ParamDef, type PipelineDefSummary, type RunIdResponse, type RunRow } from "../../types.ts";
 import { handleUnauthorized, isMac } from "../utils.ts";
 import { Button } from "./Button.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
@@ -148,7 +148,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
         throw new Error(data.error || `HTTP ${res.status}`);
       }
 
-      const { runId } = (await res.json()) as { runId: string };
+      const { runId } = (await res.json()) as RunIdResponse;
       onRunStarted(runId);
     } catch (err) {
       setError(errorMessage(err));

@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import type { RunStatus } from "../types.ts";
 import { CommandPalette } from "./components/CommandPalette.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts.tsx";
@@ -12,11 +13,16 @@ import { NamespacePage } from "./namespace.tsx";
 import { PipelinePage } from "./pipeline.tsx";
 import { Link, RouterProvider } from "./router.tsx";
 import { RunPage } from "./run.tsx";
-import { requestNotificationPermission, showRunNotification } from "./utils.ts";
+import { requestNotificationPermission, showRunNotification, statusVerbs } from "./utils.ts";
 import { useGlobalEvents, WebSocketProvider } from "./ws.tsx";
 
-const statusVerb: Record<string, string> = { success: "succeeded", cancelled: "cancelled" };
-const statusVariant: Record<string, "success" | "error" | "info"> = { success: "success", cancelled: "info" };
+const toastVariant: Record<RunStatus, "success" | "error" | "info"> = {
+  pending: "info",
+  running: "info",
+  success: "success",
+  failed: "error",
+  cancelled: "info",
+};
 
 function GlobalNotifications() {
   const { toast } = useToast();
@@ -27,8 +33,8 @@ function GlobalNotifications() {
       return;
     }
     if (event.type === "run:completed") {
-      const verb = statusVerb[event.status] ?? "failed";
-      toast(`${event.pipelineName} ${verb}`, statusVariant[event.status] ?? "error");
+      const verb = statusVerbs[event.status] ?? "failed";
+      toast(`${event.pipelineName} ${verb}`, toastVariant[event.status] ?? "error");
       showRunNotification(event.pipelineName, event.status);
     }
   });

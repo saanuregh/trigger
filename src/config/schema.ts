@@ -64,7 +64,7 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
       id: z.string(),
       name: z.string(),
       action: z.string(),
-      config: z.unknown(),
+      config: z.record(z.string(), z.unknown()),
     })
     .strict()
     .superRefine((step, ctx) => {
@@ -135,9 +135,9 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
 }
 
 function getAtPath(obj: unknown, path: (string | number)[]): unknown {
-  let current = obj;
+  let current: unknown = obj;
   for (const key of path) {
-    if (current == null || typeof current !== "object") return current;
+    if (current == null || typeof current !== "object" || Array.isArray(current)) return current;
     current = (current as Record<string | number, unknown>)[key];
   }
   return current;
@@ -148,7 +148,7 @@ const HAS_TEMPLATE = /\{\{.+?\}\}/;
 function hasTemplateRefs(value: unknown): boolean {
   if (typeof value === "string") return HAS_TEMPLATE.test(value);
   if (Array.isArray(value)) return value.some(hasTemplateRefs);
-  if (value && typeof value === "object") return Object.values(value).some(hasTemplateRefs);
+  if (value !== null && typeof value === "object") return Object.values(value).some(hasTemplateRefs);
   return false;
 }
 
@@ -163,7 +163,7 @@ function extractTemplateRefs(value: unknown): TemplateRef[] {
       }
     } else if (Array.isArray(v)) {
       v.forEach(walk);
-    } else if (v && typeof v === "object") {
+    } else if (v !== null && typeof v === "object") {
       Object.values(v).forEach(walk);
     }
   }
@@ -188,7 +188,7 @@ interface JSONSchemaNode {
   if?: JSONSchemaNode;
   then?: JSONSchemaNode;
   not?: JSONSchemaNode;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 export function buildJSONSchema(zodSchema: z.ZodType, actions: Array<{ name: string; schema: z.ZodType }>): JSONSchemaNode {

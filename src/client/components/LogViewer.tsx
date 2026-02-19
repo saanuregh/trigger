@@ -1,11 +1,11 @@
 import { ArrowDown, FileText, Search, X } from "lucide-react";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LogLine } from "../../types.ts";
+import type { LogLevel, LogLine } from "../../types.ts";
 
 const CHUNK_SIZE = 50;
 const chunkStyle: CSSProperties = { contentVisibility: "auto", containIntrinsicSize: "auto none" };
 
-const levelColors: Record<string, string> = {
+const levelColors: Record<LogLevel, string> = {
   error: "border-l-red-500 bg-red-500/[0.08]",
   warn: "border-l-yellow-500 bg-yellow-500/[0.06]",
   info: "border-l-transparent",

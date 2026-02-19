@@ -1,6 +1,6 @@
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
-import type { ParamDef } from "../types.ts";
+import type { ActionName, PipelineConfigResponse } from "../types.ts";
 import { Card } from "./components/Card.tsx";
 import { ErrorMessage } from "./components/ErrorMessage.tsx";
 import { Layout } from "./components/Layout.tsx";
@@ -10,30 +10,32 @@ import { ConfigSkeleton } from "./components/Skeleton.tsx";
 import { useConfigs, useFetch } from "./hooks.tsx";
 import { useRoute } from "./router.tsx";
 
-interface StepConfig {
-  id: string;
-  name: string;
-  action: string;
-  config: Record<string, unknown>;
-}
-
-interface PipelineConfig {
-  id: string;
-  name: string;
-  description?: string;
-  params?: ParamDef[];
-  steps: StepConfig[];
-}
-
 const TEMPLATE_SPLIT_RE = /(\{\{.+?\}\})/g;
 const TEMPLATE_TEST_RE = /^\{\{.+?\}\}$/;
 
-const actionColors: Record<string, string> = {
-  codebuild: "bg-orange-500/15 text-orange-300",
-  "ecs-task": "bg-white/[0.06] text-neutral-300",
-  "cloudflare-purge": "bg-amber-500/15 text-amber-300",
-};
-const defaultActionColor = "bg-white/[0.06] text-neutral-400";
+const ACTION_COLOR_PALETTE = [
+  { bg: "bg-teal-500/15", text: "text-teal-300" },
+  { bg: "bg-amber-500/15", text: "text-amber-300" },
+  { bg: "bg-violet-500/15", text: "text-violet-300" },
+  { bg: "bg-rose-500/15", text: "text-rose-300" },
+  { bg: "bg-sky-500/15", text: "text-sky-300" },
+  { bg: "bg-lime-500/15", text: "text-lime-300" },
+  { bg: "bg-orange-500/15", text: "text-orange-300" },
+  { bg: "bg-pink-500/15", text: "text-pink-300" },
+  { bg: "bg-cyan-500/15", text: "text-cyan-300" },
+  { bg: "bg-indigo-500/15", text: "text-indigo-300" },
+  { bg: "bg-fuchsia-500/15", text: "text-fuchsia-300" },
+  { bg: "bg-emerald-500/15", text: "text-emerald-300" },
+] as const;
+
+function getActionColor(action: ActionName): string {
+  let hash = 0;
+  for (let i = 0; i < action.length; i++) {
+    hash = ((hash << 5) - hash + action.charCodeAt(i)) | 0;
+  }
+  const color = ACTION_COLOR_PALETTE[Math.abs(hash) % ACTION_COLOR_PALETTE.length]!;
+  return `${color.bg} ${color.text}`;
+}
 
 function TemplateString({ value }: { value: string }) {
   const parts = value.split(TEMPLATE_SPLIT_RE);
@@ -135,7 +137,7 @@ function ConfigValue({ value }: { value: unknown }) {
   return <span className="text-green-400">"{String(value)}"</span>;
 }
 
-function StepCard({ step, index }: { step: StepConfig; index: number }) {
+function StepCard({ step, index }: { step: PipelineConfigResponse["steps"][number]; index: number }) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -152,9 +154,7 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
         )}
         <span className="text-xs text-neutral-600 w-5 text-right">{index + 1}.</span>
         <span className="text-sm font-medium text-neutral-200">{step.name}</span>
-        <span className={`text-xs px-1.5 py-0.5 rounded-lg font-mono ${actionColors[step.action] ?? defaultActionColor}`}>
-          {step.action}
-        </span>
+        <span className={`text-xs px-1.5 py-0.5 rounded-lg font-mono ${getActionColor(step.action)}`}>{step.action}</span>
       </button>
       {expanded && (
         <div className="px-3 pb-3 ml-7 space-y-1 border-t border-white/[0.04] pt-2">
@@ -178,7 +178,7 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
 export function ConfigPage() {
   const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
-  const { data: config, error } = useFetch<PipelineConfig>(`/api/pipelines/${ns}/${pipelineId}/config`);
+  const { data: config, error } = useFetch<PipelineConfigResponse>(`/api/pipelines/${ns}/${pipelineId}/config`);
   const { data: configs } = useConfigs();
   const nsDisplayName = configs?.find((c) => c.namespace === ns)?.display_name ?? ns;
 

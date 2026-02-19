@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import type { RunStatus } from "../types.ts";
 
 export const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 
@@ -46,7 +47,7 @@ function getFaviconLink(): HTMLLinkElement {
   return el;
 }
 
-const faviconColors: Record<string, string> = {
+const faviconColors: Record<RunStatus, string> = {
   running: "#ffffff",
   pending: "#ffffff",
   success: "#22c55e",
@@ -54,7 +55,7 @@ const faviconColors: Record<string, string> = {
   cancelled: "#eab308",
 };
 
-export function setFaviconStatus(status: string | null): void {
+export function setFaviconStatus(status: RunStatus | null): void {
   const link = getFaviconLink();
 
   if (!status) {
@@ -93,12 +94,15 @@ export function requestNotificationPermission(): void {
   }
 }
 
-const statusVerbs: Record<string, string> = {
+export const statusVerbs: Record<RunStatus, string> = {
+  pending: "pending",
+  running: "running",
   success: "succeeded",
+  failed: "failed",
   cancelled: "cancelled",
 };
 
-export function showRunNotification(pipelineName: string, status: string): void {
+export function showRunNotification(pipelineName: string, status: RunStatus): void {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
 
   const verb = statusVerbs[status] ?? "failed";

@@ -1,8 +1,12 @@
-type LogData = Record<string, unknown>;
+import type { JSONValue, LogLevel } from "./types.ts";
+
+type LogData = Record<string, JSONValue | undefined>;
 type WriteFn = (line: string) => void;
 
+export type LoggerLevel = LogLevel | "silent";
+
 export interface Logger {
-  level: string;
+  level: LoggerLevel;
   info(data: LogData, msg: string): void;
   info(msg: string): void;
   warn(data: LogData, msg: string): void;
@@ -23,7 +27,7 @@ export function createLogger(bindings: LogData = {}, write: WriteFn = stdout): L
     child: (extra) => createLogger({ ...bindings, ...extra }, write),
   };
 
-  function emit(level: string, args: [LogData, string] | [string]) {
+  function emit(level: LogLevel, args: [LogData, string] | [string]) {
     if (self.level === "silent") return;
     const [data, msg] = args.length === 2 ? args : [{}, args[0]];
     write(JSON.stringify({ level, time: new Date().toISOString(), ...bindings, ...data, msg }));

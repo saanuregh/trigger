@@ -6,7 +6,7 @@ import * as db from "../db/queries.ts";
 import { env } from "../env.ts";
 import { publish } from "../events.ts";
 import { createLogger, type Logger, logger } from "../logger.ts";
-import { errorMessage, type ParamValues, type StepStatus } from "../types.ts";
+import { errorMessage, type JSONValue, type ParamValues, type StepStatus } from "../types.ts";
 import { clearRegistry, getAction, type RegisteredAction, registerAction } from "./action-registry.ts";
 import cloudflare from "./actions/cloudflare.ts";
 import codebuild from "./actions/codebuild.ts";
@@ -297,7 +297,7 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
   const stepLog = createLogger({ runId, stepId: def.id, step: def.name, action: def.action, stepIndex, totalSteps }, write);
 
   function makeLogFn(level: "info" | "warn") {
-    return (msg: string, fields?: Record<string, unknown>) => (fields ? stepLog[level](fields, msg) : stepLog[level](msg));
+    return (msg: string, fields?: Record<string, JSONValue | undefined>) => (fields ? stepLog[level](fields, msg) : stepLog[level](msg));
   }
 
   return {
@@ -336,7 +336,7 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
 
     if (dryRun) {
       sl.stepLog.info("dry run, skipping action execution");
-      sl.stepLog.info({ resolvedConfig }, "dry run resolved config");
+      sl.stepLog.info({ resolvedConfig: resolvedConfig as JSONValue }, "dry run resolved config");
       await Bun.sleep(5000 + Math.random() * 10000);
       if (Math.random() < 0.05) throw new Error("simulated dry run failure");
       db.updateStepStatus(dbId, "success");

@@ -38,7 +38,8 @@ function resolveExpression(expr: string, ctx: ResolveContext): unknown {
 
   if (ref.type === "vars") {
     if (!(ref.name in ctx.vars)) throw new Error(`Undefined variable: vars.${ref.name}`);
-    return ctx.vars[ref.name];
+    const varValue = ctx.vars[ref.name];
+    return varValue ?? null;
   }
 
   if (ref.fallback !== undefined) {
@@ -90,7 +91,7 @@ export function resolveConfig(value: unknown, ctx: ResolveContext, depth = 0): u
     const obj = value as Record<string, unknown>;
 
     if ("$switch" in obj) {
-      const paramName = obj.$switch as string;
+      const paramName = String(obj.$switch);
       const paramValue = String(ctx.params[paramName] ?? "");
       const cases = (obj.cases ?? {}) as Record<string, unknown>;
 

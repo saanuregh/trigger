@@ -1,16 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NamespaceConfigSummary } from "../types.ts";
+import type { NamespaceConfigSummary, UserResponse } from "../types.ts";
 
 // --- Fetcher ---
 
-export async function fetcher(url: string) {
+export class FetchError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "FetchError";
+  }
+}
+
+export async function fetcher<T>(url: string): Promise<T> {
   const r = await fetch(url);
   if (r.status === 401) {
     window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}&error=session_expired`;
-    throw new Error("Unauthorized");
+    throw new FetchError("Unauthorized", 401);
   }
-  if (!r.ok) throw new Error(r.statusText || `HTTP ${r.status}`);
-  return r.json();
+  if (!r.ok) throw new FetchError(r.statusText || `HTTP ${r.status}`, r.status);
+  return r.json() as Promise<T>;
 }
 
 // --- Cache & dedup ---
@@ -31,7 +41,6 @@ function cacheGet<T>(key: string): T | undefined {
 
 function cacheSet(key: string, data: unknown) {
   cache.set(key, { data, ts: Date.now() });
-  // Evict stale entries when cache grows large
   if (cache.size > 200) {
     const now = Date.now();
     for (const [k, v] of cache) {
@@ -62,7 +71,7 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
     if (!key) return undefined;
     let promise = inflight.get(key) as Promise<T> | undefined;
     if (!promise) {
-      promise = fetcher(key) as Promise<T>;
+      promise = fetcher<T>(key);
       inflight.set(key, promise);
       promise.finally(() => inflight.delete(key));
     }
@@ -121,17 +130,10 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
 
 // --- App-specific hooks ---
 
-export interface User {
-  email: string;
-  name: string;
-  groups: string[];
-  isSuperAdmin: boolean;
-}
-
 export function useConfigs() {
   return useFetch<NamespaceConfigSummary[]>("/api/configs");
 }
 
 export function useUser() {
-  return useFetch<User>("/api/me");
+  return useFetch<UserResponse>("/api/me");
 }
