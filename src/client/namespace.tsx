@@ -1,7 +1,8 @@
-import { GitBranch, Loader2 } from "lucide-react";
+import { GitBranch } from "lucide-react";
 import type { PaginatedResponse, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
+import { NamespaceNav } from "./components/NamespaceNav.tsx";
 import { NamespaceSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useConfigs, useFetch } from "./hooks.tsx";
@@ -43,7 +44,7 @@ export function NamespacePage() {
 
   if (error) {
     return (
-      <Layout breadcrumbs={[{ label: ns }]}>
+      <Layout>
         <div className="text-red-400">{error}</div>
       </Layout>
     );
@@ -51,35 +52,14 @@ export function NamespacePage() {
 
   if (!nsConfig) {
     return (
-      <Layout breadcrumbs={[{ label: ns }]}>
+      <Layout>
         <NamespaceSkeleton />
       </Layout>
     );
   }
 
-  const sidebar =
-    runningByPipeline.size > 0 ? (
-      <div>
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">
-          <Loader2 size={12} className="animate-spin text-neutral-400" />
-          Running
-        </div>
-        {[...runningByPipeline.entries()].map(([pipelineId, runs]) => (
-          <Link
-            key={pipelineId}
-            to={`/${ns}/${pipelineId}`}
-            className="flex items-center gap-2 px-2 py-1.5 text-sm text-neutral-300 hover:text-white hover:bg-white/[0.04] rounded-lg no-underline transition-colors"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
-            {runs[0]!.pipeline_name}
-            {runs.length > 1 && <span className="text-[10px] text-neutral-500 font-mono">{runs.length}</span>}
-          </Link>
-        ))}
-      </div>
-    ) : undefined;
-
   return (
-    <Layout breadcrumbs={[{ label: nsConfig.display_name }]} sidebar={sidebar}>
+    <Layout sidebar={<NamespaceNav current={ns} />}>
       <div>
         <h1 className="text-xl font-semibold tracking-tight mb-5">{nsConfig.display_name}</h1>
         {nsConfig.pipelines.length === 0 ? (

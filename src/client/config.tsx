@@ -4,7 +4,7 @@ import type { ParamDef } from "../types.ts";
 import { Card } from "./components/Card.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
-import { useFetch, useNsDisplayName } from "./hooks.tsx";
+import { useFetch } from "./hooks.tsx";
 import { useRoute } from "./router.tsx";
 
 interface StepConfig {
@@ -175,20 +175,14 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
 export function ConfigPage() {
   const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
-  const nsDisplayName = useNsDisplayName(ns);
   const { data: config, error } = useFetch<PipelineConfig>(`/api/pipelines/${ns}/${pipelineId}/config`);
 
-  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="config" />;
-
-  const breadcrumbs = [
-    { label: nsDisplayName, href: `/${ns}` },
-    { label: config?.name ?? pipelineId, href: `/${ns}/${pipelineId}` },
-    { label: "Config" },
-  ];
+  const pipelineName = config?.name ?? pipelineId;
+  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} pipelineName={pipelineName} active="config" />;
 
   if (error) {
     return (
-      <Layout breadcrumbs={breadcrumbs} sidebar={sidebar}>
+      <Layout sidebar={sidebar}>
         <div className="text-red-400">{error.message}</div>
       </Layout>
     );
@@ -196,14 +190,14 @@ export function ConfigPage() {
 
   if (!config) {
     return (
-      <Layout breadcrumbs={breadcrumbs} sidebar={sidebar}>
+      <Layout sidebar={sidebar}>
         <div className="text-neutral-500">Loading...</div>
       </Layout>
     );
   }
 
   return (
-    <Layout breadcrumbs={breadcrumbs} sidebar={sidebar}>
+    <Layout sidebar={sidebar}>
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{config.name}</h1>

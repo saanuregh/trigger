@@ -5,10 +5,11 @@ import { Button } from "./components/Button.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { LogViewer } from "./components/LogViewer.tsx";
+import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { RunSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useFetch, useNsDisplayName } from "./hooks.tsx";
+import { useFetch } from "./hooks.tsx";
 import { navigate, useRoute } from "./router.tsx";
 import {
   formatDuration,
@@ -60,8 +61,6 @@ export function RunPage() {
   }, []);
 
   const { ns, pipelineId, runId } = useRoute().params as { ns: string; pipelineId: string; runId: string };
-
-  const nsDisplayName = useNsDisplayName(ns);
 
   const { data, error, mutate } = useFetch<{ run: RunRow; steps: StepRow[] }>(`/api/runs/${runId}`);
   const run = data?.run ?? null;
@@ -208,15 +207,12 @@ export function RunPage() {
     }
   }, [runId, toast]);
 
-  const breadcrumbs = [
-    { label: nsDisplayName, href: `/${ns}` },
-    { label: run?.pipeline_name ?? pipelineId, href: `/${ns}/${pipelineId}` },
-    { label: `Run #${runId.slice(0, 8)}` },
-  ];
+  const pipelineName = run?.pipeline_name ?? pipelineId;
+  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} pipelineName={pipelineName} active="runs" />;
 
   if (error) {
     return (
-      <Layout breadcrumbs={breadcrumbs}>
+      <Layout sidebar={sidebar}>
         <div className="text-red-400">{error.message}</div>
       </Layout>
     );
@@ -224,7 +220,7 @@ export function RunPage() {
 
   if (!run) {
     return (
-      <Layout breadcrumbs={breadcrumbs}>
+      <Layout sidebar={sidebar}>
         <RunSkeleton />
       </Layout>
     );
@@ -233,7 +229,7 @@ export function RunPage() {
   const isActive = run.status === "running" || run.status === "pending";
 
   return (
-    <Layout breadcrumbs={breadcrumbs}>
+    <Layout sidebar={sidebar}>
       <div className="h-full flex flex-col">
         {/* Metadata bar */}
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/[0.06] shrink-0">
