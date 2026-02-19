@@ -2,7 +2,7 @@ import { ChevronsLeft, ChevronsRight, Loader2, LogOut, Search, Workflow } from "
 import { type ReactNode, useEffect } from "react";
 import { useUser } from "../hooks.tsx";
 import { Link } from "../router.tsx";
-import { isMac, SidebarContext, useLocalStorage, useSidebar } from "../utils.ts";
+import { SidebarContext, useLocalStorage, useSidebar } from "../utils.ts";
 import { useStatus } from "../ws.tsx";
 import { Breadcrumb, type BreadcrumbItem } from "./Breadcrumb.tsx";
 import { ConnectionStatus } from "./ConnectionStatus.tsx";
@@ -163,9 +163,9 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
             <SidebarToggle />
             <button
               type="button"
-              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: isMac, ctrlKey: !isMac }))}
+              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }))}
               className="text-neutral-500 hover:text-neutral-300 transition-colors p-1.5"
-              title={`Search (${isMac ? "\u2318" : "Ctrl+"}K)`}
+              title="Search (/)"
             >
               <Search size={14} />
             </button>
@@ -175,12 +175,11 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
           <>
             <button
               type="button"
-              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: isMac, ctrlKey: !isMac }))}
+              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }))}
               className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1 transition-colors"
-              title={`Search (${isMac ? "\u2318" : "Ctrl+"}K)`}
+              title="Search (/)"
             >
-              <kbd className="text-xs">{isMac ? "\u2318" : "Ctrl"}</kbd>
-              <span>K</span>
+              <kbd className="text-xs">/</kbd>
             </button>
             <UserMenu />
           </>

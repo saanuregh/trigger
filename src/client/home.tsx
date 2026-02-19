@@ -1,5 +1,5 @@
 import { AlertTriangle, FolderOpen, Loader2 } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { NamespaceConfigSummary, PaginatedResponse, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
@@ -7,16 +7,27 @@ import { SectionHeader } from "./components/SectionHeader.tsx";
 import { HomeSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useConfigs, useFetch } from "./hooks.tsx";
-import { Link } from "./router.tsx";
+import { FocusList, focusRingClass } from "./keyboard.tsx";
+import { Link, navigate } from "./router.tsx";
 import { nsColor, timeAgo } from "./utils.ts";
 import { useGlobalEvents, useStatus } from "./ws.tsx";
 
-function NamespaceRow({ ns, activeRuns, lastRun }: { ns: NamespaceConfigSummary; activeRuns: number; lastRun: RunRow | null }) {
+function NamespaceRow({
+  ns,
+  focused,
+  activeRuns,
+  lastRun,
+}: {
+  ns: NamespaceConfigSummary;
+  focused: boolean;
+  activeRuns: number;
+  lastRun: RunRow | null;
+}) {
   const color = nsColor(ns.namespace);
   return (
     <Link
       to={`/${ns.namespace}`}
-      className="flex items-center gap-3 px-3 py-1.5 hover:bg-white/[0.04] transition-colors no-underline group"
+      className={`flex items-center gap-3 px-3 py-1.5 hover:bg-white/[0.04] transition-colors no-underline group ${focusRingClass(focused)}`}
     >
       <span className={`w-2 h-2 rounded-full ${color.dot} shrink-0`} />
       <span className="text-sm text-neutral-200 group-hover:text-white font-medium truncate">{ns.display_name}</span>
@@ -96,6 +107,9 @@ export function HomePage() {
 
   useGlobalEvents(debouncedMutate);
 
+  const validConfigs = useMemo(() => configs?.filter((c) => !c.error) ?? [], [configs]);
+  const errorConfigs = useMemo(() => configs?.filter((c) => c.error) ?? [], [configs]);
+
   // Active runs per namespace from WebSocket status
   const activeByNs = new Map<string, number>();
   for (const p of status?.pipelines ?? []) {
@@ -123,20 +137,24 @@ export function HomePage() {
           {/* Namespaces — left column */}
           <div className="w-full lg:w-80 lg:shrink-0">
             <SectionHeader className="mb-2">Namespaces</SectionHeader>
-            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden divide-y divide-white/[0.04]">
-              {configs.map((ns) =>
-                ns.error ? (
-                  <NamespaceErrorRow key={ns.namespace} ns={ns} />
-                ) : (
-                  <NamespaceRow
-                    key={ns.namespace}
-                    ns={ns}
-                    activeRuns={activeByNs.get(ns.namespace) ?? 0}
-                    lastRun={lastRunByNs.get(ns.namespace) ?? null}
-                  />
-                ),
+            <FocusList
+              items={validConfigs}
+              onSelect={(ns) => navigate(`/${ns.namespace}`)}
+              className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden divide-y divide-white/[0.04]"
+            >
+              {(ns, focused) => (
+                <NamespaceRow
+                  key={ns.namespace}
+                  ns={ns}
+                  focused={focused}
+                  activeRuns={activeByNs.get(ns.namespace) ?? 0}
+                  lastRun={lastRunByNs.get(ns.namespace) ?? null}
+                />
               )}
-            </div>
+            </FocusList>
+            {errorConfigs.map((ns) => (
+              <NamespaceErrorRow key={ns.namespace} ns={ns} />
+            ))}
           </div>
 
           {/* Activity — right column */}

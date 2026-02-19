@@ -1,5 +1,5 @@
 import { AlertCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { errorMessage, type ParamDef, type PipelineDefSummary, type RunIdResponse, type RunRow } from "../../types.ts";
 import { handleUnauthorized, isMac } from "../utils.ts";
 import { Button } from "./Button.tsx";
@@ -69,6 +69,11 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
   );
 }
 
+export interface ParamFormHandle {
+  triggerRun: () => void;
+  triggerDryRun: () => void;
+}
+
 interface ParamFormProps {
   pipeline: PipelineDefSummary;
   ns: string;
@@ -78,7 +83,10 @@ interface ParamFormProps {
   atGlobalLimit?: boolean;
 }
 
-export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount = 0, atGlobalLimit = false }: ParamFormProps) {
+export const ParamForm = forwardRef<ParamFormHandle, ParamFormProps>(function ParamForm(
+  { pipeline, ns, onRunStarted, rerunId, activeRunCount = 0, atGlobalLimit = false },
+  ref,
+) {
   const [params, setParams] = useState<Record<string, string | boolean>>(() => defaultParams(pipeline.params ?? []));
   const dryRunRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
@@ -87,17 +95,16 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
   const formRef = useRef<HTMLFormElement>(null);
   const isDirtyRef = useRef(false);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        dryRunRef.current = e.shiftKey;
-        formRef.current?.requestSubmit();
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, []);
+  useImperativeHandle(ref, () => ({
+    triggerRun: () => {
+      dryRunRef.current = false;
+      formRef.current?.requestSubmit();
+    },
+    triggerDryRun: () => {
+      dryRunRef.current = true;
+      formRef.current?.requestSubmit();
+    },
+  }));
 
   // Track dirty state for beforeunload warning
   useEffect(() => {
@@ -211,7 +218,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
           )}
         </div>
 
-        <div className="text-xs text-neutral-600">{isMac ? "⇧⌘⏎" : "Shift+Ctrl+⏎"} for dry run</div>
+        <div className="text-xs text-neutral-600">{isMac ? "\u21E7\u2318\u23CE" : "Shift+Ctrl+\u23CE"} for dry run</div>
 
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm">
@@ -233,4 +240,4 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
       />
     </>
   );
-}
+});
