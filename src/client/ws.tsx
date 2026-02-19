@@ -1,35 +1,19 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
-import type { LogLine, SystemStatus } from "../types.ts";
+import type { LogLine, MessageOf, SystemStatus, WSClientMessage, WSServerMessage } from "../types.ts";
 
-// --- Types ---
+// --- Derived types from the message union ---
 
-interface StepUpdate {
-  stepId: string;
-  stepName: string;
-  action: string;
-  status: string;
-}
+export type WSStepMessage = MessageOf<WSServerMessage, "step">;
+export type WSRunStatusMessage = MessageOf<WSServerMessage, "run:status">;
+export type WSGlobalEvent = MessageOf<WSServerMessage, "run:started"> | MessageOf<WSServerMessage, "run:completed">;
 
-interface RunStatusUpdate {
-  runId: string;
-  status: string;
-}
-
-interface GlobalEvent {
-  type: "run:started" | "run:completed";
-  runId: string;
-  namespace: string;
-  pipelineId: string;
-  status?: string;
-}
-
-interface SubscriptionHandlers {
+export interface SubscriptionHandlers {
   onLog?: (log: LogLine) => void;
-  onStep?: (step: StepUpdate) => void;
-  onRunStatus?: (update: RunStatusUpdate) => void;
+  onStep?: (step: WSStepMessage) => void;
+  onRunStatus?: (update: WSRunStatusMessage) => void;
 }
 
-type GlobalHandler = (event: GlobalEvent) => void;
+type GlobalHandler = (event: WSGlobalEvent) => void;
 
 // --- Context ---
 
@@ -65,7 +49,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const backoffRef = useRef(1000);
   const unmountedRef = useRef(false);
 
-  function sendMsg(ws: WebSocket, msg: object) {
+  function sendMsg(ws: WebSocket, msg: WSClientMessage) {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   }
 
@@ -87,8 +71,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     ws.onmessage = (e) => {
       try {
-        const msg = JSON.parse(e.data);
-        dispatch(msg);
+        dispatch(JSON.parse(e.data) as WSServerMessage);
       } catch {
         console.warn("WS: failed to parse message", e.data);
       }
@@ -110,47 +93,34 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     };
   }
 
-  function dispatch(msg: Record<string, unknown>) {
+  function dispatch(msg: WSServerMessage) {
     switch (msg.type) {
       case "status":
-        setStatus({
-          activeRuns: msg.activeRuns as number,
-          maxConcurrentRuns: msg.maxConcurrentRuns as number,
-          pipelines: msg.pipelines as SystemStatus["pipelines"],
-        });
+        setStatus(msg);
         break;
 
       case "run:started":
       case "run:completed":
         for (const handler of globalHandlersRef.current) {
-          handler(msg as unknown as GlobalEvent);
+          handler(msg);
         }
         break;
 
       case "log": {
-        // Find which run subscription this belongs to by checking runId
-        const runId = msg.runId as string;
-        const handlers = runHandlersRef.current.get(`run:${runId}`);
-        handlers?.onLog?.(msg as unknown as LogLine);
+        const handlers = runHandlersRef.current.get(`run:${msg.runId}`);
+        handlers?.onLog?.(msg);
         break;
       }
 
       case "step": {
-        const runId = msg.runId as string | undefined;
-        // step messages come from per-run subscriptions; find handler by iterating
-        for (const [topic, handlers] of runHandlersRef.current) {
-          if (runId && topic === `run:${runId}`) {
-            handlers.onStep?.(msg as unknown as StepUpdate);
-            break;
-          }
-        }
+        const handlers = runHandlersRef.current.get(`run:${msg.runId}`);
+        handlers?.onStep?.(msg);
         break;
       }
 
       case "run:status": {
-        const runId = msg.runId as string;
-        const handlers = runHandlersRef.current.get(`run:${runId}`);
-        handlers?.onRunStatus?.(msg as unknown as RunStatusUpdate);
+        const handlers = runHandlersRef.current.get(`run:${msg.runId}`);
+        handlers?.onRunStatus?.(msg);
         break;
       }
 

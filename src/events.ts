@@ -1,14 +1,14 @@
 import { logger } from "./logger.ts";
-import { errorMessage } from "./types.ts";
+import { errorMessage, type PubSubMessage } from "./types.ts";
 
-type Listener = (message: Record<string, unknown>) => void;
+type Listener = (message: PubSubMessage) => void;
 
 const MAX_LISTENERS_PER_TOPIC = 100;
 
 const topicListeners = new Map<string, Set<Listener>>();
 const globalListeners = new Set<Listener>();
 
-export function publish(topic: string, message: Record<string, unknown>) {
+export function publish(topic: string, message: PubSubMessage) {
   const listeners = topic === "global" ? globalListeners : topicListeners.get(topic);
 
   if (!listeners) return;

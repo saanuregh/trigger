@@ -5,7 +5,7 @@ import { env } from "../env.ts";
 import { subscribe } from "../events.ts";
 import { logger } from "../logger.ts";
 import { getActiveRunSummary } from "../pipeline/executor.ts";
-import { type ActiveRunInfo, errorMessage, type SystemStatus, TERMINAL_STATUSES } from "../types.ts";
+import { type ActiveRunInfo, errorMessage, type SystemStatus, TERMINAL_STATUSES, type WSServerMessage } from "../types.ts";
 import { checkNamespaceAccess } from "./controllers/helpers.ts";
 
 export interface WSData {
@@ -26,7 +26,7 @@ function buildStatus(): SystemStatus {
   return { activeRuns: total, maxConcurrentRuns: env.MAX_CONCURRENT_RUNS, pipelines };
 }
 
-function send(ws: WS, msg: object) {
+function send(ws: WS, msg: WSServerMessage) {
   try {
     ws.send(JSON.stringify(msg));
   } catch (err) {
@@ -34,7 +34,7 @@ function send(ws: WS, msg: object) {
   }
 }
 
-export function broadcast(msg: object) {
+export function broadcast(msg: WSServerMessage) {
   const payload = JSON.stringify(msg);
   for (const ws of sockets) {
     try {
@@ -74,20 +74,19 @@ async function handleSubscribe(ws: WS, topic: string) {
   }
 
   const unsubscribe = subscribe(runId, (message) => {
-    const { type, ...payload } = message;
-
-    if (type === "log") send(ws, { type: "log", ...payload });
-    else if (type === "step:status") {
+    if (message.type === "log") {
+      send(ws, message);
+    } else if (message.type === "step:status") {
       send(ws, {
         type: "step",
-        runId: payload.runId,
-        stepId: payload.stepId,
-        stepName: payload.stepName,
-        action: payload.action,
-        status: payload.status,
+        runId: message.runId,
+        stepId: message.stepId,
+        stepName: message.stepName,
+        action: message.action,
+        status: message.status,
       });
-    } else if (type === "run:status") {
-      send(ws, { type: "run:status", runId: payload.runId, status: payload.status });
+    } else if (message.type === "run:status") {
+      send(ws, message);
     }
   });
 
