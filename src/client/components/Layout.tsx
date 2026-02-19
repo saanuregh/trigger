@@ -1,18 +1,13 @@
-import { ChevronRight, LogOut, Workflow } from "lucide-react";
+import { Loader2, LogOut, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { useUser } from "../hooks.tsx";
 import { Link } from "../router.tsx";
 import { isMac } from "../utils.ts";
-
-interface Breadcrumb {
-  label: string;
-  href?: string;
-}
+import { useStatus } from "../ws.tsx";
 
 interface LayoutProps {
   children: ReactNode;
   sidebar?: ReactNode;
-  breadcrumbs?: Breadcrumb[];
   actions?: ReactNode;
 }
 
@@ -26,14 +21,14 @@ function UserMenu() {
   };
 
   return (
-    <div className="flex items-center gap-2 ml-3 pl-3 border-l border-white/[0.06]">
-      <span className="text-xs text-neutral-400 max-w-32 truncate" title={user.email}>
+    <div className="flex items-center gap-2 min-w-0">
+      <span className="text-xs text-neutral-400 truncate" title={user.email}>
         {user.name || user.email}
       </span>
       <button
         type="button"
         onClick={handleLogout}
-        className="text-neutral-500 hover:text-neutral-300 transition-colors p-0.5"
+        className="text-neutral-500 hover:text-neutral-300 transition-colors p-0.5 shrink-0"
         title="Sign out"
       >
         <LogOut size={14} />
@@ -42,37 +37,67 @@ function UserMenu() {
   );
 }
 
-export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps) {
+function ActiveRuns() {
+  const { data: status } = useStatus();
+
+  if (!status || status.pipelines.length === 0) {
+    return <div className="px-4 pb-2 text-[11px] text-neutral-600 shrink-0">No active runs</div>;
+  }
+
   return (
-    <div className="flex flex-col h-screen">
-      <header className="bg-neutral-950/80 backdrop-blur-xl border-b border-white/[0.06] px-4 h-12 flex items-center justify-between shrink-0">
-        <nav className="flex items-center gap-1.5 text-sm">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 font-bold font-mono tracking-wide text-white no-underline hover:text-neutral-300 transition-colors px-2.5 py-1"
-          >
-            <Workflow size={16} className="text-white" />
-            Trigger
-          </Link>
-          {breadcrumbs?.map((crumb, i) => (
-            <span key={i} className="inline-flex items-center gap-1.5">
-              <ChevronRight size={14} className="text-neutral-700" />
-              {crumb.href ? (
-                <Link to={crumb.href} className="text-neutral-400 hover:text-white no-underline transition-colors max-w-48 truncate">
-                  {crumb.label}
-                </Link>
-              ) : (
-                <span className="text-neutral-200 max-w-48 truncate">{crumb.label}</span>
-              )}
-            </span>
-          ))}
-        </nav>
-        <div className="flex items-center gap-2">
-          {actions}
+    <div className="px-3 pb-2 shrink-0">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-1.5">
+        <Loader2 size={10} className="animate-spin text-neutral-400" />
+        Active
+        <span className="font-mono">
+          {status.activeRuns}/{status.maxConcurrentRuns}
+        </span>
+      </div>
+      <div className="space-y-0.5">
+        {status.pipelines.map((p) =>
+          p.runIds.map((runId) => (
+            <Link
+              key={runId}
+              to={`/${p.namespace}/${p.pipelineId}/runs/${runId}`}
+              className="flex items-center gap-2 px-2 py-1 text-xs text-neutral-400 hover:text-white hover:bg-white/[0.04] rounded-lg no-underline transition-colors"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+              <span className="truncate">
+                {p.namespace}/{p.pipelineId}
+              </span>
+            </Link>
+          )),
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function Layout({ children, sidebar, actions }: LayoutProps) {
+  return (
+    <div className="flex h-screen">
+      <aside className="w-56 bg-neutral-950/40 border-r border-white/[0.06] shrink-0 flex flex-col">
+        {/* Brand */}
+        <Link
+          to="/"
+          className="flex items-center gap-1.5 font-bold font-mono tracking-wide text-white no-underline hover:text-neutral-300 transition-colors px-4 h-12 shrink-0"
+        >
+          <Workflow size={16} />
+          Trigger
+        </Link>
+
+        {/* Sidebar content */}
+        <div className="flex-1 overflow-y-auto px-3 pt-1 pb-3">{sidebar}</div>
+
+        {/* Active runs */}
+        <ActiveRuns />
+
+        {/* Bottom bar */}
+        <div className="flex items-center justify-between p-3 border-t border-white/[0.06] shrink-0">
           <button
             type="button"
             onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: isMac, ctrlKey: !isMac }))}
-            className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-neutral-500 hover:text-neutral-300 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1 transition-colors"
+            className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500 hover:text-neutral-300 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1 transition-colors"
             title={`Search (${isMac ? "\u2318" : "Ctrl+"}K)`}
           >
             <kbd className="text-[11px]">{isMac ? "\u2318" : "Ctrl"}</kbd>
@@ -80,14 +105,14 @@ export function Layout({ children, sidebar, breadcrumbs, actions }: LayoutProps)
           </button>
           <UserMenu />
         </div>
-      </header>
+      </aside>
 
-      <div className="flex flex-1 overflow-hidden">
-        {sidebar && <aside className="w-56 bg-neutral-950/40 border-r border-white/[0.06] overflow-y-auto shrink-0 p-3">{sidebar}</aside>}
-        <main className="flex-1 overflow-y-auto p-5">
-          <div className="max-w-6xl mx-auto animate-fade-in">{children}</div>
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto p-5">
+        <div className="max-w-6xl mx-auto animate-fade-in">
+          {actions && <div className="flex justify-end mb-4">{actions}</div>}
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

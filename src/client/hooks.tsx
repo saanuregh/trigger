@@ -106,11 +106,6 @@ export function useConfigs() {
   return useFetch<NamespaceConfigSummary[]>("/api/configs");
 }
 
-export function useNsDisplayName(ns: string): string {
-  const { data } = useConfigs();
-  return data?.find((c) => c.namespace === ns)?.display_name ?? ns;
-}
-
 export function useUser() {
   return useFetch<User>("/api/me");
 }

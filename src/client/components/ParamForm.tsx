@@ -74,7 +74,7 @@ interface ParamFormProps {
 
 export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount = 0, atGlobalLimit = false }: ParamFormProps) {
   const [params, setParams] = useState<Record<string, string | boolean>>(() => defaultParams(pipeline.params ?? []));
-  const [dryRun, setDryRun] = useState(false);
+  const dryRunRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
@@ -84,7 +84,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        if (e.shiftKey) setDryRun(true);
+        dryRunRef.current = e.shiftKey;
         formRef.current?.requestSubmit();
       }
     };
@@ -118,6 +118,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
     setSubmitting(true);
     setError("");
     setShowConfirm(false);
+    const dryRun = dryRunRef.current;
 
     try {
       const res = await fetch(`/api/pipelines/${ns}/${pipeline.id}/run`, {
@@ -138,14 +139,14 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
       setError(errorMessage(err));
     } finally {
       setSubmitting(false);
-      setDryRun(false);
+      dryRunRef.current = false;
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (pipeline.confirm && !dryRun) {
+    if (pipeline.confirm && !dryRunRef.current) {
       setShowConfirm(true);
       return;
     }

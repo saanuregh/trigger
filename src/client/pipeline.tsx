@@ -9,7 +9,7 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { PipelineSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
-import { useFetch, useNsDisplayName } from "./hooks.tsx";
+import { useFetch } from "./hooks.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
 import { formatDuration, timeAgo, useLiveDuration } from "./utils.ts";
 import { useGlobalEvents, useStatus } from "./ws.tsx";
@@ -26,7 +26,6 @@ function RunDuration({ run }: { run: RunRow }) {
 export function PipelinePage() {
   const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
-  const nsDisplayName = useNsDisplayName(ns);
   const [page, setPage] = useState(1);
   const { toast } = useToast();
   const { data: status } = useStatus();
@@ -55,11 +54,12 @@ export function PipelinePage() {
     navigate(`/${ns}/${pipelineId}/runs/${runId}`);
   };
 
-  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="runs" />;
+  const pipelineName = pipeline?.name ?? pipelineId;
+  const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} pipelineName={pipelineName} active="runs" />;
 
   if (error && !pipeline) {
     return (
-      <Layout breadcrumbs={[{ label: nsDisplayName, href: `/${ns}` }, { label: pipelineId }]} sidebar={sidebar}>
+      <Layout sidebar={sidebar}>
         <div className="text-red-400">{error.message}</div>
       </Layout>
     );
@@ -67,7 +67,7 @@ export function PipelinePage() {
 
   if (!pipeline) {
     return (
-      <Layout breadcrumbs={[{ label: nsDisplayName, href: `/${ns}` }, { label: pipelineId }]} sidebar={sidebar}>
+      <Layout sidebar={sidebar}>
         <PipelineSkeleton />
       </Layout>
     );
@@ -78,7 +78,7 @@ export function PipelinePage() {
   const rerunId = new URLSearchParams(window.location.search).get("rerun");
 
   return (
-    <Layout breadcrumbs={[{ label: nsDisplayName, href: `/${ns}` }, { label: pipeline.name }]} sidebar={sidebar}>
+    <Layout sidebar={sidebar}>
       <div className="space-y-8">
         {/* Trigger section */}
         <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
