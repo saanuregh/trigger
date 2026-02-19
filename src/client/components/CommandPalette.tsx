@@ -12,8 +12,7 @@ interface PaletteItem {
   type: "namespace" | "pipeline";
 }
 
-export function CommandPalette() {
-  const [open, setOpen] = useState(false);
+export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,17 +51,6 @@ export function CommandPalette() {
   }, [items, query]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setOpen((prev) => !prev);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  useEffect(() => {
     if (open) {
       previousFocusRef.current = document.activeElement as HTMLElement | null;
       setQuery("");
@@ -72,9 +60,9 @@ export function CommandPalette() {
   }, [open]);
 
   const close = useCallback(() => {
-    setOpen(false);
+    onClose();
     requestAnimationFrame(() => previousFocusRef.current?.focus());
-  }, []);
+  }, [onClose]);
 
   const handleSelect = useCallback(
     (item: PaletteItem) => {

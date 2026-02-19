@@ -1,5 +1,5 @@
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { ActionName, PipelineConfigResponse } from "../types.ts";
 import { Card } from "./components/Card.tsx";
 import { ErrorMessage } from "./components/ErrorMessage.tsx";
@@ -8,6 +8,7 @@ import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { SectionHeader } from "./components/SectionHeader.tsx";
 import { ConfigSkeleton } from "./components/Skeleton.tsx";
 import { useFetch, useNsDisplayName } from "./hooks.tsx";
+import { FocusList, focusRingClass } from "./keyboard.tsx";
 import { useRoute } from "./router.tsx";
 import { hashString } from "./utils.ts";
 
@@ -134,14 +135,24 @@ function ConfigValue({ value }: { value: unknown }) {
   return <span className="text-green-400">"{String(value)}"</span>;
 }
 
-function StepCard({ step, index }: { step: PipelineConfigResponse["steps"][number]; index: number }) {
-  const [expanded, setExpanded] = useState(true);
-
+function StepCard({
+  step,
+  index,
+  expanded,
+  onToggle,
+  focused,
+}: {
+  step: PipelineConfigResponse["steps"][number];
+  index: number;
+  expanded: boolean;
+  onToggle: () => void;
+  focused: boolean;
+}) {
   return (
-    <Card>
+    <Card className={focusRingClass(focused)}>
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
+        onClick={onToggle}
         className="w-full flex items-center gap-2 p-3 text-left hover:bg-white/[0.04] transition-colors rounded-lg"
       >
         {expanded ? (
@@ -177,6 +188,16 @@ export function ConfigPage() {
 
   const { data: config, error } = useFetch<PipelineConfigResponse>(`/api/pipelines/${ns}/${pipelineId}/config`);
   const nsDisplayName = useNsDisplayName(ns);
+  const [expandedSteps, setExpandedSteps] = useState<Set<number> | null>(null);
+
+  const toggleStep = useCallback((index: number) => {
+    setExpandedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
 
   const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="config" />;
 
@@ -195,6 +216,9 @@ export function ConfigPage() {
       </Layout>
     );
   }
+
+  // All steps expanded by default until user toggles
+  const resolved = expandedSteps ?? new Set(config.steps.map((_, i) => i));
 
   return (
     <Layout
@@ -244,11 +268,18 @@ export function ConfigPage() {
 
         <div>
           <SectionHeader className="mb-2">Steps</SectionHeader>
-          <div className="space-y-1.5">
-            {config.steps.map((step, i) => (
-              <StepCard key={step.id} step={step} index={i} />
-            ))}
-          </div>
+          <FocusList items={config.steps} onSelect={(_step, index) => toggleStep(index)} className="space-y-1.5">
+            {(step, focused, index) => (
+              <StepCard
+                key={step.id}
+                step={step}
+                index={index}
+                expanded={resolved.has(index)}
+                onToggle={() => toggleStep(index)}
+                focused={focused}
+              />
+            )}
+          </FocusList>
         </div>
       </div>
     </Layout>

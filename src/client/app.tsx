@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { RunStatus } from "../types.ts";
 import { CommandPalette } from "./components/CommandPalette.tsx";
@@ -8,10 +8,11 @@ import { Layout } from "./components/Layout.tsx";
 import { ToastProvider, useToast } from "./components/Toast.tsx";
 import { ConfigPage } from "./config.tsx";
 import { HomePage } from "./home.tsx";
+import { ShortcutRegistryProvider, useKeyboard } from "./keyboard.tsx";
 import { LoginPage } from "./login.tsx";
 import { NamespacePage } from "./namespace.tsx";
 import { PipelinePage } from "./pipeline.tsx";
-import { Link, RouterProvider } from "./router.tsx";
+import { Link, navigate, RouterProvider } from "./router.tsx";
 import { RunPage } from "./run.tsx";
 import { requestNotificationPermission, showRunNotification, statusVerbs } from "./utils.ts";
 import { useGlobalEvents, WebSocketProvider } from "./ws.tsx";
@@ -102,15 +103,43 @@ function NotFound() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(
-  <ErrorBoundary>
-    <ToastProvider>
-      <WebSocketProvider>
-        <GlobalNotifications />
-        <RouterProvider routes={routes} fallback={NotFound} />
-        <CommandPalette />
-        <KeyboardShortcuts />
-      </WebSocketProvider>
-    </ToastProvider>
-  </ErrorBoundary>,
-);
+function GlobalShortcuts({ onOpenPalette, onOpenHelp }: { onOpenPalette: () => void; onOpenHelp: () => void }) {
+  useKeyboard([
+    { key: "/", description: "Search", handler: onOpenPalette },
+    { key: "?", description: "Keyboard shortcuts", handler: onOpenHelp },
+    {
+      key: "Backspace",
+      description: "Go back",
+      handler: () => {
+        const path = location.pathname;
+        if (path === "/") return;
+        const parent = path.replace(/\/[^/]+\/?$/, "") || "/";
+        navigate(parent);
+      },
+    },
+  ]);
+  return null;
+}
+
+function App() {
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  return (
+    <ErrorBoundary>
+      <ToastProvider>
+        <WebSocketProvider>
+          <ShortcutRegistryProvider>
+            <GlobalNotifications />
+            <GlobalShortcuts onOpenPalette={() => setPaletteOpen(true)} onOpenHelp={() => setHelpOpen(true)} />
+            <RouterProvider routes={routes} fallback={NotFound} />
+            <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+            <KeyboardShortcuts open={helpOpen} onClose={() => setHelpOpen(false)} />
+          </ShortcutRegistryProvider>
+        </WebSocketProvider>
+      </ToastProvider>
+    </ErrorBoundary>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(<App />);

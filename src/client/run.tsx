@@ -11,6 +11,7 @@ import { RunSkeleton } from "./components/Skeleton.tsx";
 import { StatusBadge, StepIcon } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
 import { useFetch, useNsDisplayName } from "./hooks.tsx";
+import { FocusList, focusRingClass, useKeyboard } from "./keyboard.tsx";
 import { navigate, useRoute } from "./router.tsx";
 import { formatDuration, handleUnauthorized, setFaviconStatus, timeAgo, useLiveDuration } from "./utils.ts";
 import { useSubscription } from "./ws.tsx";
@@ -227,6 +228,23 @@ export function RunPage() {
     }
   }, [runId, toast]);
 
+  const isActive = run ? run.status === "running" || run.status === "pending" : false;
+
+  useKeyboard([
+    { key: "s", description: "Stop run", handler: () => setShowStopConfirm(true), when: isActive },
+    { key: "r", description: "Retry", handler: () => setShowRetryConfirm(true), when: run?.status === "failed" },
+    { key: "e", description: "Re-run", handler: () => navigate(`/${ns}/${pipelineId}?rerun=${runId}`), when: !!run && !isActive },
+    { key: "d", description: "Download logs", handler: handleDownloadLogs },
+    {
+      key: "a",
+      description: "All steps",
+      handler: () => {
+        setAutoFollow(false);
+        setSelectedStepId(null);
+      },
+    },
+  ]);
+
   const pipelineName = run?.pipeline_name ?? pipelineId;
   const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="runs" />;
 
@@ -245,8 +263,6 @@ export function RunPage() {
       </Layout>
     );
   }
-
-  const isActive = run.status === "running" || run.status === "pending";
 
   return (
     <Layout
@@ -309,47 +325,56 @@ export function RunPage() {
         {/* Side-by-side: Steps + Logs */}
         <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
           {/* Steps panel */}
-          <div className="lg:w-52 shrink-0 overflow-y-auto lg:pr-3 flex flex-col gap-0.5 max-h-48 lg:max-h-none">
+          <div className="lg:w-52 shrink-0 overflow-y-auto lg:pr-3 max-h-48 lg:max-h-none">
             <StepProgressBar steps={steps} />
             <button
               type="button"
               onClick={() => selectStep(null)}
-              className={`w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-150 active:scale-[0.98] ${
+              className={`w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-150 active:scale-[0.98] mb-0.5 ${
                 selectedStepId === null
                   ? "bg-white/[0.08] text-white font-medium"
                   : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
               }`}
             >
-              All steps
+              All steps <kbd className="text-[10px] opacity-40 ml-1">A</kbd>
             </button>
 
-            {steps.map((step) => {
-              const isSelected = selectedStepId === step.step_id;
-
-              return (
-                <button
-                  key={step.step_id}
-                  type="button"
-                  onClick={() => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left ${
-                    isSelected ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
-                  } ${pulsingSteps.has(step.step_id) ? "step-pulse" : ""}`}
-                >
-                  <StepIcon status={step.status} size={14} />
-                  <div className="min-w-0 flex-1">
-                    <div className={`text-xs font-medium truncate ${step.status === "skipped" ? "text-neutral-600" : "text-neutral-200"}`}>
-                      {step.step_name}
+            <FocusList
+              items={steps}
+              onSelect={(step) => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
+              className="flex flex-col gap-0.5"
+            >
+              {(step, focused) => {
+                const isSelected = selectedStepId === step.step_id;
+                return (
+                  <button
+                    key={step.step_id}
+                    type="button"
+                    onClick={() => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left ${
+                      isSelected ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
+                    } ${focusRingClass(focused)} ${pulsingSteps.has(step.step_id) ? "step-pulse" : ""}`}
+                  >
+                    <StepIcon status={step.status} size={14} />
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`text-xs font-medium truncate ${step.status === "skipped" ? "text-neutral-600" : "text-neutral-200"}`}
+                      >
+                        {step.step_name}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[11px] text-neutral-600 font-mono">{step.action}</span>
+                        {step.started_at && step.finished_at && (
+                          <span className="text-[11px] text-neutral-600 font-mono">
+                            {formatDuration(step.started_at, step.finished_at)}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[11px] text-neutral-600 font-mono">{step.action}</span>
-                      {step.started_at && step.finished_at && (
-                        <span className="text-[11px] text-neutral-600 font-mono">{formatDuration(step.started_at, step.finished_at)}</span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              }}
+            </FocusList>
           </div>
 
           {/* Log viewer */}
