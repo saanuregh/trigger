@@ -2,6 +2,7 @@ import { AlertTriangle, FolderOpen, Loader2 } from "lucide-react";
 import type { NamespaceConfigSummary, PaginatedResponse, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
+import { SectionHeader } from "./components/SectionHeader.tsx";
 import { HomeSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useConfigs, useFetch } from "./hooks.tsx";
@@ -18,10 +19,10 @@ function NamespaceRow({ ns, activeRuns, lastRun }: { ns: NamespaceConfigSummary;
     >
       <span className={`w-2 h-2 rounded-full ${color.dot} shrink-0`} />
       <span className="text-sm text-neutral-200 group-hover:text-white font-medium truncate">{ns.display_name}</span>
-      <span className="text-[11px] text-neutral-600 font-mono shrink-0">{ns.pipelines.length}p</span>
+      <span className="text-xs text-neutral-600 font-mono shrink-0">{ns.pipelines.length}p</span>
       <span className="flex-1" />
       {activeRuns > 0 && (
-        <span className="flex items-center gap-1 text-[11px] text-white shrink-0">
+        <span className="flex items-center gap-1 text-xs text-white shrink-0">
           <Loader2 size={10} className="animate-spin" />
           {activeRuns}
         </span>
@@ -29,7 +30,7 @@ function NamespaceRow({ ns, activeRuns, lastRun }: { ns: NamespaceConfigSummary;
       {lastRun && (
         <span className="flex items-center gap-1.5 shrink-0">
           <StatusDot status={lastRun.status} />
-          <span className="text-[11px] text-neutral-600 font-mono whitespace-nowrap">{timeAgo(lastRun.started_at)}</span>
+          <span className="text-xs text-neutral-600 font-mono whitespace-nowrap">{timeAgo(lastRun.started_at)}</span>
         </span>
       )}
     </Link>
@@ -41,7 +42,7 @@ function NamespaceErrorRow({ ns }: { ns: NamespaceConfigSummary }) {
     <div className="flex items-center gap-3 px-3 py-1.5 opacity-50">
       <AlertTriangle size={12} className="text-red-400 shrink-0" />
       <span className="text-sm text-neutral-400">{ns.display_name}</span>
-      <span className="text-[11px] text-red-400/80 truncate">{ns.error}</span>
+      <span className="text-xs text-red-400/80 truncate">{ns.error}</span>
     </div>
   );
 }
@@ -49,7 +50,7 @@ function NamespaceErrorRow({ ns }: { ns: NamespaceConfigSummary }) {
 function ActivityFeed({ runs }: { runs: RunRow[] }) {
   return (
     <div>
-      <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">Recent Activity</h2>
+      <SectionHeader className="mb-2">Recent Activity</SectionHeader>
       {runs.length === 0 ? (
         <div className="text-xs text-neutral-600 py-4">No recent activity</div>
       ) : (
@@ -107,10 +108,10 @@ export function HomePage() {
           description="Add TRIGGER_{NS}_CONFIG environment variables to get started."
         />
       ) : (
-        <div className="flex gap-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Namespaces — left column */}
-          <div className="w-80 shrink-0">
-            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">Namespaces</h2>
+          <div className="w-full lg:w-80 lg:shrink-0">
+            <SectionHeader className="mb-2">Namespaces</SectionHeader>
             <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden divide-y divide-white/[0.04]">
               {configs.map((ns) =>
                 ns.error ? (

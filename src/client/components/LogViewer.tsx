@@ -133,6 +133,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
           <select
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value)}
+            aria-label="Filter by log level"
             className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1 text-xs text-neutral-300 focus:outline-none focus:border-white/[0.2] shrink-0"
           >
             <option value="all">All levels</option>
@@ -142,7 +143,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
             <option value="debug">Debug</option>
           </select>
           {search && (
-            <span className="text-[10px] text-neutral-500 shrink-0 font-mono tabular-nums">
+            <span className="text-[11px] text-neutral-500 shrink-0 font-mono tabular-nums">
               {filteredLines.length} match{filteredLines.length !== 1 ? "es" : ""}
             </span>
           )}
@@ -153,6 +154,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter logs..."
+              aria-label="Search logs"
               className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-8 py-1 text-xs text-neutral-300 placeholder-neutral-500 focus:outline-none focus:border-white/[0.2] focus:ring-1 focus:ring-white/[0.08] transition-colors"
             />
             {search && (
@@ -172,7 +174,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className={`font-mono text-[11px] leading-snug overflow-y-auto divide-y divide-white/[0.03] ${fullHeight ? "h-full" : "max-h-[60vh]"} ${hasScrolled ? "log-fade-top" : ""}`}
+          className={`font-mono text-xs leading-snug overflow-y-auto divide-y divide-white/[0.03] ${fullHeight ? "h-full" : "max-h-[60vh]"} ${hasScrolled ? "log-fade-top" : ""}`}
         >
           {Array.from({ length: Math.ceil(filteredLines.length / CHUNK_SIZE) }, (_, ci) => {
             const start = ci * CHUNK_SIZE;

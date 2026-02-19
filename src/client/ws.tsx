@@ -221,6 +221,11 @@ export function useStatus() {
   return { data: status };
 }
 
+export function useConnected() {
+  const { connected } = useWS();
+  return connected;
+}
+
 export function useSubscription(topic: string | null, handlers: SubscriptionHandlers) {
   const ws = useWS();
   const handlersRef = useRef(handlers);

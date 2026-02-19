@@ -1,5 +1,5 @@
 import { CheckCircle2, Info, X, XCircle } from "lucide-react";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -31,11 +31,6 @@ let nextId = 0;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const toast = useCallback((message: string, variant: ToastVariant = "info") => {
-    const id = nextId++;
-    setToasts((prev) => [...prev, { id, message, variant }]);
-  }, []);
-
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, removing: true } : t)));
     setTimeout(() => {
@@ -43,18 +38,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, 200);
   }, []);
 
-  useEffect(() => {
-    if (toasts.length === 0) return;
-    const latest = toasts[toasts.length - 1]!;
-    if (latest.removing) return;
-    const timer = setTimeout(() => dismiss(latest.id), 4000);
-    return () => clearTimeout(timer);
-  }, [toasts, dismiss]);
+  const toast = useCallback(
+    (message: string, variant: ToastVariant = "info") => {
+      const id = nextId++;
+      setToasts((prev) => [...prev, { id, message, variant }]);
+      setTimeout(() => dismiss(id), 4000);
+    },
+    [dismiss],
+  );
 
   return (
     <ToastContext value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      <output aria-live="polite" className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => {
           const { style, icon: Icon, iconColor } = variantConfig[t.variant];
           return (
@@ -70,7 +66,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             </div>
           );
         })}
-      </div>
+      </output>
     </ToastContext>
   );
 }

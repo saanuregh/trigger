@@ -1,5 +1,5 @@
 import { FolderOpen, GitBranch, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useConfigs } from "../hooks.tsx";
 import { navigate } from "../router.tsx";
@@ -17,6 +17,7 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef: RefObject<HTMLElement | null> = useRef(null);
   const { data: configs } = useConfigs();
 
   // Build flat list of searchable items
@@ -63,13 +64,17 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
       setQuery("");
       setSelectedIndex(0);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    setOpen(false);
+    requestAnimationFrame(() => previousFocusRef.current?.focus());
+  }, []);
 
   const handleSelect = useCallback(
     (item: PaletteItem) => {
@@ -107,6 +112,9 @@ export function CommandPalette() {
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" onClick={close}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search namespaces and pipelines"
         className="relative w-full max-w-lg bg-neutral-900 border border-white/[0.08] rounded-lg shadow-2xl shadow-black/40 animate-scale-in overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
@@ -124,7 +132,7 @@ export function CommandPalette() {
             placeholder="Search namespaces and pipelines..."
             className="flex-1 bg-transparent text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none"
           />
-          <kbd className="text-[10px] text-neutral-500 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.06]">ESC</kbd>
+          <kbd className="text-[11px] text-neutral-500 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.06]">ESC</kbd>
         </div>
 
         <div className="max-h-72 overflow-y-auto py-2">
@@ -137,7 +145,7 @@ export function CommandPalette() {
               return (
                 <div key={item.id}>
                   {showHeader && (
-                    <div className="px-4 py-1.5 text-[10px] text-neutral-500 uppercase tracking-wider font-medium mt-1 first:mt-0">
+                    <div className="px-4 py-1.5 text-[11px] text-neutral-500 uppercase tracking-wider font-medium mt-1 first:mt-0">
                       {item.type === "namespace" ? "Namespaces" : "Pipelines"}
                     </div>
                   )}

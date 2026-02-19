@@ -15,8 +15,34 @@ export async function fetcher(url: string) {
 
 // --- Cache & dedup ---
 
-const cache = new Map<string, unknown>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const cache = new Map<string, { data: unknown; ts: number }>();
 const inflight = new Map<string, Promise<unknown>>();
+
+function cacheGet<T>(key: string): T | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > CACHE_TTL) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry.data as T;
+}
+
+function cacheSet(key: string, data: unknown) {
+  cache.set(key, { data, ts: Date.now() });
+  // Evict stale entries when cache grows large
+  if (cache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of cache) {
+      if (now - v.ts > CACHE_TTL) cache.delete(k);
+    }
+  }
+}
+
+function cacheHas(key: string): boolean {
+  return cacheGet(key) !== undefined;
+}
 
 // --- useFetch hook ---
 
@@ -25,9 +51,9 @@ interface UseFetchOptions {
 }
 
 export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
-  const [data, setData] = useState<T | undefined>(url ? (cache.get(url) as T | undefined) : undefined);
+  const [data, setData] = useState<T | undefined>(url ? cacheGet<T>(url) : undefined);
   const [error, setError] = useState<Error | undefined>();
-  const [isLoading, setIsLoading] = useState(!cache.has(url ?? ""));
+  const [isLoading, setIsLoading] = useState(!cacheHas(url ?? ""));
   const urlRef = useRef(url);
   urlRef.current = url;
 
@@ -42,7 +68,7 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
     }
     try {
       const result = await promise;
-      cache.set(key, result);
+      cacheSet(key, result);
       if (urlRef.current === key) {
         setData(result);
         setError(undefined);
@@ -58,8 +84,8 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
 
   useEffect(() => {
     if (!url) return;
-    setIsLoading(!cache.has(url));
-    if (cache.has(url)) setData(cache.get(url) as T);
+    setIsLoading(!cacheHas(url));
+    if (cacheHas(url)) setData(cacheGet<T>(url));
     doFetch();
   }, [url, doFetch]);
 
@@ -78,13 +104,13 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
         let next: T | undefined;
         setData((prev) => {
           next = fn(prev);
-          if (next !== undefined && urlRef.current) cache.set(urlRef.current, next);
+          if (next !== undefined && urlRef.current) cacheSet(urlRef.current, next);
           return next ?? prev;
         });
         return next;
       }
       setData(updater);
-      if (urlRef.current) cache.set(urlRef.current, updater);
+      if (urlRef.current) cacheSet(urlRef.current, updater);
       return updater;
     },
     [doFetch],

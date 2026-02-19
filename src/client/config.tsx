@@ -2,8 +2,11 @@ import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 import type { ParamDef } from "../types.ts";
 import { Card } from "./components/Card.tsx";
+import { ErrorMessage } from "./components/ErrorMessage.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
+import { SectionHeader } from "./components/SectionHeader.tsx";
+import { ConfigSkeleton } from "./components/Skeleton.tsx";
 import { useConfigs, useFetch } from "./hooks.tsx";
 import { useRoute } from "./router.tsx";
 
@@ -149,7 +152,7 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
         )}
         <span className="text-xs text-neutral-600 w-5 text-right">{index + 1}.</span>
         <span className="text-sm font-medium text-neutral-200">{step.name}</span>
-        <span className={`text-[11px] px-1.5 py-0.5 rounded-lg font-mono ${actionColors[step.action] ?? defaultActionColor}`}>
+        <span className={`text-xs px-1.5 py-0.5 rounded-lg font-mono ${actionColors[step.action] ?? defaultActionColor}`}>
           {step.action}
         </span>
       </button>
@@ -184,7 +187,7 @@ export function ConfigPage() {
   if (error) {
     return (
       <Layout sidebar={sidebar}>
-        <div className="text-red-400">{error.message}</div>
+        <ErrorMessage>{error.message}</ErrorMessage>
       </Layout>
     );
   }
@@ -192,7 +195,7 @@ export function ConfigPage() {
   if (!config) {
     return (
       <Layout sidebar={sidebar}>
-        <div className="text-neutral-500">Loading...</div>
+        <ConfigSkeleton />
       </Layout>
     );
   }
@@ -207,11 +210,11 @@ export function ConfigPage() {
 
         {config.params && config.params.length > 0 && (
           <div>
-            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">Parameters</h2>
+            <SectionHeader className="mb-2">Parameters</SectionHeader>
             <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-neutral-500 text-[11px] font-medium">
+                  <tr className="text-left text-neutral-500 text-xs font-medium">
                     <th className="px-3 py-1.5">Name</th>
                     <th className="px-3 py-1.5">Type</th>
                     <th className="px-3 py-1.5">Default</th>
@@ -244,7 +247,7 @@ export function ConfigPage() {
         )}
 
         <div>
-          <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">Steps</h2>
+          <SectionHeader className="mb-2">Steps</SectionHeader>
           <div className="space-y-1.5">
             {config.steps.map((step, i) => (
               <StepCard key={step.id} step={step} index={i} />

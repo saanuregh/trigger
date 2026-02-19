@@ -2,10 +2,12 @@ import { Clock, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { PaginatedResponse, PipelineDefSummary, RunRow, StepRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
+import { ErrorMessage } from "./components/ErrorMessage.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { Pagination } from "./components/Pagination.tsx";
 import { ParamForm } from "./components/ParamForm.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
+import { SectionHeader } from "./components/SectionHeader.tsx";
 import { PipelineSkeleton } from "./components/Skeleton.tsx";
 import { StatusDot } from "./components/StatusBadge.tsx";
 import { useToast } from "./components/Toast.tsx";
@@ -53,6 +55,7 @@ export function PipelinePage() {
   const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
   const { data: status } = useStatus();
   const { data: configs } = useConfigs();
@@ -68,6 +71,7 @@ export function PipelinePage() {
   });
 
   const runs = runsData?.data ?? [];
+  const filteredRuns = statusFilter === "all" ? runs : runs.filter((r) => r.status === statusFilter);
   const totalPages = Math.ceil((runsData?.total ?? 0) / PER_PAGE);
 
   useEffect(() => {
@@ -87,7 +91,7 @@ export function PipelinePage() {
   if (error && !pipeline) {
     return (
       <Layout sidebar={sidebar}>
-        <div className="text-red-400">{error.message}</div>
+        <ErrorMessage>{error.message}</ErrorMessage>
       </Layout>
     );
   }
@@ -110,8 +114,8 @@ export function PipelinePage() {
         {/* Trigger section */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">Run Pipeline</h2>
-            <span className="text-[11px] font-mono text-neutral-500">
+            <SectionHeader>Run Pipeline</SectionHeader>
+            <span className="text-xs font-mono text-neutral-500">
               {activeRuns.length}/{pipeline.concurrency} slots
             </span>
           </div>
@@ -133,7 +137,23 @@ export function PipelinePage() {
           <EmptyState icon={<Clock size={48} />} title="No runs yet" description="Run this pipeline to see execution history." />
         ) : (
           <div>
-            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">Recent Runs</h2>
+            <div className="flex items-center justify-between mb-2">
+              <SectionHeader>Recent Runs</SectionHeader>
+              <div className="flex items-center gap-1">
+                {["all", "running", "success", "failed", "cancelled"].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStatusFilter(s)}
+                    className={`text-xs px-2 py-0.5 rounded-full transition-colors ${
+                      statusFilter === s ? "bg-white/[0.1] text-white" : "text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {activeRuns.length > 0 && (
               <div className="space-y-1.5 mb-3">
@@ -143,10 +163,10 @@ export function PipelinePage() {
               </div>
             )}
 
-            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
+            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-neutral-500 text-[11px] font-medium">
+                  <tr className="text-left text-neutral-500 text-xs font-medium">
                     <th className="px-3 py-1.5">Run</th>
                     <th className="px-3 py-1.5">Status</th>
                     <th className="px-3 py-1.5">Started</th>
@@ -155,7 +175,7 @@ export function PipelinePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {runs.map((run) => (
+                  {filteredRuns.map((run) => (
                     <tr key={run.id} className="border-t border-white/[0.04] hover:bg-white/[0.04] transition-colors">
                       <td className="px-3 py-1.5">
                         <Link
@@ -165,7 +185,7 @@ export function PipelinePage() {
                           {run.id.slice(0, 8)}
                         </Link>
                         {run.dry_run === 1 && (
-                          <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/15">
+                          <span className="ml-2 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/15">
                             DRY
                           </span>
                         )}
