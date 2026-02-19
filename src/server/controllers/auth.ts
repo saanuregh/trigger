@@ -3,7 +3,7 @@ import { exchangeCode, getAuthUrl, getOIDCConfig } from "../../auth/oidc.ts";
 import { clearSessionCookie, getCookie, sessionCookieHeader, signSession } from "../../auth/session.ts";
 import { env } from "../../env.ts";
 import { logger } from "../../logger.ts";
-import { errorMessage } from "../../types.ts";
+import { type AuthInfoResponse, errorMessage, type OkResponse, type UserResponse } from "../../types.ts";
 import { OAUTH_STATE_COOKIE, type RouteRequest } from "./helpers.ts";
 
 const SECURE_SUFFIX = env.development ? "" : "; Secure";
@@ -12,7 +12,7 @@ function safeReturnUrl(url: string): string {
   return url.startsWith("/") && !url.startsWith("//") ? url : "/";
 }
 
-export const info = () => Response.json({ enabled: env.authEnabled });
+export const info = () => Response.json({ enabled: env.authEnabled } satisfies AuthInfoResponse);
 
 export const login = (req: RouteRequest) => {
   if (!env.authEnabled || !getOIDCConfig()) {
@@ -78,9 +78,14 @@ export const callback = async (req: RouteRequest) => {
 };
 
 export const me = authed(async (_req, session) => {
-  return Response.json({ email: session.email, name: session.name, groups: session.groups, isSuperAdmin: session.isSuperAdmin });
+  return Response.json({
+    email: session.email,
+    name: session.name,
+    groups: session.groups,
+    isSuperAdmin: session.isSuperAdmin,
+  } satisfies UserResponse);
 });
 
 export const logout = (_req: RouteRequest) => {
-  return Response.json({ ok: true }, { headers: { "Set-Cookie": clearSessionCookie() } });
+  return Response.json({ ok: true } satisfies OkResponse, { headers: { "Set-Cookie": clearSessionCookie() } });
 };

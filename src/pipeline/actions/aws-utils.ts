@@ -1,6 +1,6 @@
 import { CloudWatchLogsClient, GetLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
 import { ECSClient } from "@aws-sdk/client-ecs";
-import { errorMessage } from "../../types.ts";
+import { errorMessage, type JSONValue } from "../../types.ts";
 import type { ActionContext } from "../types.ts";
 
 export function lazyClient<T>(factory: (region: string) => T): (region: string) => T {
@@ -34,7 +34,7 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-export type PollResult = "continue" | { done: true; output?: Record<string, unknown> } | { error: string };
+export type PollResult = "continue" | { done: true; output?: Record<string, JSONValue> } | { error: string };
 
 export async function pollUntil<T>(opts: {
   deadline: number;
@@ -44,7 +44,7 @@ export async function pollUntil<T>(opts: {
   check: (result: T) => PollResult | Promise<PollResult>;
   onProgress?: (result: T) => void | Promise<void>;
   timeoutMessage: string;
-}): Promise<{ output?: Record<string, unknown> }> {
+}): Promise<{ output?: Record<string, JSONValue> }> {
   for (;;) {
     if (opts.signal.aborted) throw new Error("Aborted");
     if (Date.now() >= opts.deadline) throw new Error(opts.timeoutMessage);

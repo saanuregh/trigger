@@ -7,6 +7,7 @@ import { logger } from "../logger.ts";
 import { getActiveRunSummary } from "../pipeline/executor.ts";
 import { type ActiveRunInfo, errorMessage, type SystemStatus, TERMINAL_STATUSES, type WSServerMessage } from "../types.ts";
 import { checkNamespaceAccess } from "./controllers/helpers.ts";
+import { wsClientMessageSchema } from "./validation.ts";
 
 export interface WSData {
   session: AuthSession | null;
@@ -115,15 +116,29 @@ export const wsHandlers = {
 
   message(ws: WS, raw: string | Buffer) {
     try {
-      const msg = JSON.parse(typeof raw === "string" ? raw : raw.toString());
+      const parsed = JSON.parse(typeof raw === "string" ? raw : raw.toString());
+      const result = wsClientMessageSchema.safeParse(parsed);
 
-      if (msg.type === "subscribe" && typeof msg.topic === "string") {
-        handleSubscribe(ws, msg.topic);
-      } else if (msg.type === "unsubscribe" && typeof msg.topic === "string") {
-        handleUnsubscribe(ws, msg.topic);
+      if (!result.success) {
+        logger.warn(
+          {
+            error: "Invalid WebSocket message format",
+            issues: result.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+          },
+          "ws message validation failed",
+        );
+        send(ws, { type: "error", message: "Invalid message format" });
+        return;
+      }
+
+      if (result.data.type === "subscribe") {
+        handleSubscribe(ws, result.data.topic);
+      } else if (result.data.type === "unsubscribe") {
+        handleUnsubscribe(ws, result.data.topic);
       }
     } catch (err) {
       logger.warn({ error: errorMessage(err) }, "ws message parse failed");
+      send(ws, { type: "error", message: "Failed to parse message" });
     }
   },
 

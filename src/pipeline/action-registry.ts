@@ -1,11 +1,12 @@
 import type { z } from "zod";
 import { logger } from "../logger.ts";
+import type { JSONValue } from "../types.ts";
 import type { ActionContext } from "./types.ts";
 
 export interface RegisteredAction {
   name: string;
   schema: z.ZodType;
-  handler: (config: unknown, ctx: ActionContext) => Promise<{ output?: Record<string, unknown> }>;
+  handler: (config: unknown, ctx: ActionContext) => Promise<{ output?: Record<string, JSONValue> }>;
   builtin: boolean;
 }
 

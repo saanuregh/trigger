@@ -1,11 +1,22 @@
+// --- JSON types ---
+
+export type JSONValue = string | number | boolean | null | JSONObject | JSONValue[];
+
+export interface JSONObject {
+  [key: string]: JSONValue;
+}
+
+// --- Utilities ---
+
 export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
 export type RunStatus = "pending" | "running" | "success" | "failed" | "cancelled";
 export type StepStatus = "pending" | "running" | "success" | "failed" | "skipped";
+export type LogLevel = "error" | "warn" | "info" | "debug";
 
-export const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["success", "failed", "cancelled"]);
+export const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set(["success", "failed", "cancelled"]);
 
 export interface RunRow {
   id: string;
@@ -21,12 +32,15 @@ export interface RunRow {
   triggered_by: string | null;
 }
 
+export type BuiltinActionName = "codebuild" | "ecs-task" | "ecs-restart" | "cloudflare-purge" | "trigger-pipeline";
+export type ActionName = BuiltinActionName | (string & {});
+
 export interface StepRow {
   id: string;
   run_id: string;
   step_id: string;
   step_name: string;
-  action: string;
+  action: ActionName;
   status: StepStatus;
   started_at: string | null;
   finished_at: string | null;
@@ -43,7 +57,7 @@ export type ParamDef =
 export type ParamValues = Record<string, string | boolean>;
 
 export interface LogLine {
-  level: string;
+  level: LogLevel;
   time: string;
   msg: string;
   runId: string;
@@ -57,7 +71,7 @@ export interface LogLine {
 export interface StepDefSummary {
   id: string;
   name: string;
-  action: string;
+  action: ActionName;
 }
 
 export interface PipelineDefSummary {
@@ -121,3 +135,53 @@ export type PubSubMessage =
 
 /** Extract a specific variant from a message union by type */
 export type MessageOf<T, K extends string> = Extract<T, { type: K }>;
+
+// --- API response types ---
+
+export interface AuthInfoResponse {
+  enabled: boolean;
+}
+
+export interface UserResponse {
+  email: string;
+  name: string;
+  groups: string[];
+  isSuperAdmin: boolean;
+}
+
+export type PipelineResponse = PipelineDefSummary;
+
+export interface PipelineConfigResponse {
+  id: string;
+  name: string;
+  description?: string;
+  params?: ParamDef[];
+  steps: Array<StepDefSummary & { config: Record<string, unknown> }>;
+}
+
+export interface RunDetailResponse {
+  run: RunRow;
+  steps: StepRow[];
+}
+
+export interface RunLogsResponse {
+  lines: LogLine[];
+  truncated: boolean;
+}
+
+export interface TriggerRunRequest {
+  params?: ParamValues;
+  dryRun?: boolean;
+}
+
+export interface RunIdResponse {
+  runId: string;
+}
+
+export interface OkResponse {
+  ok: boolean;
+}
+
+export interface ErrorResponse {
+  error: string;
+}

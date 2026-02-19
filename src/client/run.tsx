@@ -1,6 +1,6 @@
 import { AlertCircle, Download, Play, RotateCcw, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type LogLine, type RunRow, type StepRow, TERMINAL_STATUSES } from "../types.ts";
+import { type LogLine, type RunDetailResponse, type RunLogsResponse, type RunRow, type StepRow, TERMINAL_STATUSES } from "../types.ts";
 import { Button } from "./components/Button.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
 import { ErrorMessage } from "./components/ErrorMessage.tsx";
@@ -82,7 +82,7 @@ export function RunPage() {
 
   const { ns, pipelineId, runId } = useRoute().params as { ns: string; pipelineId: string; runId: string };
 
-  const { data, error, mutate } = useFetch<{ run: RunRow; steps: StepRow[] }>(`/api/runs/${runId}`);
+  const { data, error, mutate } = useFetch<RunDetailResponse>(`/api/runs/${runId}`);
   const run = data?.run ?? null;
   const steps = data?.steps ?? [];
 
@@ -107,7 +107,7 @@ export function RunPage() {
     if (!isTerminal) return;
     fetch(`/api/runs/${runId}/logs`)
       .then((r) => r.json())
-      .then((data: { lines: LogLine[] }) => setLogs(data.lines))
+      .then((data: RunLogsResponse) => setLogs(data.lines))
       .catch(console.error);
   }, [isTerminal, runId]);
 
@@ -221,7 +221,7 @@ export function RunPage() {
   const handleDownloadLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/runs/${runId}/logs`);
-      const data = (await res.json()) as { lines: LogLine[] };
+      const data = (await res.json()) as RunLogsResponse;
       const ndjson = data.lines.map((l) => JSON.stringify(l)).join("\n");
       const blob = new Blob([ndjson], { type: "application/x-ndjson" });
       const url = URL.createObjectURL(blob);

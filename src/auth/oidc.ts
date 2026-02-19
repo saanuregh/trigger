@@ -1,11 +1,25 @@
+import { z } from "zod";
 import { env } from "../env.ts";
 import { logger } from "../logger.ts";
 
-interface OIDCConfig {
-  authorization_endpoint: string;
-  token_endpoint: string;
-  userinfo_endpoint: string;
-}
+const oidcConfigSchema = z.object({
+  authorization_endpoint: z.string(),
+  token_endpoint: z.string(),
+  userinfo_endpoint: z.string(),
+});
+
+const oidcTokenResponseSchema = z.object({
+  id_token: z.string(),
+});
+
+const oidcPayloadSchema = z.object({
+  email: z.string().optional(),
+  name: z.string().optional(),
+  preferred_username: z.string().optional(),
+  groups: z.array(z.unknown()).optional(),
+});
+
+type OIDCConfig = z.infer<typeof oidcConfigSchema>;
 
 let cachedConfig: OIDCConfig | null = null;
 
@@ -18,13 +32,14 @@ export async function fetchOIDCConfig(): Promise<OIDCConfig> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status} ${res.statusText}`);
 
-  const data = (await res.json()) as Record<string, unknown>;
-  cachedConfig = {
-    authorization_endpoint: data.authorization_endpoint as string,
-    token_endpoint: data.token_endpoint as string,
-    userinfo_endpoint: data.userinfo_endpoint as string,
-  };
+  const data = await res.json();
+  const result = oidcConfigSchema.safeParse(data);
 
+  if (!result.success) {
+    throw new Error(`Invalid OIDC configuration: ${result.error.message}`);
+  }
+
+  cachedConfig = result.data;
   logger.info("OIDC discovery loaded");
   return cachedConfig;
 }
@@ -75,18 +90,27 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<O
     throw new Error(`Token exchange failed: ${res.status} ${body}`);
   }
 
-  const tokens = (await res.json()) as { id_token?: string; access_token?: string };
+  const tokens = await res.json();
+  const tokenResult = oidcTokenResponseSchema.safeParse(tokens);
+
+  if (!tokenResult.success) {
+    throw new Error("No id_token in token response");
+  }
 
   // Decode ID token (JWT) — no signature verification needed since we got it
   // directly from the token endpoint over HTTPS (standard OIDC practice for
   // confidential clients using the authorization code flow).
-  if (!tokens.id_token) throw new Error("No id_token in token response");
+  const payload = JSON.parse(Buffer.from(tokenResult.data.id_token.split(".")[1]!, "base64url").toString());
+  const payloadResult = oidcPayloadSchema.safeParse(payload);
 
-  const payload = JSON.parse(Buffer.from(tokens.id_token.split(".")[1]!, "base64url").toString()) as Record<string, unknown>;
+  if (!payloadResult.success) {
+    throw new Error(`Invalid JWT payload: ${payloadResult.error.message}`);
+  }
 
+  const user = payloadResult.data;
   return {
-    email: (payload.email as string) ?? "",
-    name: (payload.name as string) ?? (payload.preferred_username as string) ?? "",
-    groups: Array.isArray(payload.groups) ? (payload.groups as string[]) : [],
+    email: user.email ?? "",
+    name: user.name ?? user.preferred_username ?? "",
+    groups: user.groups?.filter((g): g is string => typeof g === "string") ?? [],
   };
 }

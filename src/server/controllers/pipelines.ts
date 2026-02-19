@@ -2,7 +2,8 @@ import { authed, filterAccessibleConfigs } from "../../auth/access.ts";
 import { refreshNamespace } from "../../config/loader.ts";
 import { logger } from "../../logger.ts";
 import { executePipeline, PipelineError } from "../../pipeline/executor.ts";
-import { errorMessage } from "../../types.ts";
+import { type ErrorResponse, errorMessage, type PipelineConfigResponse, type PipelineResponse, type RunIdResponse } from "../../types.ts";
+import { triggerRunRequestSchema, validateBody } from "../validation.ts";
 import { checkPipelineAccess, findNsConfig, getConfigs, toClientConfigs, toStepSummary } from "./helpers.ts";
 
 export const listConfigs = authed(async (_req, session) => {
@@ -30,7 +31,7 @@ export const getPipeline = authed(async (req, session) => {
     concurrency: pipeline!.concurrency ?? 1,
     params: pipeline!.params,
     steps: pipeline!.steps.map(toStepSummary),
-  });
+  } satisfies PipelineResponse);
 });
 
 export const getPipelineConfig = authed(async (req, session) => {
@@ -50,7 +51,7 @@ export const getPipelineConfig = authed(async (req, session) => {
       ...toStepSummary(s),
       config: s.config,
     })),
-  });
+  } satisfies PipelineConfigResponse);
 });
 
 export const triggerPipeline = authed(async (req, session) => {
@@ -62,17 +63,23 @@ export const triggerPipeline = authed(async (req, session) => {
   const denied = checkPipelineAccess(session, nsConfig, pipeline);
   if (denied) return denied;
 
+  const validation = await validateBody(req, triggerRunRequestSchema);
+  if (!validation.success) {
+    return Response.json({ error: validation.error } satisfies ErrorResponse, { status: 400 });
+  }
+
+  const body = validation.data;
+
   try {
-    const body = (await req.json()) as {
-      params?: Record<string, string | boolean>;
-      dryRun?: boolean;
-    };
     const runId = await executePipeline(ns!, id!, body.params ?? {}, {
       dryRun: body.dryRun ?? false,
       triggeredBy: session.email || undefined,
     });
-    logger.info({ namespace: ns, pipelineId: id, runId, dryRun: body.dryRun ?? false, triggeredBy: session.email }, "pipeline triggered");
-    return Response.json({ runId });
+    logger.info(
+      { namespace: ns, pipelineId: id, runId, dryRun: body.dryRun ?? false, triggeredBy: session.email || undefined },
+      "pipeline triggered",
+    );
+    return Response.json({ runId } satisfies RunIdResponse);
   } catch (err) {
     const msg = errorMessage(err);
     const status = err instanceof PipelineError ? err.statusCode : 500;
@@ -81,6 +88,6 @@ export const triggerPipeline = authed(async (req, session) => {
     } else {
       logger.warn({ namespace: ns, pipelineId: id, error: msg, status }, "pipeline trigger rejected");
     }
-    return Response.json({ error: msg }, { status });
+    return Response.json({ error: msg } satisfies ErrorResponse, { status });
   }
 });

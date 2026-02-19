@@ -1,12 +1,12 @@
-import type { ParamDef } from "../types.ts";
+import type { ActionName, ParamDef } from "../types.ts";
 
 export type { PipelineConfig } from "./schema.ts";
 
 export interface StepDef {
   id: string;
   name: string;
-  action: string;
-  config: unknown;
+  action: ActionName;
+  config: Record<string, unknown>;
 }
 
 export interface PipelineDef {

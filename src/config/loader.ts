@@ -2,7 +2,7 @@ import type { z } from "zod";
 import { env } from "../env.ts";
 import { logger } from "../logger.ts";
 import { getAllActionSchemas } from "../pipeline/action-registry.ts";
-import { errorMessage } from "../types.ts";
+import { errorMessage, type JSONValue } from "../types.ts";
 import { type NamespaceSource, resolveNamespaces } from "./namespace.ts";
 import { buildJSONSchema, buildSchema } from "./schema.ts";
 import type { NamespaceConfig, PipelineConfig } from "./types.ts";
@@ -15,7 +15,7 @@ const refreshInFlight = new Map<string, Promise<NamespaceConfig[]>>();
 let loadAllInFlight: Promise<NamespaceConfig[]> | null = null;
 
 let activeSchema: z.ZodType | null = null;
-let cachedJSONSchema: Record<string, unknown> | null = null;
+let cachedJSONSchema: Record<string, JSONValue> | null = null;
 
 export function rebuildConfigSchema(): void {
   const actions = getAllActionSchemas();
@@ -29,7 +29,7 @@ export function getActiveSchema(): z.ZodType {
   return activeSchema;
 }
 
-export function getJSONSchema(): Record<string, unknown> {
+export function getJSONSchema(): Record<string, JSONValue> {
   if (!cachedJSONSchema) throw new Error("JSON schema not initialized — call rebuildConfigSchema() first");
   return cachedJSONSchema;
 }

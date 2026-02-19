@@ -1,7 +1,10 @@
 import type { RunRow, RunStatus, StepRow, StepStatus } from "../types.ts";
 import { getDb } from "./index.ts";
 
-function buildRunFilters(filters: { namespace?: string; pipeline_id?: string; status?: string }) {
+function buildRunFilters(filters: { namespace?: string; pipeline_id?: string; status?: RunStatus }): {
+  where: string;
+  values: string[];
+} {
   const conditions: string[] = [];
   const values: string[] = [];
 
@@ -52,7 +55,7 @@ export function getRun(id: string): RunRow | null {
 export function listRuns(filters: {
   namespace?: string;
   pipeline_id?: string;
-  status?: string;
+  status?: RunStatus;
   limit?: number;
   offset?: number;
 }): RunRow[] {
@@ -65,7 +68,7 @@ export function listRuns(filters: {
     .all(...values, limit, offset) as RunRow[];
 }
 
-export function countRuns(filters: { namespace?: string; pipeline_id?: string; status?: string }): number {
+export function countRuns(filters: { namespace?: string; pipeline_id?: string; status?: RunStatus }): number {
   const { where, values } = buildRunFilters(filters);
   return getDb()
     .query<{ count: number }, string[]>(`SELECT COUNT(*) as count FROM pipeline_runs ${where}`)

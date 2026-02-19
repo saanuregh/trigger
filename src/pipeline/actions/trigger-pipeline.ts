@@ -1,6 +1,6 @@
 import * as db from "../../db/queries.ts";
 import { subscribe } from "../../events.ts";
-import { type ParamValues, type RunStatus, TERMINAL_STATUSES } from "../../types.ts";
+import { type JSONValue, type ParamValues, type RunStatus, TERMINAL_STATUSES } from "../../types.ts";
 import { defineAction, expectString, stringOrTemplate, z } from "../types.ts";
 
 const schema = z
@@ -11,7 +11,11 @@ const schema = z
   })
   .strict();
 
-function waitForRun(runId: string, signal: AbortSignal, log: (msg: string, fields?: Record<string, unknown>) => void): Promise<RunStatus> {
+function waitForRun(
+  runId: string,
+  signal: AbortSignal,
+  log: (msg: string, fields?: Record<string, JSONValue | undefined>) => void,
+): Promise<RunStatus> {
   const run = db.getRun(runId);
   if (run && TERMINAL_STATUSES.has(run.status)) return Promise.resolve(run.status);
 
@@ -23,15 +27,15 @@ function waitForRun(runId: string, signal: AbortSignal, log: (msg: string, field
 
     const unsubscribe = subscribe(runId, (msg) => {
       if (msg.type === "run:status") {
-        const status = msg.status as RunStatus;
+        const status = msg.status;
         if (TERMINAL_STATUSES.has(status)) {
           cleanup();
           resolve(status);
         }
       } else if (msg.type === "step:status") {
         log("child step status changed", {
-          childStep: msg.stepName as string,
-          childStatus: msg.status as string,
+          childStep: msg.stepName,
+          childStatus: msg.status,
         });
       }
     });

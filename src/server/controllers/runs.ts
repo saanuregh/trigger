@@ -2,16 +2,28 @@ import { authed } from "../../auth/access.ts";
 import * as db from "../../db/queries.ts";
 import { logger } from "../../logger.ts";
 import { cancelPipeline, PipelineError, retryRun as retryRunFn } from "../../pipeline/executor.ts";
-import { errorMessage, type LogLine, type PaginatedResponse, type RunRow } from "../../types.ts";
+import {
+  type ErrorResponse,
+  errorMessage,
+  type LogLine,
+  type OkResponse,
+  type PaginatedResponse,
+  type RunDetailResponse,
+  type RunIdResponse,
+  type RunLogsResponse,
+  type RunRow,
+} from "../../types.ts";
+import { listRunsQuerySchema, validateQuery } from "../validation.ts";
 import { checkNamespaceAccess, getRunWithAccess, MAX_LOG_LINES } from "./helpers.ts";
 
 export const listRuns = authed(async (req, session) => {
   const url = new URL(req.url);
-  const namespace = url.searchParams.get("ns") || undefined;
-  const pipeline_id = url.searchParams.get("pipeline_id") || undefined;
-  const status = url.searchParams.get("status") || undefined;
-  const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
-  const per_page = Math.min(100, Math.max(1, Number(url.searchParams.get("per_page")) || 20));
+  const validation = validateQuery(url, listRunsQuerySchema);
+  if (!validation.success) {
+    return Response.json({ error: validation.error } satisfies ErrorResponse, { status: 400 });
+  }
+
+  const { ns: namespace, pipeline_id, status, page, per_page } = validation.data;
 
   if (namespace) {
     const denied = await checkNamespaceAccess(session, namespace);
@@ -39,7 +51,7 @@ export const getRun = authed(async (req, session) => {
   if ("error" in result) return result.error;
 
   const steps = db.getStepsForRun(req.params.runId!);
-  return Response.json({ run: result.run, steps });
+  return Response.json({ run: result.run, steps } satisfies RunDetailResponse);
 });
 
 export const getRunLogs = authed(async (req, session) => {
@@ -77,7 +89,7 @@ export const getRunLogs = authed(async (req, session) => {
     if (lines.length >= MAX_LOG_LINES) break;
   }
 
-  return Response.json({ lines, truncated: lines.length >= MAX_LOG_LINES });
+  return Response.json({ lines, truncated: lines.length >= MAX_LOG_LINES } satisfies RunLogsResponse);
 });
 
 export const cancelRun = authed(async (req, session) => {
@@ -90,8 +102,8 @@ export const cancelRun = authed(async (req, session) => {
     logger.warn({ runId }, "cancel requested for inactive run");
     return Response.json({ error: "Run not active" }, { status: 404 });
   }
-  logger.info({ runId, cancelledBy: session.email }, "pipeline cancellation requested");
-  return Response.json({ ok: true });
+  logger.info({ runId, cancelledBy: session.email || undefined }, "pipeline cancellation requested");
+  return Response.json({ ok: true } satisfies OkResponse);
 });
 
 export const retryRun = authed(async (req, session) => {
@@ -101,8 +113,8 @@ export const retryRun = authed(async (req, session) => {
 
   try {
     const resultId = await retryRunFn(runId!, { triggeredBy: session.email || undefined });
-    logger.info({ runId, retriedBy: session.email }, "pipeline retry requested");
-    return Response.json({ runId: resultId });
+    logger.info({ runId, retriedBy: session.email || undefined }, "pipeline retry requested");
+    return Response.json({ runId: resultId } satisfies RunIdResponse);
   } catch (err) {
     const msg = errorMessage(err);
     const status = err instanceof PipelineError ? err.statusCode : 500;
@@ -111,6 +123,6 @@ export const retryRun = authed(async (req, session) => {
     } else {
       logger.warn({ runId, error: msg, status }, "pipeline retry rejected");
     }
-    return Response.json({ error: msg }, { status });
+    return Response.json({ error: msg } satisfies ErrorResponse, { status });
   }
 });

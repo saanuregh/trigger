@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { env } from "../env.ts";
 import { logger } from "../logger.ts";
 import { errorMessage } from "../types.ts";
@@ -5,12 +6,14 @@ import { errorMessage } from "../types.ts";
 const SESSION_TTL_S = 24 * 60 * 60; // 24 hours
 const COOKIE_NAME = "trigger_session";
 
-export interface SessionPayload {
-  email: string;
-  name: string;
-  groups: string[];
-  exp: number;
-}
+const sessionPayloadSchema = z.object({
+  email: z.string(),
+  name: z.string(),
+  groups: z.array(z.string()),
+  exp: z.number(),
+});
+
+type SessionPayload = z.infer<typeof sessionPayloadSchema>;
 
 export interface AuthSession {
   email: string;
@@ -77,8 +80,11 @@ export async function verifySession(cookie: string): Promise<AuthSession | null>
 
   try {
     const json = fromBase64Url(payloadB64);
-    const payload = JSON.parse(json) as SessionPayload;
+    const result = sessionPayloadSchema.safeParse(JSON.parse(json));
 
+    if (!result.success) return null;
+
+    const payload = result.data;
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
 
     return {
