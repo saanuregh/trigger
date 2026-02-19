@@ -6,10 +6,10 @@ const CHUNK_SIZE = 50;
 const chunkStyle: CSSProperties = { contentVisibility: "auto", containIntrinsicSize: "auto none" };
 
 const levelColors: Record<string, string> = {
-  error: "border-l-red-500 bg-red-500/[0.05]",
-  warn: "border-l-yellow-500 bg-yellow-500/[0.05]",
+  error: "border-l-red-500 bg-red-500/[0.08]",
+  warn: "border-l-yellow-500 bg-yellow-500/[0.06]",
   info: "border-l-transparent",
-  debug: "border-l-transparent opacity-60",
+  debug: "border-l-transparent opacity-50",
 };
 
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }): ReactNode {
@@ -80,6 +80,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
   const [userScrolledUp, setUserScrolledUp] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [search, setSearch] = useState("");
+  const [levelFilter, setLevelFilter] = useState("all");
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -103,12 +104,13 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
   }, []);
 
   const filteredLines = useMemo(() => {
-    const filtered = stepFilter ? lines.filter((entry) => entry.stepId === stepFilter) : lines;
+    let filtered = stepFilter ? lines.filter((entry) => entry.stepId === stepFilter) : lines;
+    if (levelFilter !== "all") filtered = filtered.filter((entry) => entry.level === levelFilter);
     const indexed = filtered.map((entry, i) => ({ entry, num: i + 1 }));
     if (!search) return indexed;
     const lower = search.toLowerCase();
     return indexed.filter(({ entry }) => JSON.stringify(entry).toLowerCase().includes(lower));
-  }, [lines, search, stepFilter]);
+  }, [lines, search, stepFilter, levelFilter]);
 
   if (lines.length === 0) {
     return (
@@ -128,6 +130,17 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
           {stepFilter ? `${filteredLines.length} / ${lines.length}` : lines.length} lines
         </span>
         <div className="flex items-center gap-2 flex-1 justify-end">
+          <select
+            value={levelFilter}
+            onChange={(e) => setLevelFilter(e.target.value)}
+            className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1 text-xs text-neutral-300 focus:outline-none focus:border-white/[0.2] shrink-0"
+          >
+            <option value="all">All levels</option>
+            <option value="error">Errors</option>
+            <option value="warn">Warnings</option>
+            <option value="info">Info</option>
+            <option value="debug">Debug</option>
+          </select>
           {search && (
             <span className="text-[10px] text-neutral-500 shrink-0 font-mono tabular-nums">
               {filteredLines.length} match{filteredLines.length !== 1 ? "es" : ""}
