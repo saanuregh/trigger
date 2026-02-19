@@ -72,7 +72,18 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
       if (!schema) return; // unknown action — accept any config
 
       const switchResult = switchConfig.safeParse(step.config);
-      if (switchResult.success) return; // $switch config is always valid
+      if (switchResult.success) {
+        const sw = switchResult.data;
+        const hasCases = sw.cases && Object.keys(sw.cases).length > 0;
+        if (!hasCases && sw.default === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["config"],
+            message: `$switch on "${sw.$switch}" has no cases and no default — will always fail at runtime`,
+          });
+        }
+        return;
+      }
 
       const result = schema.safeParse(step.config);
       if (!result.success) {
@@ -137,8 +148,12 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
 function getAtPath(obj: unknown, path: (string | number)[]): unknown {
   let current: unknown = obj;
   for (const key of path) {
-    if (current == null || typeof current !== "object" || Array.isArray(current)) return current;
-    current = (current as Record<string | number, unknown>)[key];
+    if (current == null || typeof current !== "object") return current;
+    if (Array.isArray(current)) {
+      current = current[key as number];
+    } else {
+      current = (current as Record<string | number, unknown>)[key];
+    }
   }
   return current;
 }

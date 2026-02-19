@@ -24,10 +24,6 @@ export function getAction(name: string): RegisteredAction | undefined {
   return registry.get(name);
 }
 
-export function getActionNames(): string[] {
-  return [...registry.keys()];
-}
-
 export function clearRegistry(): void {
   registry.clear();
 }

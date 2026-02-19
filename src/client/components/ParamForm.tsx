@@ -8,7 +8,13 @@ import { ConfirmDialog } from "./ConfirmDialog.tsx";
 function defaultParams(params: ParamDef[]): Record<string, string | boolean> {
   const defaults: Record<string, string | boolean> = {};
   for (const p of params) {
-    defaults[p.name] = p.default ?? (p.type === "boolean" ? false : "");
+    if (p.type === "boolean") {
+      defaults[p.name] = p.default ?? false;
+    } else if (p.type === "select" && p.default === undefined && p.options.length > 0) {
+      defaults[p.name] = p.options[0]!.value;
+    } else {
+      defaults[p.name] = p.default ?? "";
+    }
   }
   return defaults;
 }
@@ -142,7 +148,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
         body: JSON.stringify({ params, dryRun }),
       });
 
-      handleUnauthorized(res);
+      if (handleUnauthorized(res)) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Request failed" }));
         throw new Error(data.error || `HTTP ${res.status}`);

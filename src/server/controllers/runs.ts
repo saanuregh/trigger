@@ -1,20 +1,19 @@
 import { authed } from "../../auth/access.ts";
 import * as db from "../../db/queries.ts";
 import { logger } from "../../logger.ts";
-import { cancelPipeline, PipelineError, retryRun as retryRunFn } from "../../pipeline/executor.ts";
-import {
-  type ErrorResponse,
-  errorMessage,
-  type LogLine,
-  type OkResponse,
-  type PaginatedResponse,
-  type RunDetailResponse,
-  type RunIdResponse,
-  type RunLogsResponse,
-  type RunRow,
+import { cancelPipeline, retryRun as retryRunFn } from "../../pipeline/executor.ts";
+import type {
+  ErrorResponse,
+  LogLine,
+  OkResponse,
+  PaginatedResponse,
+  RunDetailResponse,
+  RunIdResponse,
+  RunLogsResponse,
+  RunRow,
 } from "../../types.ts";
 import { listRunsQuerySchema, validateQuery } from "../validation.ts";
-import { checkNamespaceAccess, getRunWithAccess, MAX_LOG_LINES } from "./helpers.ts";
+import { checkNamespaceAccess, getRunWithAccess, handlePipelineError, MAX_LOG_LINES } from "./helpers.ts";
 
 export const listRuns = authed(async (req, session) => {
   const url = new URL(req.url);
@@ -66,23 +65,39 @@ export const getRunLogs = authed(async (req, session) => {
     if (!step.log_file) continue;
     const file = Bun.file(step.log_file);
     if (!(await file.exists())) continue;
-    const text = await file.text();
-    for (const raw of text.split("\n")) {
-      if (!raw) continue;
-      try {
-        lines.push(JSON.parse(raw));
-      } catch {
-        lines.push({
-          level: "info",
-          time: "",
-          msg: raw,
-          runId: runId!,
-          stepId: step.step_id,
-          step: step.step_name,
-          action: step.action,
-          stepIndex: 0,
-          totalSteps: 0,
-        });
+
+    // Stream file in chunks via Reader API to avoid loading entire log into memory
+    const reader = file.stream().getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let done = false;
+    while (!done) {
+      const result = await reader.read();
+      done = result.done;
+      if (result.value) buffer += decoder.decode(result.value, { stream: !done });
+      let newlineIdx = buffer.indexOf("\n");
+      while (newlineIdx !== -1) {
+        const raw = buffer.slice(0, newlineIdx);
+        buffer = buffer.slice(newlineIdx + 1);
+        if (raw) {
+          try {
+            lines.push(JSON.parse(raw));
+          } catch {
+            lines.push({
+              level: "info",
+              time: "",
+              msg: raw,
+              runId: runId!,
+              stepId: step.step_id,
+              step: step.step_name,
+              action: step.action,
+              stepIndex: 0,
+              totalSteps: 0,
+            });
+          }
+          if (lines.length >= MAX_LOG_LINES) break;
+        }
+        newlineIdx = buffer.indexOf("\n");
       }
       if (lines.length >= MAX_LOG_LINES) break;
     }
@@ -116,13 +131,6 @@ export const retryRun = authed(async (req, session) => {
     logger.info({ runId, retriedBy: session.email || undefined }, "pipeline retry requested");
     return Response.json({ runId: resultId } satisfies RunIdResponse);
   } catch (err) {
-    const msg = errorMessage(err);
-    const status = err instanceof PipelineError ? err.statusCode : 500;
-    if (status >= 500) {
-      logger.error({ runId, error: msg, status }, "pipeline retry failed");
-    } else {
-      logger.warn({ runId, error: msg, status }, "pipeline retry rejected");
-    }
-    return Response.json({ error: msg } satisfies ErrorResponse, { status });
+    return handlePipelineError(err, { runId }, "retry");
   }
 });

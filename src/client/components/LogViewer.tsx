@@ -1,5 +1,5 @@
 import { ArrowDown, FileText, Search, X } from "lucide-react";
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { LogLevel, LogLine } from "../../types.ts";
 
 const CHUNK_SIZE = 50;
@@ -103,14 +103,20 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
     }
   }, []);
 
-  const filteredLines = useMemo(() => {
+  const deferredSearch = useDeferredValue(search);
+
+  // Pre-compute searchable text once per line set, not per keystroke
+  const indexedLines = useMemo(() => {
     let filtered = stepFilter ? lines.filter((entry) => entry.stepId === stepFilter) : lines;
     if (levelFilter !== "all") filtered = filtered.filter((entry) => entry.level === levelFilter);
-    const indexed = filtered.map((entry, i) => ({ entry, num: i + 1 }));
-    if (!search) return indexed;
-    const lower = search.toLowerCase();
-    return indexed.filter(({ entry }) => JSON.stringify(entry).toLowerCase().includes(lower));
-  }, [lines, search, stepFilter, levelFilter]);
+    return filtered.map((entry, i) => ({ entry, num: i + 1, searchText: JSON.stringify(entry).toLowerCase() }));
+  }, [lines, stepFilter, levelFilter]);
+
+  const filteredLines = useMemo(() => {
+    if (!deferredSearch) return indexedLines;
+    const lower = deferredSearch.toLowerCase();
+    return indexedLines.filter(({ searchText }) => searchText.includes(lower));
+  }, [indexedLines, deferredSearch]);
 
   if (lines.length === 0) {
     return (

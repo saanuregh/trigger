@@ -7,8 +7,9 @@ import { Layout } from "./components/Layout.tsx";
 import { PipelineSidebar } from "./components/PipelineSidebar.tsx";
 import { SectionHeader } from "./components/SectionHeader.tsx";
 import { ConfigSkeleton } from "./components/Skeleton.tsx";
-import { useConfigs, useFetch } from "./hooks.tsx";
+import { useFetch, useNsDisplayName } from "./hooks.tsx";
 import { useRoute } from "./router.tsx";
+import { hashString } from "./utils.ts";
 
 const TEMPLATE_SPLIT_RE = /(\{\{.+?\}\})/g;
 const TEMPLATE_TEST_RE = /^\{\{.+?\}\}$/;
@@ -29,11 +30,7 @@ const ACTION_COLOR_PALETTE = [
 ] as const;
 
 function getActionColor(action: ActionName): string {
-  let hash = 0;
-  for (let i = 0; i < action.length; i++) {
-    hash = ((hash << 5) - hash + action.charCodeAt(i)) | 0;
-  }
-  const color = ACTION_COLOR_PALETTE[Math.abs(hash) % ACTION_COLOR_PALETTE.length]!;
+  const color = ACTION_COLOR_PALETTE[hashString(action) % ACTION_COLOR_PALETTE.length]!;
   return `${color.bg} ${color.text}`;
 }
 
@@ -179,8 +176,7 @@ export function ConfigPage() {
   const { ns, pipelineId } = useRoute().params as { ns: string; pipelineId: string };
 
   const { data: config, error } = useFetch<PipelineConfigResponse>(`/api/pipelines/${ns}/${pipelineId}/config`);
-  const { data: configs } = useConfigs();
-  const nsDisplayName = configs?.find((c) => c.namespace === ns)?.display_name ?? ns;
+  const nsDisplayName = useNsDisplayName(ns);
 
   const sidebar = <PipelineSidebar ns={ns} pipelineId={pipelineId} active="config" />;
 

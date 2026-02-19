@@ -1,3 +1,4 @@
+import { readdirSync, rmSync, statSync } from "node:fs";
 import { fetchOIDCConfig } from "../auth/oidc.ts";
 import { loadAllConfigs, rebuildConfigSchema } from "../config/loader.ts";
 import { closeDb, getDb } from "../db/index.ts";
@@ -10,6 +11,32 @@ import { error, fetch, routes } from "./routes.ts";
 import { initWSGlobalSubscription, wsHandlers } from "./ws.ts";
 
 let _server: ReturnType<typeof Bun.serve> | null = null;
+
+function cleanupOldLogs() {
+  const retentionMs = env.LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - retentionMs;
+  const logsDir = `${env.DATA_DIR}/logs`;
+  let cleaned = 0;
+  try {
+    for (const entry of readdirSync(logsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const dirPath = `${logsDir}/${entry.name}`;
+        if (statSync(dirPath).mtimeMs < cutoff) {
+          rmSync(dirPath, { recursive: true });
+          cleaned++;
+        }
+      } catch {
+        /* individual dir cleanup failure is non-fatal */
+      }
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      logger.warn({ error: errorMessage(err) }, "log cleanup scan failed");
+    }
+  }
+  if (cleaned > 0) logger.info({ cleaned, retentionDays: env.LOG_RETENTION_DAYS }, "old logs cleaned up");
+}
 
 export function getServer() {
   return _server!;
@@ -48,6 +75,9 @@ export async function startServer(): Promise<void> {
   initWSGlobalSubscription();
 
   logger.info({ env: env.NODE_ENV, port: server.port, dataDir: env.DATA_DIR }, "server started");
+
+  cleanupOldLogs();
+  setInterval(cleanupOldLogs, 24 * 60 * 60 * 1000);
 
   let shuttingDown = false;
 

@@ -1,4 +1,5 @@
 import { AlertTriangle, FolderOpen, Loader2 } from "lucide-react";
+import { useCallback, useRef } from "react";
 import type { NamespaceConfigSummary, PaginatedResponse, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
@@ -83,7 +84,17 @@ export function HomePage() {
   const { data: status } = useStatus();
   const { data: recentData, mutate: mutateRecent } = useFetch<PaginatedResponse<RunRow>>("/api/runs?per_page=100");
 
-  useGlobalEvents(() => mutateRecent());
+  // Debounce refetches — multiple events in quick succession coalesce into one API call
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const debouncedMutate = useCallback(
+    (_event: unknown) => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => mutateRecent(), 500);
+    },
+    [mutateRecent],
+  );
+
+  useGlobalEvents(debouncedMutate);
 
   // Active runs per namespace from WebSocket status
   const activeByNs = new Map<string, number>();

@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { LogLine, MessageOf, SystemStatus, WSClientMessage, WSServerMessage } from "../types.ts";
 
 // --- Derived types from the message union ---
@@ -15,11 +15,9 @@ export interface SubscriptionHandlers {
 
 type GlobalHandler = (event: WSGlobalEvent) => void;
 
-// --- Context ---
+// --- Contexts (split for performance: actions are stable, state changes on updates) ---
 
-interface WSContextValue {
-  status: SystemStatus | null;
-  connected: boolean;
+interface WSActions {
   subscribe: (topic: string) => void;
   unsubscribe: (topic: string) => void;
   addRunHandler: (topic: string, handlers: SubscriptionHandlers) => void;
@@ -27,11 +25,17 @@ interface WSContextValue {
   addGlobalHandler: (handler: GlobalHandler) => () => void;
 }
 
-const WSContext = createContext<WSContextValue | null>(null);
+interface WSState {
+  status: SystemStatus | null;
+  connected: boolean;
+}
 
-function useWS(): WSContextValue {
-  const ctx = useContext(WSContext);
-  if (!ctx) throw new Error("useWS requires WebSocketProvider");
+const WSActionsContext = createContext<WSActions | null>(null);
+const WSStateContext = createContext<WSState>({ status: null, connected: false });
+
+function useWSActions(): WSActions {
+  const ctx = useContext(WSActionsContext);
+  if (!ctx) throw new Error("useWSActions requires WebSocketProvider");
   return ctx;
 }
 
@@ -140,64 +144,61 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const subscribeTopic = (topic: string) => {
+  const subscribeTopic = useCallback((topic: string) => {
     activeTopicsRef.current.add(topic);
     const ws = wsRef.current;
     if (ws) sendMsg(ws, { type: "subscribe", topic });
-  };
+  }, []);
 
-  const unsubscribeTopic = (topic: string) => {
+  const unsubscribeTopic = useCallback((topic: string) => {
     activeTopicsRef.current.delete(topic);
     const ws = wsRef.current;
     if (ws) sendMsg(ws, { type: "unsubscribe", topic });
-  };
+  }, []);
 
-  const addRunHandler = (topic: string, handlers: SubscriptionHandlers) => {
+  const addRunHandler = useCallback((topic: string, handlers: SubscriptionHandlers) => {
     runHandlersRef.current.set(topic, handlers);
-  };
+  }, []);
 
-  const removeRunHandler = (topic: string) => {
+  const removeRunHandler = useCallback((topic: string) => {
     runHandlersRef.current.delete(topic);
-  };
+  }, []);
 
-  const addGlobalHandler = (handler: GlobalHandler) => {
+  const addGlobalHandler = useCallback((handler: GlobalHandler) => {
     globalHandlersRef.current.add(handler);
     return () => {
       globalHandlersRef.current.delete(handler);
     };
-  };
+  }, []);
+
+  const actions = useMemo<WSActions>(
+    () => ({ subscribe: subscribeTopic, unsubscribe: unsubscribeTopic, addRunHandler, removeRunHandler, addGlobalHandler }),
+    [subscribeTopic, unsubscribeTopic, addRunHandler, removeRunHandler, addGlobalHandler],
+  );
+
+  const state = useMemo<WSState>(() => ({ status, connected }), [status, connected]);
 
   return (
-    <WSContext.Provider
-      value={{
-        status,
-        connected,
-        subscribe: subscribeTopic,
-        unsubscribe: unsubscribeTopic,
-        addRunHandler,
-        removeRunHandler,
-        addGlobalHandler,
-      }}
-    >
-      {children}
-    </WSContext.Provider>
+    <WSActionsContext.Provider value={actions}>
+      <WSStateContext.Provider value={state}>{children}</WSStateContext.Provider>
+    </WSActionsContext.Provider>
   );
 }
 
 // --- Hooks ---
 
 export function useStatus() {
-  const { status } = useWS();
+  const { status } = useContext(WSStateContext);
   return { data: status };
 }
 
 export function useConnected() {
-  const { connected } = useWS();
+  const { connected } = useContext(WSStateContext);
   return connected;
 }
 
 export function useSubscription(topic: string | null, handlers: SubscriptionHandlers) {
-  const ws = useWS();
+  const ws = useWSActions();
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
 
@@ -222,7 +223,7 @@ export function useSubscription(topic: string | null, handlers: SubscriptionHand
 }
 
 export function useGlobalEvents(handler: GlobalHandler) {
-  const ws = useWS();
+  const ws = useWSActions();
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
 

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { env } from "../env.ts";
 import { logger } from "../logger.ts";
@@ -22,61 +23,40 @@ export interface AuthSession {
   isSuperAdmin: boolean;
 }
 
-const encoder = new TextEncoder();
-
 function toBase64Url(b64: string): string {
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function fromBase64Url(b64url: string): string {
-  return atob(b64url.replace(/-/g, "+").replace(/_/g, "/"));
+export function fromBase64Url(b64url: string): string {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+  return atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "="));
 }
 
-let cachedKey: CryptoKey | null = null;
-
-async function getHmacKey(): Promise<CryptoKey> {
-  if (cachedKey) return cachedKey;
-  cachedKey = await crypto.subtle.importKey("raw", encoder.encode(env.OIDC_CLIENT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-    "verify",
-  ]);
-  return cachedKey;
+function hmacSign(data: string): string {
+  if (!env.OIDC_CLIENT_SECRET) throw new Error("Cannot sign session: OIDC_CLIENT_SECRET not set");
+  return toBase64Url(new Bun.CryptoHasher("sha256", env.OIDC_CLIENT_SECRET).update(data).digest("base64"));
 }
 
-async function hmacSign(data: string): Promise<string> {
-  const key = await getHmacKey();
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
-  return toBase64Url(btoa(String.fromCharCode(...new Uint8Array(sig))));
+function hmacVerify(data: string, signature: string): boolean {
+  const expected = hmacSign(data);
+  if (expected.length !== signature.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
 
-async function hmacVerify(data: string, signature: string): Promise<boolean> {
-  const key = await getHmacKey();
-  let sigBytes: Uint8Array;
-  try {
-    const decoded = fromBase64Url(signature);
-    sigBytes = new Uint8Array(decoded.length);
-    for (let i = 0; i < decoded.length; i++) sigBytes[i] = decoded.charCodeAt(i);
-  } catch {
-    return false;
-  }
-  return crypto.subtle.verify("HMAC", key, sigBytes.buffer as ArrayBuffer, encoder.encode(data));
-}
-
-export async function signSession(user: { email: string; name: string; groups: string[] }): Promise<string> {
+export function signSession(user: { email: string; name: string; groups: string[] }): string {
   const payload: SessionPayload = { ...user, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_S };
   const payloadB64 = toBase64Url(btoa(JSON.stringify(payload)));
-  const signature = await hmacSign(payloadB64);
-  return `${payloadB64}.${signature}`;
+  return `${payloadB64}.${hmacSign(payloadB64)}`;
 }
 
-export async function verifySession(cookie: string): Promise<AuthSession | null> {
+export function verifySession(cookie: string): AuthSession | null {
   const dotIndex = cookie.lastIndexOf(".");
   if (dotIndex === -1) return null;
 
   const payloadB64 = cookie.slice(0, dotIndex);
   const signature = cookie.slice(dotIndex + 1);
 
-  if (!(await hmacVerify(payloadB64, signature))) return null;
+  if (!hmacVerify(payloadB64, signature)) return null;
 
   try {
     const json = fromBase64Url(payloadB64);
@@ -108,7 +88,7 @@ export function getCookie(req: Request, name: string): string | null {
   return null;
 }
 
-export async function getSession(req: Request): Promise<AuthSession | null> {
+export function getSession(req: Request): AuthSession | null {
   const cookie = getCookie(req, COOKIE_NAME);
   if (!cookie) return null;
   return verifySession(cookie);

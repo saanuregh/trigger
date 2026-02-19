@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NamespaceConfigSummary, UserResponse } from "../types.ts";
+import { handleUnauthorized } from "./utils.ts";
 
 // --- Fetcher ---
 
@@ -15,10 +16,7 @@ export class FetchError extends Error {
 
 export async function fetcher<T>(url: string): Promise<T> {
   const r = await fetch(url);
-  if (r.status === 401) {
-    window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}&error=session_expired`;
-    throw new FetchError("Unauthorized", 401);
-  }
+  if (handleUnauthorized(r)) throw new FetchError("Session expired", 401);
   if (!r.ok) throw new FetchError(r.statusText || `HTTP ${r.status}`, r.status);
   return r.json() as Promise<T>;
 }
@@ -49,10 +47,6 @@ function cacheSet(key: string, data: unknown) {
   }
 }
 
-function cacheHas(key: string): boolean {
-  return cacheGet(key) !== undefined;
-}
-
 // --- useFetch hook ---
 
 interface UseFetchOptions {
@@ -62,7 +56,7 @@ interface UseFetchOptions {
 export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
   const [data, setData] = useState<T | undefined>(url ? cacheGet<T>(url) : undefined);
   const [error, setError] = useState<Error | undefined>();
-  const [isLoading, setIsLoading] = useState(!cacheHas(url ?? ""));
+  const [isLoading, setIsLoading] = useState(cacheGet(url ?? "") === undefined);
   const urlRef = useRef(url);
   urlRef.current = url;
 
@@ -93,8 +87,9 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
 
   useEffect(() => {
     if (!url) return;
-    setIsLoading(!cacheHas(url));
-    if (cacheHas(url)) setData(cacheGet<T>(url));
+    const cached = cacheGet<T>(url);
+    setIsLoading(cached === undefined);
+    if (cached !== undefined) setData(cached);
     doFetch();
   }, [url, doFetch]);
 
@@ -132,6 +127,11 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
 
 export function useConfigs() {
   return useFetch<NamespaceConfigSummary[]>("/api/configs");
+}
+
+export function useNsDisplayName(ns: string): string {
+  const { data: configs } = useConfigs();
+  return configs?.find((c) => c.namespace === ns)?.display_name ?? ns;
 }
 
 export function useUser() {
