@@ -1,4 +1,4 @@
-import { Clock, Loader2, Play } from "lucide-react";
+import { Clock, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { PaginatedResponse, PipelineDefSummary, RunRow, StepRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
@@ -31,7 +31,7 @@ function ActiveRunBanner({ ns, pipelineId, runId }: { ns: string; pipelineId: st
   return (
     <Link
       to={`/${ns}/${pipelineId}/runs/${runId}`}
-      className="flex items-center gap-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 no-underline hover:bg-white/[0.05] transition-colors"
+      className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 no-underline hover:bg-white/[0.05] transition-colors"
     >
       <Loader2 size={14} className="text-white animate-spin shrink-0" />
       <span className="text-sm text-neutral-300 flex-1 min-w-0 truncate">
@@ -106,18 +106,17 @@ export function PipelinePage() {
 
   return (
     <Layout sidebar={sidebar} breadcrumbs={[{ label: nsDisplayName, to: `/${ns}` }, { label: pipeline.name }]}>
-      <div className="space-y-8">
+      <div className="space-y-5">
         {/* Trigger section */}
-        <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.04]">
-            <Play size={14} className="text-neutral-400" />
-            <h2 className="text-sm font-medium text-neutral-200">Run Pipeline</h2>
-            <span className="ml-auto text-[11px] font-mono text-neutral-500">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">Run Pipeline</h2>
+            <span className="text-[11px] font-mono text-neutral-500">
               {activeRuns.length}/{pipeline.concurrency} slots
             </span>
           </div>
-          <div className="p-4">
-            {pipeline.description && <p className="text-sm text-neutral-400 mb-3">{pipeline.description}</p>}
+          <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg p-3">
+            {pipeline.description && <p className="text-sm text-neutral-400 mb-2">{pipeline.description}</p>}
             <ParamForm
               pipeline={pipeline}
               ns={ns}
@@ -134,31 +133,31 @@ export function PipelinePage() {
           <EmptyState icon={<Clock size={48} />} title="No runs yet" description="Run this pipeline to see execution history." />
         ) : (
           <div>
-            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-4">Recent Runs</h2>
+            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">Recent Runs</h2>
 
             {activeRuns.length > 0 && (
-              <div className="space-y-2 mb-4">
+              <div className="space-y-1.5 mb-3">
                 {activeRuns.map((activeRun) => (
                   <ActiveRunBanner key={activeRun.id} ns={ns} pipelineId={pipelineId} runId={activeRun.id} />
                 ))}
               </div>
             )}
 
-            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
+            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-neutral-500 text-[11px] font-medium">
-                    <th className="px-4 py-2.5">Run</th>
-                    <th className="px-4 py-2.5">Status</th>
-                    <th className="px-4 py-2.5">Started</th>
-                    <th className="px-4 py-2.5">Duration</th>
-                    <th className="px-4 py-2.5">By</th>
+                    <th className="px-3 py-1.5">Run</th>
+                    <th className="px-3 py-1.5">Status</th>
+                    <th className="px-3 py-1.5">Started</th>
+                    <th className="px-3 py-1.5">Duration</th>
+                    <th className="px-3 py-1.5">By</th>
                   </tr>
                 </thead>
                 <tbody>
                   {runs.map((run) => (
                     <tr key={run.id} className="border-t border-white/[0.04] hover:bg-white/[0.04] transition-colors">
-                      <td className="px-4 py-2.5">
+                      <td className="px-3 py-1.5">
                         <Link
                           to={`/${ns}/${pipelineId}/runs/${run.id}`}
                           className="inline-flex items-center bg-white/[0.06] hover:bg-white/[0.1] text-neutral-300 hover:text-white no-underline font-mono text-xs px-2 py-0.5 rounded-lg transition-colors"
@@ -171,16 +170,16 @@ export function PipelinePage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-3 py-1.5">
                         <StatusDot status={run.status} />
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-400 text-xs">
+                      <td className="px-3 py-1.5 text-neutral-400 text-xs">
                         <span title={run.started_at}>{timeAgo(run.started_at)}</span>
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-400 font-mono text-xs">
+                      <td className="px-3 py-1.5 text-neutral-400 font-mono text-xs">
                         <RunDuration run={run} />
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-500 text-xs truncate max-w-24">{run.triggered_by || "-"}</td>
+                      <td className="px-3 py-1.5 text-neutral-500 text-xs truncate max-w-24">{run.triggered_by || "-"}</td>
                     </tr>
                   ))}
                 </tbody>

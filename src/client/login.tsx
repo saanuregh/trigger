@@ -8,7 +8,7 @@ export function LoginPage() {
   return (
     <div className="flex items-center justify-center h-screen relative">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.04)_0%,_transparent_70%)]" />
-      <div className="relative text-center space-y-6 max-w-sm bg-neutral-900/60 border border-white/[0.08] rounded-xl p-8 backdrop-blur-xl shadow-2xl shadow-black/40">
+      <div className="relative text-center space-y-6 max-w-sm bg-neutral-900/60 border border-white/[0.08] rounded-lg p-8 backdrop-blur-xl shadow-2xl shadow-black/40">
         <div className="flex items-center justify-center gap-2.5 text-2xl font-bold">
           <Workflow size={32} className="text-white" />
           Trigger
