@@ -308,7 +308,7 @@ export function RunPage() {
     >
       <div className="h-full flex flex-col">
         {/* Run info bar */}
-        <div className="flex items-center gap-3 mb-4 shrink-0">
+        <div className="flex items-center gap-2 mb-3 shrink-0">
           <StatusBadge status={run.status} />
           <div className="text-xs text-neutral-500">
             <span className="font-mono" title={run.started_at}>
@@ -326,7 +326,7 @@ export function RunPage() {
 
         {/* Error banner */}
         {run.error && (
-          <div className="flex items-start gap-3 bg-red-500/[0.08] border border-red-500/15 rounded-lg p-3 mb-4 shrink-0">
+          <div className="flex items-start gap-2.5 bg-red-500/[0.08] border border-red-500/15 rounded-lg p-2.5 mb-3 shrink-0">
             <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
             <div className="text-sm text-red-300">{run.error}</div>
           </div>
@@ -335,12 +335,12 @@ export function RunPage() {
         {/* Side-by-side: Steps + Logs */}
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Steps panel */}
-          <div className="w-60 shrink-0 overflow-y-auto pr-3 flex flex-col gap-0.5">
+          <div className="w-52 shrink-0 overflow-y-auto pr-3 flex flex-col gap-0.5">
             <StepProgressBar steps={steps} />
             <button
               type="button"
               onClick={() => selectStep(null)}
-              className={`w-full text-left text-xs px-2.5 py-2 rounded-lg transition-all duration-150 active:scale-[0.98] ${
+              className={`w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-150 active:scale-[0.98] ${
                 selectedStepId === null
                   ? "bg-white/[0.08] text-white font-medium"
                   : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
@@ -357,7 +357,7 @@ export function RunPage() {
                   key={step.step_id}
                   type="button"
                   onClick={() => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors text-left ${
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left ${
                     isSelected ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
                   } ${pulsingSteps.has(step.step_id) ? "step-pulse" : ""}`}
                 >

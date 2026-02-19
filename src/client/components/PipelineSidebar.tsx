@@ -13,7 +13,7 @@ const tabBase = "block px-2 py-1 text-xs rounded-lg no-underline transition-colo
 const tabActive = `${tabBase} bg-white/[0.08] text-white font-medium`;
 const tabInactive = `${tabBase} text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.04]`;
 
-const pipelineBase = "block px-2 py-1.5 text-sm rounded-lg no-underline transition-colors truncate";
+const pipelineBase = "block px-2 py-1 text-sm rounded-lg no-underline transition-colors truncate";
 const pipelineActive = `${pipelineBase} text-white font-medium`;
 const pipelineInactive = `${pipelineBase} text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.04]`;
 

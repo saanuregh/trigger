@@ -140,7 +140,7 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 p-4 text-left hover:bg-white/[0.04] transition-colors rounded-lg"
+        className="w-full flex items-center gap-2 p-3 text-left hover:bg-white/[0.04] transition-colors rounded-lg"
       >
         {expanded ? (
           <ChevronDown size={14} className="text-neutral-500 shrink-0" />
@@ -154,7 +154,7 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
         </span>
       </button>
       {expanded && (
-        <div className="px-4 pb-4 ml-9 space-y-1.5 border-t border-white/[0.04] pt-3">
+        <div className="px-3 pb-3 ml-7 space-y-1 border-t border-white/[0.04] pt-2">
           {Object.entries(step.config).map(([key, val]) => (
             <div key={key} className="text-sm flex items-start gap-2 group">
               <span className="text-neutral-500 shrink-0">{key}:</span>
@@ -202,33 +202,33 @@ export function ConfigPage() {
       sidebar={sidebar}
       breadcrumbs={[{ label: nsDisplayName, to: `/${ns}` }, { label: config.name, to: `/${ns}/${pipelineId}` }, { label: "Config" }]}
     >
-      <div className="space-y-6">
+      <div className="space-y-4">
         {config.description && <p className="text-sm text-neutral-400">{config.description}</p>}
 
         {config.params && config.params.length > 0 && (
           <div>
-            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-3">Parameters</h2>
-            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
+            <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">Parameters</h2>
+            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-neutral-500 text-[11px] font-medium">
-                    <th className="px-4 py-2.5">Name</th>
-                    <th className="px-4 py-2.5">Type</th>
-                    <th className="px-4 py-2.5">Default</th>
-                    <th className="px-4 py-2.5">Required</th>
+                    <th className="px-3 py-1.5">Name</th>
+                    <th className="px-3 py-1.5">Type</th>
+                    <th className="px-3 py-1.5">Default</th>
+                    <th className="px-3 py-1.5">Required</th>
                   </tr>
                 </thead>
                 <tbody>
                   {config.params.map((p) => (
                     <tr key={p.name} className="border-t border-white/[0.04]">
-                      <td className="px-4 py-2.5 text-neutral-200">{p.label}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-3 py-1.5 text-neutral-200">{p.label}</td>
+                      <td className="px-3 py-1.5">
                         <span className="text-xs bg-white/[0.06] text-neutral-400 px-1.5 py-0.5 rounded-lg font-mono">{p.type}</span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-3 py-1.5">
                         <ConfigValue value={p.default} />
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-400">
+                      <td className="px-3 py-1.5 text-neutral-400">
                         {"required" in p && p.required ? (
                           <span className="text-xs bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-lg">Yes</span>
                         ) : (
@@ -244,8 +244,8 @@ export function ConfigPage() {
         )}
 
         <div>
-          <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-3">Steps</h2>
-          <div className="space-y-2">
+          <h2 className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mb-2">Steps</h2>
+          <div className="space-y-1.5">
             {config.steps.map((step, i) => (
               <StepCard key={step.id} step={step} index={i} />
             ))}

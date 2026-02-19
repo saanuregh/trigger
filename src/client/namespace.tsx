@@ -53,57 +53,46 @@ export function NamespacePage() {
         {nsConfig.pipelines.length === 0 ? (
           <EmptyState icon={<GitBranch size={48} />} title="No pipelines" description="This namespace has no pipelines configured." />
         ) : (
-          <div className="bg-neutral-900/50 border border-white/[0.06] rounded-xl overflow-hidden">
+          <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 text-[11px] font-medium">
-                  <th className="px-4 py-2.5">Pipeline</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5">Last Run</th>
-                  <th className="px-4 py-2.5 w-20">Duration</th>
-                  <th className="px-4 py-2.5">By</th>
+                  <th className="px-3 py-1.5">Pipeline</th>
+                  <th className="px-3 py-1.5">Status</th>
+                  <th className="px-3 py-1.5">Last Run</th>
+                  <th className="px-3 py-1.5 w-20">Duration</th>
                 </tr>
               </thead>
               <tbody>
                 {nsConfig.pipelines.map((p) => {
                   const lastRun = latestRuns.get(p.id);
-                  const borderColor = lastRun
-                    ? ((
-                        {
-                          pending: "border-l-neutral-500/40",
-                          running: "border-l-white/40",
-                          success: "border-l-green-500/40",
-                          failed: "border-l-red-500/40",
-                          cancelled: "border-l-yellow-500/40",
-                        } satisfies Record<string, string>
-                      )[lastRun.status] ?? "border-l-transparent")
-                    : "border-l-transparent";
                   return (
                     <tr
                       key={p.id}
-                      className={`border-t border-white/[0.04] border-l-2 ${borderColor} hover:bg-white/[0.04] transition-colors cursor-pointer`}
+                      className="border-t border-white/[0.04] hover:bg-white/[0.04] transition-colors cursor-pointer"
                       onClick={() => navigate(`/${ns}/${p.id}`)}
                     >
-                      <td className="px-4 py-2.5">
+                      <td className="px-3 py-1.5">
                         <Link to={`/${ns}/${p.id}`} className="text-neutral-200 hover:text-white no-underline font-medium">
                           {p.name}
                         </Link>
                         {p.description && <div className="text-xs text-neutral-500 mt-0.5">{p.description}</div>}
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-3 py-1.5">
                         {lastRun ? <StatusDot status={lastRun.status} /> : <span className="text-xs text-neutral-600">-</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-500 text-xs">
+                      <td className="px-3 py-1.5 text-neutral-500 text-xs">
                         {lastRun ? (
-                          <span title={lastRun.started_at}>{timeAgo(lastRun.started_at)}</span>
+                          <span title={`${lastRun.started_at}${lastRun.triggered_by ? ` by ${lastRun.triggered_by}` : ""}`}>
+                            {timeAgo(lastRun.started_at)}
+                          </span>
                         ) : (
                           <span className="text-neutral-600">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-500 text-xs font-mono">
+                      <td className="px-3 py-1.5 text-neutral-500 text-xs font-mono">
                         {lastRun?.finished_at ? formatDuration(lastRun.started_at, lastRun.finished_at) : lastRun ? "..." : "-"}
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-500 text-xs truncate max-w-24">{lastRun?.triggered_by || "-"}</td>
                     </tr>
                   );
                 })}

@@ -130,10 +130,10 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
 
   return (
     <aside
-      className={`${collapsed ? "w-14" : "w-56"} sidebar-transition bg-neutral-950/40 border-r border-white/[0.06] shrink-0 flex flex-col`}
+      className={`${collapsed ? "w-14" : "w-52"} sidebar-transition bg-neutral-950/40 border-r border-white/[0.06] shrink-0 flex flex-col`}
     >
       {/* Brand */}
-      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} px-3 h-12 shrink-0`}>
+      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} px-3 h-10 shrink-0`}>
         <Link
           to="/"
           className={`flex items-center gap-1.5 font-bold font-mono tracking-wide text-white no-underline hover:text-neutral-300 transition-colors ${collapsed ? "" : "px-1"}`}
@@ -145,7 +145,7 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
       </div>
 
       {/* Nav content */}
-      <div className={`flex-1 overflow-y-auto ${collapsed ? "px-1" : "px-3"} pt-1 pb-3`}>{sidebar}</div>
+      <div className={`flex-1 overflow-y-auto ${collapsed ? "px-1" : "px-3"} pt-1 pb-2`}>{sidebar}</div>
 
       {/* Active runs */}
       <ActiveRuns />
@@ -209,15 +209,15 @@ export function Layout({ children, sidebar, actions, breadcrumbs }: LayoutProps)
 
         <main className="flex-1 overflow-y-auto flex flex-col min-w-0">
           {/* Header bar: breadcrumbs (only when sidebar collapsed) + actions */}
-          {((collapsed && breadcrumbs?.length) || actions) && (
-            <div className="flex items-center justify-between gap-4 px-5 h-12 border-b border-white/[0.06] shrink-0">
-              {collapsed ? <Breadcrumb items={breadcrumbs ?? []} /> : <div />}
+          {(breadcrumbs?.length || actions) && (
+            <div className="flex items-center justify-between gap-4 px-4 h-10 border-b border-white/[0.06] shrink-0">
+              <Breadcrumb items={breadcrumbs ?? []} />
               {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto p-5">
-            <div className="max-w-6xl mx-auto animate-fade-in">{children}</div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-7xl mx-auto animate-fade-in">{children}</div>
           </div>
         </main>
       </div>

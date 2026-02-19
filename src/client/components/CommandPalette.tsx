@@ -107,11 +107,11 @@ export function CommandPalette() {
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" onClick={close}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
       <div
-        className="relative w-full max-w-lg bg-neutral-900 border border-white/[0.08] rounded-xl shadow-2xl shadow-black/40 animate-scale-in overflow-hidden"
+        className="relative w-full max-w-lg bg-neutral-900 border border-white/[0.08] rounded-lg shadow-2xl shadow-black/40 animate-scale-in overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06]">
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.06]">
           <Search size={16} className="text-neutral-500 shrink-0" />
           <input
             ref={inputRef}

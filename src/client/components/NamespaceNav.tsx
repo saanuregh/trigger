@@ -36,7 +36,7 @@ export function NamespaceNav({ current, children }: { current: string; children?
           <div key={c.namespace}>
             <Link
               to={`/${c.namespace}`}
-              className={`flex items-center gap-2 px-2 py-1.5 text-sm rounded-lg no-underline transition-colors ${
+              className={`flex items-center gap-2 px-2 py-1 text-sm rounded-lg no-underline transition-colors ${
                 isCurrent
                   ? `bg-white/[0.06] text-white font-medium border-l-2 ${color.border}`
                   : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"

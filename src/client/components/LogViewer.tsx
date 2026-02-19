@@ -114,7 +114,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
 
   if (lines.length === 0) {
     return (
-      <div className={`bg-neutral-900/50 border border-white/[0.06] rounded-xl ${fullHeight ? "flex-1" : ""}`}>
+      <div className={`bg-neutral-900/50 border border-white/[0.06] rounded-lg ${fullHeight ? "flex-1" : ""}`}>
         <div className="flex flex-col items-center justify-center py-12 text-neutral-600">
           <FileText size={32} className="mb-2" />
           <span className="text-sm">No logs yet</span>
@@ -124,8 +124,8 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
   }
 
   return (
-    <div className={`bg-neutral-900/50 border border-white/[0.06] rounded-xl ${fullHeight ? "flex flex-col h-full" : ""}`}>
-      <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/[0.04] shrink-0">
+    <div className={`bg-neutral-900/50 border border-white/[0.06] rounded-lg ${fullHeight ? "flex flex-col h-full" : ""}`}>
+      <div className="flex items-center justify-between gap-3 px-3 py-1.5 border-b border-white/[0.04] shrink-0">
         <span className="text-xs text-neutral-500 font-mono tabular-nums shrink-0">
           {stepFilter ? `${filteredLines.length} / ${lines.length}` : lines.length} lines
         </span>
@@ -182,7 +182,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
                 {chunk.map(({ entry, num }) => (
                   <div
                     key={num}
-                    className={`flex gap-2 px-3 py-1.5 border-l-2 hover:bg-white/[0.02] ${levelColors[entry.level] ?? "border-l-transparent"}`}
+                    className={`flex gap-2 px-3 py-1 border-l-2 hover:bg-white/[0.02] ${levelColors[entry.level] ?? "border-l-transparent"}`}
                   >
                     <span className="text-neutral-700 select-none shrink-0 text-right pt-0.5 tabular-nums">
                       {new Date(entry.time).toLocaleTimeString("en", { hour12: false })}

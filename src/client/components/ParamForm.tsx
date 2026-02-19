@@ -14,7 +14,7 @@ function defaultParams(params: ParamDef[]): Record<string, string | boolean> {
 }
 
 const inputBase =
-  "w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-white/[0.2] focus:ring-1 focus:ring-white/[0.08] transition-colors";
+  "w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2.5 py-1 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-white/[0.2] focus:ring-1 focus:ring-white/[0.08] transition-colors";
 
 function ParamField({ param, value, onChange }: { param: ParamDef; value: string | boolean; onChange: (value: string | boolean) => void }) {
   if (param.type === "boolean") {
@@ -34,7 +34,7 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
   if (param.type === "select") {
     return (
       <div>
-        <label className="block text-sm text-neutral-400 mb-1.5 font-medium">{param.label}</label>
+        <label className="block text-sm text-neutral-400 mb-1 font-medium">{param.label}</label>
         <select value={value as string} onChange={(e) => onChange(e.target.value)} className={inputBase}>
           {param.options.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -48,7 +48,7 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
 
   return (
     <div>
-      <label className="block text-sm text-neutral-400 mb-1.5 font-medium">
+      <label className="block text-sm text-neutral-400 mb-1 font-medium">
         {param.label}
         {param.required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
@@ -156,7 +156,7 @@ export function ParamForm({ pipeline, ns, onRunStarted, rerunId, activeRunCount 
 
   return (
     <>
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-2">
         {(pipeline.params ?? []).map((param) => (
           <ParamField
             key={param.name}
