@@ -140,7 +140,7 @@ function StepCard({ step, index }: { step: StepConfig; index: number }) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 p-4 text-left hover:bg-white/[0.03] transition-colors rounded-lg"
+        className="w-full flex items-center gap-2 p-4 text-left hover:bg-white/[0.04] transition-colors rounded-lg"
       >
         {expanded ? (
           <ChevronDown size={14} className="text-neutral-500 shrink-0" />

@@ -1,6 +1,6 @@
 import { Clock, Loader2, Play } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { PaginatedResponse, PipelineDefSummary, RunRow } from "../types.ts";
+import type { PaginatedResponse, PipelineDefSummary, RunRow, StepRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { Pagination } from "./components/Pagination.tsx";
@@ -21,6 +21,32 @@ function RunDuration({ run }: { run: RunRow }) {
   if (run.finished_at) return <>{formatDuration(run.started_at, run.finished_at)}</>;
   if (run.status === "running") return <span className="text-white">{live || "..."}</span>;
   return <>-</>;
+}
+
+function ActiveRunBanner({ ns, pipelineId, runId }: { ns: string; pipelineId: string; runId: string }) {
+  const { data } = useFetch<{ run: RunRow; steps: StepRow[] }>(`/api/runs/${runId}`);
+  const steps = data?.steps ?? [];
+  const runningStep = steps.find((s) => s.status === "running");
+
+  return (
+    <Link
+      to={`/${ns}/${pipelineId}/runs/${runId}`}
+      className="flex items-center gap-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 no-underline hover:bg-white/[0.05] transition-colors"
+    >
+      <Loader2 size={14} className="text-white animate-spin shrink-0" />
+      <span className="text-sm text-neutral-300 flex-1 min-w-0 truncate">
+        {runningStep ? (
+          <>
+            Step {steps.indexOf(runningStep) + 1}/{steps.length}
+            <span className="text-neutral-500"> — {runningStep.step_name}</span>
+          </>
+        ) : (
+          "Pipeline is running"
+        )}
+      </span>
+      <span className="text-xs font-mono text-neutral-300 bg-white/[0.04] px-2 py-0.5 rounded-lg shrink-0">{runId.slice(0, 8)}</span>
+    </Link>
+  );
 }
 
 export function PipelinePage() {
@@ -113,17 +139,7 @@ export function PipelinePage() {
             {activeRuns.length > 0 && (
               <div className="space-y-2 mb-4">
                 {activeRuns.map((activeRun) => (
-                  <Link
-                    key={activeRun.id}
-                    to={`/${ns}/${pipelineId}/runs/${activeRun.id}`}
-                    className="flex items-center gap-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 no-underline hover:bg-white/[0.05] transition-colors"
-                  >
-                    <Loader2 size={14} className="text-white animate-spin" />
-                    <span className="text-sm text-neutral-300">Pipeline is running</span>
-                    <span className="ml-auto text-xs font-mono text-neutral-300 bg-white/[0.04] px-2 py-0.5 rounded-lg">
-                      {activeRun.id.slice(0, 8)}
-                    </span>
-                  </Link>
+                  <ActiveRunBanner key={activeRun.id} ns={ns} pipelineId={pipelineId} runId={activeRun.id} />
                 ))}
               </div>
             )}
@@ -141,7 +157,7 @@ export function PipelinePage() {
                 </thead>
                 <tbody>
                   {runs.map((run) => (
-                    <tr key={run.id} className="border-t border-white/[0.04] hover:bg-white/[0.03] transition-colors">
+                    <tr key={run.id} className="border-t border-white/[0.04] hover:bg-white/[0.04] transition-colors">
                       <td className="px-4 py-2.5">
                         <Link
                           to={`/${ns}/${pipelineId}/runs/${run.id}`}

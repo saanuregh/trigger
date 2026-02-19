@@ -39,6 +39,31 @@ function StepProgress({ steps }: { steps: StepRow[] }) {
   );
 }
 
+function StepProgressBar({ steps }: { steps: StepRow[] }) {
+  if (steps.length === 0) return null;
+
+  return (
+    <div className="flex gap-0.5 mb-2">
+      {steps.map((step) => (
+        <div
+          key={step.step_id}
+          className={`h-1 flex-1 rounded-full transition-colors duration-500 ${
+            step.status === "success"
+              ? "bg-green-400"
+              : step.status === "failed"
+                ? "bg-red-400"
+                : step.status === "running"
+                  ? "bg-white animate-pulse"
+                  : step.status === "skipped"
+                    ? "bg-neutral-700"
+                    : "bg-neutral-800"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function RunPage() {
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [cancelling, setCancelling] = useState(false);
@@ -47,6 +72,8 @@ export function RunPage() {
   const [showRetryConfirm, setShowRetryConfirm] = useState(false);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [autoFollow, setAutoFollow] = useState(true);
+  const [pulsingSteps, setPulsingSteps] = useState<Set<string>>(new Set());
+  const prevStepsRef = useRef<Map<string, string>>(new Map());
   const { toast } = useToast();
 
   const logBufferRef = useRef<LogLine[]>([]);
@@ -130,6 +157,22 @@ export function RunPage() {
     const runningStep = steps.find((s) => s.status === "running");
     if (runningStep) setSelectedStepId(runningStep.step_id);
   }, [steps, autoFollow]);
+
+  useEffect(() => {
+    const newPulsing = new Set<string>();
+    for (const step of steps) {
+      const prev = prevStepsRef.current.get(step.step_id);
+      if (step.status === "running" && prev && prev !== "running") {
+        newPulsing.add(step.step_id);
+      }
+      prevStepsRef.current.set(step.step_id, step.status);
+    }
+    if (newPulsing.size > 0) {
+      setPulsingSteps(newPulsing);
+      const timer = setTimeout(() => setPulsingSteps(new Set()), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [steps]);
 
   const selectStep = (stepId: string | null) => {
     setAutoFollow(false);
@@ -293,6 +336,7 @@ export function RunPage() {
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Steps panel */}
           <div className="w-60 shrink-0 overflow-y-auto pr-3 flex flex-col gap-0.5">
+            <StepProgressBar steps={steps} />
             <button
               type="button"
               onClick={() => selectStep(null)}
@@ -314,8 +358,8 @@ export function RunPage() {
                   type="button"
                   onClick={() => selectStep(selectedStepId === step.step_id ? null : step.step_id)}
                   className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors text-left ${
-                    isSelected ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
-                  }`}
+                    isSelected ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
+                  } ${pulsingSteps.has(step.step_id) ? "step-pulse" : ""}`}
                 >
                   <StepIcon status={step.status} size={14} />
                   <div className="min-w-0 flex-1">

@@ -101,6 +101,20 @@
   background: rgba(255 255 255 / 0.18);
 }
 
+/* Step pulse animation */
+@keyframes step-pulse {
+  0% {
+    background-color: rgba(255 255 255 / 0.12);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.step-pulse {
+  animation: step-pulse 1s ease-out;
+}
+
 /* Sidebar collapse transition */
 .sidebar-transition {
   transition: width 200ms ease;

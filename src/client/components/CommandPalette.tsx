@@ -146,7 +146,7 @@ export function CommandPalette() {
                     onClick={() => handleSelect(item)}
                     onMouseEnter={() => setSelectedIndex(i)}
                     className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
-                      i === selectedIndex ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
+                      i === selectedIndex ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
                     }`}
                   >
                     {item.type === "namespace" ? (
