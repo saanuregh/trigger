@@ -11,7 +11,7 @@ When enabled:
 
 ## Session Security
 
-- Sessions are signed with `OIDC_CLIENT_SECRET` via Web Crypto HMAC-SHA256
+- Sessions are signed with `SESSION_SECRET` (falls back to `OIDC_CLIENT_SECRET`) via `Bun.CryptoHasher` HMAC-SHA256
 - Cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production
 - No server-side session store — all state is in the signed cookie payload
 - Session expiry is checked on every request
@@ -25,7 +25,8 @@ When enabled:
 
 ## Secrets
 
-- `OIDC_CLIENT_SECRET` — used for both OIDC token exchange and session cookie signing
+- `SESSION_SECRET` — preferred key for session cookie signing (optional, falls back to `OIDC_CLIENT_SECRET`)
+- `OIDC_CLIENT_SECRET` — used for OIDC token exchange and as fallback session signing key
 - `GITHUB_TOKEN` — used for fetching pipeline configs from private repositories
 - `CLOUDFLARE_API_TOKEN` — used for cache purge actions
 - AWS credentials — sourced from the standard AWS credential chain (env vars, instance profile, etc.)

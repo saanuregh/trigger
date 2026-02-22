@@ -1,4 +1,4 @@
-import { AlertCircle, Download, Play, RotateCcw, Square } from "lucide-react";
+import { AlertCircle, Clock, Download, Play, RotateCcw, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type LogLine, type RunDetailResponse, type RunLogsResponse, type RunRow, type StepRow, TERMINAL_STATUSES } from "../types.ts";
 import { Button } from "./components/Button.tsx";
@@ -72,6 +72,13 @@ export function RunPage() {
     setLogs((prev) => prev.concat(batch));
   }, []);
 
+  // Cancel pending RAF on unmount to avoid setState after unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
   const { ns, pipelineId, runId } = useRoute().params as { ns: string; pipelineId: string; runId: string };
 
   const { data, error, mutate } = useFetch<RunDetailResponse>(`/api/runs/${runId}`);
@@ -97,8 +104,13 @@ export function RunPage() {
   useEffect(() => {
     if (!isTerminal) return;
     fetch(`/api/runs/${runId}/logs`)
-      .then((r) => r.json())
-      .then((data: RunLogsResponse) => setLogs(data.lines))
+      .then((r) => {
+        if (handleUnauthorized(r)) return null;
+        return r.json();
+      })
+      .then((data: RunLogsResponse | null) => {
+        if (data) setLogs(data.lines);
+      })
       .catch(console.error);
   }, [isTerminal, runId]);
 
@@ -123,6 +135,8 @@ export function RunPage() {
       if (TERMINAL_STATUSES.has(status)) {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         flushLogs();
+        // Refetch full run data so finished_at, error, etc. are up to date
+        mutate();
       }
     },
   });
@@ -162,17 +176,17 @@ export function RunPage() {
       if (handleUnauthorized(res)) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Stop failed" }));
-        toast(data.error ?? "Stop failed", "error");
+        toast(`[${nsDisplayName}] ${data.error ?? "Stop failed"}`, "error");
       } else {
-        toast("Run cancelled", "info");
+        toast(`[${nsDisplayName}] Run cancelled`, "info");
       }
     } catch (err) {
       console.error("Stop failed:", err);
-      toast("Failed to stop run", "error");
+      toast(`[${nsDisplayName}] Failed to stop run`, "error");
     } finally {
       setCancelling(false);
     }
-  }, [runId, toast]);
+  }, [runId, toast, nsDisplayName]);
 
   const handleRetry = useCallback(async () => {
     setRetrying(true);
@@ -183,13 +197,13 @@ export function RunPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Retry failed" }));
         if (res.status === 409) {
-          toast("Pipeline at max concurrency — wait for a run to finish or cancel one first", "error");
+          toast(`[${nsDisplayName}] Pipeline at max concurrency — wait for a run to finish or cancel one first`, "error");
         } else {
-          toast(data.error ?? "Retry failed", "error");
+          toast(`[${nsDisplayName}] ${data.error ?? "Retry failed"}`, "error");
         }
         return;
       }
-      toast("Retrying from failed step", "success");
+      toast(`[${nsDisplayName}] Retrying from failed step`, "success");
       setLogs([]);
       mutate(
         (prev) =>
@@ -203,30 +217,31 @@ export function RunPage() {
       );
     } catch (err) {
       console.error("Retry failed:", err);
-      toast("Failed to retry run", "error");
+      toast(`[${nsDisplayName}] Failed to retry run`, "error");
     } finally {
       setRetrying(false);
     }
-  }, [runId, toast, mutate]);
+  }, [runId, toast, mutate, nsDisplayName]);
 
   const handleDownloadLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/runs/${runId}/logs`);
+      if (handleUnauthorized(res)) return;
       const data = (await res.json()) as RunLogsResponse;
       const ndjson = data.lines.map((l) => JSON.stringify(l)).join("\n");
       const blob = new Blob([ndjson], { type: "application/x-ndjson" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `run-${runId}.log`;
+      a.download = `run-${runId.slice(0, 8)}.log`;
       a.click();
-      URL.revokeObjectURL(url);
-      toast("Logs downloaded", "success");
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast(`[${nsDisplayName}] Logs downloaded`, "success");
     } catch (err) {
       console.error("Download failed:", err);
-      toast("Failed to download logs", "error");
+      toast(`[${nsDisplayName}] Failed to download logs`, "error");
     }
-  }, [runId, toast]);
+  }, [runId, toast, nsDisplayName]);
 
   const isActive = run ? run.status === "running" || run.status === "pending" : false;
 
@@ -304,8 +319,18 @@ export function RunPage() {
             <span className="font-mono" title={run.started_at}>
               {timeAgo(run.started_at)}
             </span>
-            {run.triggered_by && <span className="ml-2">by {run.triggered_by}</span>}
-            {liveDuration && <span className="ml-2 font-mono text-white">{liveDuration}</span>}
+            {run.triggered_by === "scheduler" ? (
+              <span className="ml-2 inline-flex items-center gap-1 text-amber-400">
+                <Clock size={11} /> scheduled
+              </span>
+            ) : run.triggered_by ? (
+              <span className="ml-2">by {run.triggered_by}</span>
+            ) : null}
+            {liveDuration ? (
+              <span className="ml-2 font-mono text-white">{liveDuration}</span>
+            ) : run.finished_at ? (
+              <span className="ml-2 font-mono">{formatDuration(run.started_at, run.finished_at)}</span>
+            ) : null}
           </div>
           {run.dry_run === 1 && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/15">
@@ -325,7 +350,7 @@ export function RunPage() {
         {/* Side-by-side: Steps + Logs */}
         <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
           {/* Steps panel */}
-          <div className="lg:w-52 shrink-0 overflow-y-auto lg:pr-3 max-h-48 lg:max-h-none">
+          <div className="lg:w-52 shrink-0 overflow-y-auto lg:pr-3 max-h-[30vh] lg:max-h-none">
             <StepProgressBar steps={steps} />
             <button
               type="button"

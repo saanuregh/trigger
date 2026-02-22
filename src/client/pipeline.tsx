@@ -14,7 +14,7 @@ import { useToast } from "./components/Toast.tsx";
 import { useFetch, useNsDisplayName } from "./hooks.tsx";
 import { FocusList, focusRingClass, useKeyboard } from "./keyboard.tsx";
 import { Link, navigate, useRoute } from "./router.tsx";
-import { formatDuration, timeAgo, useLiveDuration } from "./utils.ts";
+import { describeCron, formatDuration, timeAgo, useLiveDuration } from "./utils.ts";
 import { useGlobalEvents, useStatus } from "./ws.tsx";
 
 const PER_PAGE = 20;
@@ -54,33 +54,33 @@ function ActiveRunBanner({ ns, pipelineId, runId }: { ns: string; pipelineId: st
   );
 }
 
-function RunRow_({ ns, pipelineId, run, focused }: { ns: string; pipelineId: string; run: RunRow; focused: boolean }) {
+function RunListItem({ ns, pipelineId, run, focused }: { ns: string; pipelineId: string; run: RunRow; focused: boolean }) {
   return (
     <Link
       to={`/${ns}/${pipelineId}/runs/${run.id}`}
-      className={`flex items-center gap-3 px-3 py-1.5 hover:bg-white/[0.04] transition-colors no-underline ${focusRingClass(focused)}`}
+      className={`flex items-center gap-3 px-3 py-1.5 hover:bg-white/[0.06] transition-colors no-underline ${focusRingClass(focused)}`}
     >
-      <span className="shrink-0">
-        <span className="inline-flex items-center bg-white/[0.06] text-neutral-300 font-mono text-xs px-2 py-0.5 rounded-lg">
-          {run.id.slice(0, 8)}
+      <span className="flex-1 min-w-0 flex items-center gap-1.5">
+        <span className="font-mono text-xs truncate">
+          <span className="text-neutral-300">{run.id.slice(0, 8)}</span>
+          <span className="text-neutral-600">{run.id.slice(8)}</span>
         </span>
-        {run.dry_run === 1 && (
-          <span className="ml-2 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/15">
-            DRY
-          </span>
-        )}
+        {run.dry_run === 1 && <span className="text-[10px] text-purple-400 font-medium shrink-0">DRY</span>}
       </span>
-      <span className="shrink-0">
+      <span className="shrink-0 w-[68px] flex items-center">
         <StatusDot status={run.status} />
       </span>
-      <span className="text-neutral-400 text-xs shrink-0" title={run.started_at}>
+      <span className="text-neutral-500 text-xs shrink-0 w-16" title={run.started_at}>
         {timeAgo(run.started_at)}
       </span>
-      <span className="text-neutral-400 font-mono text-xs shrink-0">
+      <span className="text-neutral-500 font-mono text-xs shrink-0 w-12">
         <RunDuration run={run} />
       </span>
-      <span className="flex-1" />
-      <span className="text-neutral-500 text-xs truncate max-w-24">{run.triggered_by || "-"}</span>
+      <span
+        className={`text-xs truncate shrink-0 w-14 text-right ${run.triggered_by === "scheduler" ? "text-amber-400/60" : "text-neutral-600"}`}
+      >
+        {run.triggered_by || "-"}
+      </span>
     </Link>
   );
 }
@@ -119,9 +119,12 @@ export function PipelinePage() {
     };
   }, [pipeline]);
 
+  const hasParams = (pipeline?.params ?? []).length > 0;
+
   useKeyboard([
     { key: "Enter", meta: true, description: "Run pipeline", handler: () => formRef.current?.triggerRun() },
     { key: "Enter", meta: true, shift: true, description: "Dry run", handler: () => formRef.current?.triggerDryRun() },
+    { key: "f", description: "Focus params", handler: () => formRef.current?.focus(), when: hasParams },
     { key: "1", description: "Filter: All", handler: () => setStatusFilter("all") },
     { key: "2", description: "Filter: Running", handler: () => setStatusFilter("running") },
     { key: "3", description: "Filter: Success", handler: () => setStatusFilter("success") },
@@ -130,7 +133,7 @@ export function PipelinePage() {
   ]);
 
   const handleRunStarted = (runId: string) => {
-    toast("Pipeline run started", "success");
+    toast(`[${nsDisplayName}] Pipeline run started`, "success");
     navigate(`/${ns}/${pipelineId}/runs/${runId}`);
   };
 
@@ -163,10 +166,23 @@ export function PipelinePage() {
         {/* Trigger section */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <SectionHeader>Run Pipeline</SectionHeader>
-            <span className="text-xs font-mono text-neutral-500">
-              {activeRunIds.length}/{pipeline.concurrency} slots
-            </span>
+            <SectionHeader>
+              Run Pipeline
+              {hasParams && <kbd className="ml-2 text-[10px] text-neutral-600 font-normal bg-white/[0.04] px-1.5 py-0.5 rounded">f</kbd>}
+            </SectionHeader>
+            <div className="flex items-center gap-3">
+              {pipeline.schedule && (
+                <span className="flex items-center gap-1 text-xs text-neutral-400">
+                  <Clock size={12} className="text-neutral-500" />
+                  {typeof pipeline.schedule === "string"
+                    ? describeCron(pipeline.schedule)
+                    : pipeline.schedule.map((s) => describeCron(s.cron)).join(", ")}
+                </span>
+              )}
+              <span className="text-xs font-mono text-neutral-500">
+                {activeRunIds.length}/{pipeline.concurrency} slots
+              </span>
+            </div>
           </div>
           <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg p-3">
             {pipeline.description && <p className="text-sm text-neutral-400 mb-2">{pipeline.description}</p>}
@@ -183,7 +199,7 @@ export function PipelinePage() {
         </div>
 
         {/* Runs section */}
-        {!runsData ? null : runs.length === 0 ? (
+        {!runsData ? null : runs.length === 0 && statusFilter === "all" ? (
           <EmptyState icon={<Clock size={48} />} title="No runs yet" description="Run this pipeline to see execution history." />
         ) : (
           <div>
@@ -214,25 +230,30 @@ export function PipelinePage() {
               </div>
             )}
 
-            <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
-              <div className="flex items-center gap-3 px-3 py-1.5 text-left text-neutral-500 text-xs font-medium border-b border-white/[0.04]">
-                <span className="shrink-0 w-20">Run</span>
-                <span className="shrink-0 w-6">Status</span>
-                <span className="shrink-0 w-16">Started</span>
-                <span className="shrink-0 w-14">Duration</span>
-                <span className="flex-1" />
-                <span className="shrink-0 w-16">By</span>
-              </div>
-              <FocusList
-                items={runs}
-                onSelect={(run) => navigate(`/${ns}/${pipelineId}/runs/${run.id}`)}
-                className="divide-y divide-white/[0.04]"
-              >
-                {(run, focused) => <RunRow_ key={run.id} ns={ns} pipelineId={pipelineId} run={run} focused={focused} />}
-              </FocusList>
-            </div>
+            {runs.length === 0 ? (
+              <div className="text-center text-neutral-500 text-sm py-8">No {statusFilter} runs</div>
+            ) : (
+              <>
+                <div className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-3 px-3 py-1.5 text-left text-neutral-500 text-xs font-medium border-b border-white/[0.04]">
+                    <span className="flex-1 min-w-0">Run</span>
+                    <span className="shrink-0 w-[68px]">Status</span>
+                    <span className="shrink-0 w-16">Started</span>
+                    <span className="shrink-0 w-12">Duration</span>
+                    <span className="shrink-0 w-14 text-right">By</span>
+                  </div>
+                  <FocusList
+                    items={runs}
+                    onSelect={(run) => navigate(`/${ns}/${pipelineId}/runs/${run.id}`)}
+                    className="divide-y divide-white/[0.04]"
+                  >
+                    {(run, focused) => <RunListItem key={run.id} ns={ns} pipelineId={pipelineId} run={run} focused={focused} />}
+                  </FocusList>
+                </div>
 
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+              </>
+            )}
           </div>
         )}
       </div>

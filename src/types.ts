@@ -30,6 +30,7 @@ export interface RunRow {
   error: string | null;
   dry_run: number;
   triggered_by: string | null;
+  call_stack: string | null;
 }
 
 export type BuiltinActionName = "codebuild" | "ecs-task" | "ecs-restart" | "cloudflare-purge" | "trigger-pipeline";
@@ -50,11 +51,51 @@ export interface StepRow {
 }
 
 export type ParamDef =
-  | { name: string; label: string; type: "string"; required?: boolean; default?: string; placeholder?: string }
+  | { name: string; label: string; type: "string"; required?: boolean; default?: string; placeholder?: string; secret?: boolean }
   | { name: string; label: string; type: "boolean"; default?: boolean }
-  | { name: string; label: string; type: "select"; options: { label: string; value: string }[]; required?: boolean; default?: string };
+  | {
+      name: string;
+      label: string;
+      type: "select";
+      options: { label: string; value: string }[];
+      required?: boolean;
+      default?: string;
+      secret?: boolean;
+    };
 
 export type ParamValues = Record<string, string | boolean>;
+
+const REDACTED = "***";
+
+/** Get the set of param names marked as secret from pipeline param definitions. */
+export function getSecretParamNames(paramDefs?: ParamDef[]): Set<string> {
+  if (!paramDefs) return new Set();
+  return new Set(paramDefs.filter((p) => "secret" in p && p.secret).map((p) => p.name));
+}
+
+/** Return a copy of a params JSON string with secret values replaced by "***". */
+export function redactParams(paramsJson: string | null, secretNames: Set<string>): string | null {
+  if (!paramsJson || secretNames.size === 0) return paramsJson;
+  try {
+    const params = JSON.parse(paramsJson) as Record<string, unknown>;
+    for (const name of secretNames) {
+      if (name in params) params[name] = REDACTED;
+    }
+    return JSON.stringify(params);
+  } catch {
+    return paramsJson;
+  }
+}
+
+/** Return a shallow copy of a ParamValues object with secret values redacted. */
+export function redactParamValues(params: ParamValues, secretNames: Set<string>): ParamValues {
+  if (secretNames.size === 0) return params;
+  const redacted = { ...params };
+  for (const name of secretNames) {
+    if (name in redacted) redacted[name] = REDACTED;
+  }
+  return redacted;
+}
 
 export interface LogLine {
   level: LogLevel;
@@ -74,6 +115,8 @@ export interface StepDefSummary {
   action: ActionName;
 }
 
+export type ScheduleDef = string | Array<{ cron: string; params?: Record<string, string | boolean> }>;
+
 export interface PipelineDefSummary {
   id: string;
   name: string;
@@ -82,6 +125,7 @@ export interface PipelineDefSummary {
   concurrency: number;
   params?: ParamDef[];
   steps: StepDefSummary[];
+  schedule?: ScheduleDef;
 }
 
 export interface PaginatedResponse<T> {

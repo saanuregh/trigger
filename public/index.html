@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
   <title>Trigger</title>
+  <!-- System font stack — avoids external CDN dependency -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a3a3a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><path d='M12 3v6m0 6v6M3 12h6m6 0h6'/><circle cx='12' cy='12' r='10'/></svg>" />
   <link rel="stylesheet" href="../src/input.css" />
 </head>
 <body class="bg-neutral-950 text-neutral-100 h-screen dot-grid">
-  <div id="root"></div>
+  <div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><svg width="24" height="24" viewBox="0 0 24 24" class="animate-spin"><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none"/><path d="M12 2a10 10 0 0 1 10 10" stroke="rgba(255,255,255,0.3)" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div></div>
   <script type="module" src="../src/client/app.tsx"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
-import { authed } from "../../auth/access.ts";
+import { authed, filterAccessibleConfigs } from "../../auth/access.ts";
 import * as db from "../../db/queries.ts";
+import { env } from "../../env.ts";
 import { logger } from "../../logger.ts";
 import { cancelPipeline, retryRun as retryRunFn } from "../../pipeline/executor.ts";
 import type {
@@ -13,7 +14,15 @@ import type {
   RunRow,
 } from "../../types.ts";
 import { listRunsQuerySchema, validateQuery } from "../validation.ts";
-import { checkNamespaceAccess, getRunWithAccess, handlePipelineError, MAX_LOG_LINES } from "./helpers.ts";
+import {
+  buildSecretNamesMap,
+  checkNamespaceAccess,
+  getConfigs,
+  getRunWithAccess,
+  handlePipelineError,
+  MAX_LOG_LINES,
+  redactRunRow,
+} from "./helpers.ts";
 
 export const listRuns = authed(async (req, session) => {
   const url = new URL(req.url);
@@ -29,7 +38,15 @@ export const listRuns = authed(async (req, session) => {
     if (denied) return denied;
   }
 
-  const filters = { namespace, pipeline_id, status };
+  // When auth is enabled and no namespace filter is given, restrict to accessible namespaces
+  let namespaces: string[] | undefined;
+  if (env.authEnabled && !namespace && !session.isSuperAdmin) {
+    const configs = await getConfigs();
+    const accessible = filterAccessibleConfigs(configs, session);
+    namespaces = accessible.map((c) => c.namespace);
+  }
+
+  const filters = { namespace, namespaces, pipeline_id, status };
   const total = db.countRuns(filters);
   const data = db.listRuns({
     ...filters,
@@ -37,8 +54,10 @@ export const listRuns = authed(async (req, session) => {
     offset: (page - 1) * per_page,
   });
 
+  const secretMap = await buildSecretNamesMap();
+
   return Response.json({
-    data,
+    data: data.map((run) => redactRunRow(run, secretMap)),
     total,
     page,
     per_page,
@@ -49,8 +68,9 @@ export const getRun = authed(async (req, session) => {
   const result = await getRunWithAccess(req.params.runId!, session);
   if ("error" in result) return result.error;
 
+  const secretMap = await buildSecretNamesMap();
   const steps = db.getStepsForRun(req.params.runId!);
-  return Response.json({ run: result.run, steps } satisfies RunDetailResponse);
+  return Response.json({ run: redactRunRow(result.run, secretMap), steps } satisfies RunDetailResponse);
 });
 
 export const getRunLogs = authed(async (req, session) => {
@@ -68,38 +88,42 @@ export const getRunLogs = authed(async (req, session) => {
 
     // Stream file in chunks via Reader API to avoid loading entire log into memory
     const reader = file.stream().getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let done = false;
-    while (!done) {
-      const result = await reader.read();
-      done = result.done;
-      if (result.value) buffer += decoder.decode(result.value, { stream: !done });
-      let newlineIdx = buffer.indexOf("\n");
-      while (newlineIdx !== -1) {
-        const raw = buffer.slice(0, newlineIdx);
-        buffer = buffer.slice(newlineIdx + 1);
-        if (raw) {
-          try {
-            lines.push(JSON.parse(raw));
-          } catch {
-            lines.push({
-              level: "info",
-              time: "",
-              msg: raw,
-              runId: runId!,
-              stepId: step.step_id,
-              step: step.step_name,
-              action: step.action,
-              stepIndex: 0,
-              totalSteps: 0,
-            });
+    try {
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let done = false;
+      while (!done) {
+        const readResult = await reader.read();
+        done = readResult.done;
+        if (readResult.value) buffer += decoder.decode(readResult.value, { stream: !done });
+        let newlineIdx = buffer.indexOf("\n");
+        while (newlineIdx !== -1) {
+          const raw = buffer.slice(0, newlineIdx);
+          buffer = buffer.slice(newlineIdx + 1);
+          if (raw) {
+            try {
+              lines.push(JSON.parse(raw));
+            } catch {
+              lines.push({
+                level: "info",
+                time: "",
+                msg: raw,
+                runId: runId!,
+                stepId: step.step_id,
+                step: step.step_name,
+                action: step.action,
+                stepIndex: 0,
+                totalSteps: 0,
+              });
+            }
+            if (lines.length >= MAX_LOG_LINES) break;
           }
-          if (lines.length >= MAX_LOG_LINES) break;
+          newlineIdx = buffer.indexOf("\n");
         }
-        newlineIdx = buffer.indexOf("\n");
+        if (lines.length >= MAX_LOG_LINES) break;
       }
-      if (lines.length >= MAX_LOG_LINES) break;
+    } finally {
+      reader.releaseLock();
     }
     if (lines.length >= MAX_LOG_LINES) break;
   }

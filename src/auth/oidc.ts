@@ -14,9 +14,9 @@ const oidcTokenResponseSchema = z.object({
 });
 
 const oidcPayloadSchema = z.object({
-  iss: z.string().optional(),
-  aud: z.union([z.string(), z.array(z.string())]).optional(),
-  exp: z.number().optional(),
+  iss: z.string(),
+  aud: z.union([z.string(), z.array(z.string())]),
+  exp: z.number(),
   email: z.string().optional(),
   name: z.string().optional(),
   preferred_username: z.string().optional(),
@@ -33,7 +33,7 @@ export async function fetchOIDCConfig(): Promise<OIDCConfig> {
   const url = `${env.OIDC_ISSUER}/.well-known/openid-configuration`;
   logger.info({ url }, "fetching OIDC discovery");
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status} ${res.statusText}`);
 
   const data = await res.json();
@@ -79,6 +79,7 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<O
 
   const res = await fetch(config.token_endpoint, {
     method: "POST",
+    signal: AbortSignal.timeout(10_000),
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "authorization_code",
@@ -90,8 +91,7 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<O
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Token exchange failed: ${res.status} ${body}`);
+    throw new Error(`Token exchange failed: ${res.status}`);
   }
 
   const tokens = await res.json();
@@ -104,7 +104,16 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<O
   // Decode ID token (JWT) — no signature verification needed since we got it
   // directly from the token endpoint over HTTPS (standard OIDC practice for
   // confidential clients using the authorization code flow).
-  const payload = JSON.parse(fromBase64Url(tokenResult.data.id_token.split(".")[1]!));
+  const jwtParts = tokenResult.data.id_token.split(".");
+  if (jwtParts.length !== 3) {
+    throw new Error(`Malformed JWT: expected 3 parts, got ${jwtParts.length}`);
+  }
+  let payload: unknown;
+  try {
+    payload = JSON.parse(fromBase64Url(jwtParts[1]!));
+  } catch {
+    throw new Error("Failed to decode JWT payload: invalid base64 or JSON");
+  }
   const payloadResult = oidcPayloadSchema.safeParse(payload);
 
   if (!payloadResult.success) {
@@ -113,19 +122,23 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<O
 
   const user = payloadResult.data;
 
-  if (user.iss && user.iss !== env.OIDC_ISSUER) {
+  if (user.iss !== env.OIDC_ISSUER) {
     throw new Error(`ID token issuer mismatch: expected ${env.OIDC_ISSUER}, got ${user.iss}`);
   }
-  const audiences = Array.isArray(user.aud) ? user.aud : user.aud ? [user.aud] : [];
-  if (audiences.length > 0 && !audiences.includes(env.OIDC_CLIENT_ID)) {
+  const audiences = Array.isArray(user.aud) ? user.aud : [user.aud];
+  if (!audiences.includes(env.OIDC_CLIENT_ID)) {
     throw new Error(`ID token audience mismatch: expected ${env.OIDC_CLIENT_ID}`);
   }
-  if (user.exp && user.exp < Math.floor(Date.now() / 1000)) {
+  if (user.exp < Math.floor(Date.now() / 1000)) {
     throw new Error("ID token has expired");
   }
 
+  const email = user.email ?? user.preferred_username ?? "";
+  if (!email) {
+    throw new Error("ID token missing email and preferred_username — cannot create session");
+  }
   return {
-    email: user.email ?? "",
+    email,
     name: user.name ?? user.preferred_username ?? "",
     groups: user.groups?.filter((g): g is string => typeof g === "string") ?? [],
   };

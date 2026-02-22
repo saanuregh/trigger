@@ -2,6 +2,11 @@ export type { ActionContext, CustomActionDefinition } from "../../src/pipeline/t
 export {
   booleanOrTemplate,
   defineAction,
+  expectBoolean,
+  expectEnum,
+  expectNumber,
+  expectString,
+  expectStringArray,
   numberOrTemplate,
   stringArrayOrTemplate,
   stringOrTemplate,

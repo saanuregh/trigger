@@ -1,6 +1,7 @@
 import { AlertCircle } from "lucide-react";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { errorMessage, type ParamDef, type PipelineDefSummary, type RunIdResponse, type RunRow } from "../../types.ts";
+import { useKeyboard } from "../keyboard.tsx";
 import { handleUnauthorized, isMac } from "../utils.ts";
 import { Button } from "./Button.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
@@ -59,11 +60,12 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
         {param.required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
       <input
-        type="text"
+        type={param.secret ? "password" : "text"}
         value={value as string}
         onChange={(e) => onChange(e.target.value)}
         placeholder={param.placeholder ?? ""}
         className={inputBase}
+        autoComplete={param.secret ? "off" : undefined}
       />
     </div>
   );
@@ -72,6 +74,7 @@ function ParamField({ param, value, onChange }: { param: ParamDef; value: string
 export interface ParamFormHandle {
   triggerRun: () => void;
   triggerDryRun: () => void;
+  focus: () => void;
 }
 
 interface ParamFormProps {
@@ -95,6 +98,11 @@ export const ParamForm = forwardRef<ParamFormHandle, ParamFormProps>(function Pa
   const formRef = useRef<HTMLFormElement>(null);
   const isDirtyRef = useRef(false);
 
+  const focusFirstField = useCallback(() => {
+    const el = formRef.current?.querySelector<HTMLElement>("input, select");
+    el?.focus();
+  }, []);
+
   useImperativeHandle(ref, () => ({
     triggerRun: () => {
       dryRunRef.current = false;
@@ -104,7 +112,22 @@ export const ParamForm = forwardRef<ParamFormHandle, ParamFormProps>(function Pa
       dryRunRef.current = true;
       formRef.current?.requestSubmit();
     },
+    focus: focusFirstField,
   }));
+
+  const handleFormKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      (document.activeElement as HTMLElement)?.blur();
+      e.stopPropagation();
+    }
+  }, []);
+
+  const hasParams = (pipeline.params ?? []).length > 0;
+  const noop = useCallback(() => {}, []);
+  useKeyboard([
+    { key: "Tab", description: "Next field", handler: noop, displayOnly: true, when: hasParams },
+    { key: "Escape", description: "Exit form", handler: noop, displayOnly: true, when: hasParams },
+  ]);
 
   // Track dirty state for beforeunload warning
   useEffect(() => {
@@ -128,12 +151,18 @@ export const ParamForm = forwardRef<ParamFormHandle, ParamFormProps>(function Pa
   useEffect(() => {
     if (!rerunId) return;
     fetch(`/api/runs/${rerunId}`)
-      .then((r) => r.json())
-      .then((data: { run: RunRow }) => {
-        if (data.run.params) {
+      .then((r) => {
+        if (handleUnauthorized(r)) return null;
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then((data: { run: RunRow } | null) => {
+        if (data?.run.params) {
           try {
             const parsed = JSON.parse(data.run.params) as Record<string, string | boolean>;
-            setParams((prev) => ({ ...prev, ...parsed }));
+            // Skip redacted secret params — user must re-enter them
+            const filtered = Object.fromEntries(Object.entries(parsed).filter(([_, v]) => v !== "***"));
+            setParams((prev) => ({ ...prev, ...filtered }));
           } catch {
             // ignore invalid JSON
           }
@@ -184,7 +213,7 @@ export const ParamForm = forwardRef<ParamFormHandle, ParamFormProps>(function Pa
 
   return (
     <>
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-2">
+      <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-2">
         {(pipeline.params ?? []).map((param) => (
           <ParamField
             key={param.name}
@@ -218,7 +247,10 @@ export const ParamForm = forwardRef<ParamFormHandle, ParamFormProps>(function Pa
           )}
         </div>
 
-        <div className="text-xs text-neutral-600">{isMac ? "\u21E7\u2318\u23CE" : "Shift+Ctrl+\u23CE"} for dry run</div>
+        <div className="text-xs text-neutral-600">
+          {isMac ? "\u21E7\u2318\u23CE" : "Shift+Ctrl+\u23CE"} dry run
+          {(pipeline.params ?? []).length > 0 && <span className="ml-3 text-neutral-700">Tab next field &middot; Esc exit form</span>}
+        </div>
 
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm">

@@ -5,7 +5,15 @@ import type { NamespaceConfig } from "../../config/types.ts";
 import * as db from "../../db/queries.ts";
 import { logger } from "../../logger.ts";
 import { PipelineError } from "../../pipeline/executor.ts";
-import { type ErrorResponse, errorMessage, type NamespaceConfigSummary, type RunRow, type StepDefSummary } from "../../types.ts";
+import {
+  type ErrorResponse,
+  errorMessage,
+  getSecretParamNames,
+  type NamespaceConfigSummary,
+  type RunRow,
+  redactParams,
+  type StepDefSummary,
+} from "../../types.ts";
 
 export type RouteRequest = Request & { params: Record<string, string> };
 
@@ -29,6 +37,7 @@ export function toClientConfigs(configs: NamespaceConfig[]): NamespaceConfigSumm
       concurrency: p.concurrency ?? 1,
       params: p.params,
       steps: p.steps.map(toStepSummary),
+      schedule: p.schedule,
     })),
     ...(ns._error && { error: ns._error }),
   }));
@@ -39,9 +48,10 @@ function findNsConfig(configs: NamespaceConfig[], ns: string): NamespaceConfig |
 }
 
 export async function checkNamespaceAccess(session: AuthSession, namespace: string): Promise<Response | null> {
+  if (session.isSuperAdmin) return null;
   const configs = await getConfigs();
   const nsConfig = findNsConfig(configs, namespace);
-  if (nsConfig && !canAccessNamespace(session, nsConfig)) {
+  if (!nsConfig || !canAccessNamespace(session, nsConfig)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   return null;
@@ -97,3 +107,24 @@ export function handlePipelineError(err: unknown, context: Record<string, unknow
 export const MAX_LOG_LINES = 50_000;
 
 export const OAUTH_STATE_COOKIE = "trigger_oauth_state";
+
+/** Map of "namespace:pipeline_id" -> Set<secret param names> for redacting API responses. */
+export type SecretNamesMap = Map<string, Set<string>>;
+
+export async function buildSecretNamesMap(configs?: NamespaceConfig[]): Promise<SecretNamesMap> {
+  const resolved = configs ?? (await getConfigs());
+  const map: SecretNamesMap = new Map();
+  for (const ns of resolved) {
+    for (const p of ns.pipelines) {
+      const secrets = getSecretParamNames(p.params);
+      if (secrets.size > 0) map.set(`${ns.namespace}:${p.id}`, secrets);
+    }
+  }
+  return map;
+}
+
+export function redactRunRow(run: RunRow, secretMap: SecretNamesMap): RunRow {
+  const secrets = secretMap.get(`${run.namespace}:${run.pipeline_id}`);
+  if (!secrets || secrets.size === 0) return run;
+  return { ...run, params: redactParams(run.params, secrets) };
+}

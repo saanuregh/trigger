@@ -14,9 +14,9 @@ export const routes = {
   "/health": () => Response.json({ status: "ok" }),
 
   // WebSocket
-  "/ws": async (req: Request) => {
+  "/ws": (req: Request) => {
     if (env.authEnabled) {
-      const session = await getSession(req);
+      const session = getSession(req);
       if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
       if (getServer().upgrade(req, { data: { session, subscriptions: new Map() } })) return undefined;
       return new Response("Upgrade failed", { status: 500 });
@@ -37,6 +37,7 @@ export const routes = {
   "/api/pipelines/:ns/:id": pipelines.getPipeline,
   "/api/pipelines/:ns/:id/config": pipelines.getPipelineConfig,
   "/api/pipelines/:ns/:id/run": { POST: pipelines.triggerPipeline },
+  "/api/pipelines/:ns/:id/schedule": pipelines.getPipelineSchedule,
 
   // Runs
   "/api/runs": runs.listRuns,

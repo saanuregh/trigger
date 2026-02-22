@@ -6,8 +6,9 @@ import * as db from "../db/queries.ts";
 import { env } from "../env.ts";
 import { publish } from "../events.ts";
 import { createLogger, type Logger, logger } from "../logger.ts";
-import { errorMessage, type JSONValue, type ParamValues, type StepStatus } from "../types.ts";
+import { errorMessage, getSecretParamNames, type JSONValue, type ParamValues, redactParamValues, type StepStatus } from "../types.ts";
 import { clearRegistry, getAction, type RegisteredAction, registerAction } from "./action-registry.ts";
+import { sleep } from "./actions/aws-utils.ts";
 import cloudflare from "./actions/cloudflare.ts";
 import codebuild from "./actions/codebuild.ts";
 import ecsRestart from "./actions/ecs-restart.ts";
@@ -32,7 +33,8 @@ export class PipelineError extends Error {
 const DEFAULT_RUN_TIMEOUT_S = 3600;
 const activePipelines = new Map<string, ActivePipeline[]>();
 
-function assertConcurrency(key: string, limit: number): void {
+/** Check concurrency limits and track the run atomically (must be synchronous — no await between check and track). */
+function checkAndTrackRun(key: string, limit: number, entry: ActivePipeline): void {
   const active = activePipelines.get(key) ?? [];
   if (active.length >= limit) {
     throw new PipelineError(`Pipeline ${key} at max concurrency (${active.length}/${limit})`, 409);
@@ -41,12 +43,8 @@ function assertConcurrency(key: string, limit: number): void {
   if (globalCount >= env.MAX_CONCURRENT_RUNS) {
     throw new PipelineError(`Global concurrency limit reached (${globalCount}/${env.MAX_CONCURRENT_RUNS})`, 409);
   }
-}
-
-function trackRun(key: string, entry: ActivePipeline): void {
-  const arr = activePipelines.get(key) ?? [];
-  arr.push(entry);
-  activePipelines.set(key, arr);
+  active.push(entry);
+  activePipelines.set(key, active);
 }
 
 function untrackRun(key: string, runId: string): void {
@@ -90,15 +88,16 @@ export async function executePipeline(
   const key = `${namespace}:${pipelineId}`;
   const dryRun = options?.dryRun ?? false;
   const { nsConfig, pipeline } = await loadPipeline(namespace, pipelineId);
-  assertConcurrency(key, pipeline.concurrency ?? 1);
 
   const runId = Bun.randomUUIDv7();
   const abort = new AbortController();
-  trackRun(key, { runId, abort });
+  // Atomic check-and-track: no await between concurrency check and map insertion
+  checkAndTrackRun(key, pipeline.concurrency ?? 1, { runId, abort });
 
   try {
     wireAbort(options?.signal, abort);
 
+    const callStack = options?.parentCallStack ?? [key];
     db.createRun({
       id: runId,
       namespace,
@@ -108,6 +107,7 @@ export async function executePipeline(
       started_at: new Date().toISOString(),
       dry_run: dryRun,
       triggered_by: options?.triggeredBy,
+      call_stack: callStack,
     });
 
     const stepRecords = pipeline.steps.map((step) => {
@@ -122,13 +122,14 @@ export async function executePipeline(
       return { dbId: id, def: step };
     });
 
+    const secretNames = getSecretParamNames(pipeline.params);
     const log = logger.child({
       namespace,
       pipeline: pipeline.name,
       pipelineId,
       runId,
       dryRun,
-      params,
+      params: redactParamValues(params, secretNames),
       stepCount: pipeline.steps.length,
       region: nsConfig.aws_region,
     });
@@ -148,11 +149,12 @@ export async function executePipeline(
       logDir,
       dryRun,
       params,
-      callStack: options?.parentCallStack ?? [key],
+      callStack,
       vars: nsConfig.vars,
       region: nsConfig.aws_region,
       timeoutS: pipeline.timeout ?? DEFAULT_RUN_TIMEOUT_S,
       triggeredBy: options?.triggeredBy,
+      secretNames,
     });
 
     return runId;
@@ -170,10 +172,10 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
   const key = `${run.namespace}:${run.pipeline_id}`;
   const dryRun = run.dry_run === 1;
   const { nsConfig, pipeline } = await loadPipeline(run.namespace, run.pipeline_id);
-  assertConcurrency(key, pipeline.concurrency ?? 1);
 
   const abort = new AbortController();
-  trackRun(key, { runId, abort });
+  // Atomic check-and-track: no await between concurrency check and map insertion
+  checkAndTrackRun(key, pipeline.concurrency ?? 1, { runId, abort });
 
   try {
     const existingSteps = db.getStepsForRun(runId);
@@ -195,13 +197,14 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
 
     const params: ParamValues = run.params ? JSON.parse(run.params) : {};
     const logDir = `${env.DATA_DIR}/logs/${runId}`;
+    const secretNames = getSecretParamNames(pipeline.params);
 
     const log = logger.child({
       namespace: run.namespace,
       pipeline: run.pipeline_name,
       pipelineId: run.pipeline_id,
       runId,
-      params,
+      params: redactParamValues(params, secretNames),
       stepCount: pipeline.steps.length,
       region: nsConfig.aws_region,
       retry: true,
@@ -221,12 +224,13 @@ export async function retryRun(runId: string, options?: { signal?: AbortSignal; 
       logDir,
       dryRun,
       params,
-      callStack: [key],
+      callStack: run.call_stack ? JSON.parse(run.call_stack) : [key],
       vars: nsConfig.vars,
       region: nsConfig.aws_region,
       timeoutS: pipeline.timeout ?? DEFAULT_RUN_TIMEOUT_S,
       triggeredBy: options?.triggeredBy,
       startFromIndex: failedIndex,
+      secretNames,
     });
 
     return runId;
@@ -273,6 +277,7 @@ interface RunStepsOptions {
   timeoutS: number;
   triggeredBy?: string;
   startFromIndex?: number;
+  secretNames: Set<string>;
 }
 
 type StepResult = "success" | { failed: string } | "cancelled";
@@ -331,8 +336,12 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
 
     if (dryRun) {
       sl.stepLog.info("dry run, skipping action execution");
-      sl.stepLog.info({ resolvedConfig: resolvedConfig as JSONValue }, "dry run resolved config");
-      await Bun.sleep(5000 + Math.random() * 10000);
+      if (opts.secretNames.size > 0) {
+        sl.stepLog.info("dry run resolved config redacted (pipeline has secret params)");
+      } else {
+        sl.stepLog.info({ resolvedConfig: resolvedConfig as JSONValue }, "dry run resolved config");
+      }
+      await sleep(5000 + Math.random() * 10000, abort.signal);
       if (Math.random() < 0.05) throw new Error("simulated dry run failure");
       db.updateStepStatus(dbId, "success");
     } else {
@@ -472,16 +481,12 @@ export async function shutdownAll(): Promise<void> {
 
 export function recoverStaleRuns(): void {
   for (const status of ["running", "pending"] as const) {
-    let recovered = 0;
-    let batch: ReturnType<typeof db.listRuns>;
-    do {
-      batch = db.listRuns({ status, limit: 100 });
-      for (const run of batch) {
-        db.updateRunStatus(run.id, "failed", `Server crashed while ${status}`);
-        db.markStaleSteps(run.id);
-        recovered++;
-      }
-    } while (batch.length === 100);
-    if (recovered > 0) logger.warn({ status, count: recovered }, "stale runs recovered");
+    // Snapshot all stale runs upfront to avoid relying on mutation side-effects during iteration
+    const staleRuns = db.listRuns({ status, limit: 10_000 });
+    for (const run of staleRuns) {
+      db.updateRunStatus(run.id, "failed", `Server crashed while ${status}`);
+      db.markStaleSteps(run.id);
+    }
+    if (staleRuns.length > 0) logger.warn({ status, count: staleRuns.length }, "stale runs recovered");
   }
 }

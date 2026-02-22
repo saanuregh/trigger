@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { env } from "../env.ts";
 import { logger } from "../logger.ts";
 import { getAllActionSchemas } from "../pipeline/action-registry.ts";
+import { refreshSchedules } from "../scheduler.ts";
 import { errorMessage, type JSONValue } from "../types.ts";
 import { type NamespaceSource, resolveNamespaces } from "./namespace.ts";
 import { buildJSONSchema, buildSchema } from "./schema.ts";
@@ -67,6 +68,7 @@ export async function loadAllConfigs(force = false): Promise<NamespaceConfig[]> 
     const failed = cachedConfigs.length - ok;
     logger.info({ loaded: ok, failed, total: cachedConfigs.length }, "configs loaded");
 
+    refreshSchedules(cachedConfigs);
     return cachedConfigs;
   })();
 
@@ -110,6 +112,7 @@ export async function refreshNamespace(ns: string): Promise<NamespaceConfig[]> {
     if (idx >= 0) cachedConfigs[idx] = updated;
     else cachedConfigs.push(updated);
 
+    refreshSchedules(cachedConfigs);
     return cachedConfigs;
   })();
 

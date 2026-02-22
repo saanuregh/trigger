@@ -7,9 +7,9 @@ Trigger and monitor deployment pipelines. Declarative YAML pipeline configs fetc
 - **Runtime:** [Bun](https://bun.sh) 1.3+
 - **CLI:** `index.ts` dispatches subcommands (`start`, `validate`) via `util.parseArgs`
 - **Server:** Raw `Bun.serve()` with route-map API (no framework) in `src/server/`
-- **Frontend:** React 19 (client-side SPA), SWR, Tailwind CSS 4, Lucide icons
+- **Frontend:** React 19 (client-side SPA), Tailwind CSS 4, Lucide icons
 - **Database:** SQLite via `bun:sqlite` (WAL mode)
-- **Real-time:** Server-Sent Events (SSE)
+- **Real-time:** WebSocket (Bun native handler)
 - **Auth:** Opt-in OIDC SSO with group-based ACLs
 - **Infra actions:** AWS CodeBuild, ECS (restart + run task), CloudWatch Logs, Cloudflare cache purge
 
@@ -120,8 +120,10 @@ Key config features:
 - **`{{vars.X}}`** — reference shared variables (type-preserving: arrays stay arrays)
 - **`{{param.X}}`** — resolve to runtime parameter values
 - **`{{param.X|default}}`** — parameter with fallback
+- **`{{env.X}}`** — inject environment variables (prefixed by `TRIGGER_ENV_PREFIX`, default `TRIGGER_ENV_`)
 - **`$switch`** — conditional config based on a parameter value
-- **Schema validation** — configs are validated at load time against a JSON Schema
+- **`schedule`** — cron-based automatic pipeline execution (single cron string or array of `{ cron, params }`)
+- **Schema validation** — configs are validated at load time via Zod; a dynamic JSON Schema is served for editor support
 
 ### Built-in actions
 
@@ -152,27 +154,20 @@ export default defineAction({
 
 Custom actions are auto-discovered at startup. See `examples/custom-actions/` for a full example.
 
-## JSON Schema
+## Validation
 
-A dynamic JSON Schema is served at `/api/config/schema` — it includes per-action config typing for all registered actions (builtin + custom) with `$switch` support. Use it for editor validation:
+A dynamic JSON Schema is served at `/api/config/schema` — use it for editor autocompletion:
 
 ```yaml
 # yaml-language-server: $schema=http://localhost:3000/api/config/schema
 ```
 
-## Validation
-
-Validate config files against the schema without starting the server:
+Validate config files or type-check without starting the server:
 
 ```bash
 bun run validate                           # validates examples/configs/*.yaml
 bun index.ts validate path/to/config.yaml  # validate specific files
-```
-
-## Type-checking
-
-```bash
-bun run typecheck
+bun run typecheck                          # TypeScript strict mode check
 ```
 
 ## License

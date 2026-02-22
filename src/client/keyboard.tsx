@@ -10,6 +10,8 @@ export interface ShortcutDef {
   description: string;
   handler: () => void;
   when?: boolean;
+  /** Show in help dialog only — don't intercept the key event */
+  displayOnly?: boolean;
 }
 
 interface RegisteredGroup {
@@ -84,6 +86,7 @@ export function useKeyboard(shortcuts: ShortcutDef[]) {
     const handler = (e: KeyboardEvent) => {
       for (const s of shortcutsRef.current) {
         if (s.when === false) continue;
+        if (s.displayOnly) continue;
 
         const wantsMeta = s.meta ?? false;
         const wantsShift = s.shift ?? false;
@@ -132,11 +135,11 @@ interface FocusListProps<T> {
 
 export function FocusList<T>({ items, onSelect, children, className }: FocusListProps<T>) {
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     setFocusedIndex(-1);
-  }, [items.length]);
+  }, [items]);
 
   useEffect(() => {
     if (focusedIndex < 0) return;
@@ -170,9 +173,9 @@ export function FocusList<T>({ items, onSelect, children, className }: FocusList
   ]);
 
   return (
-    <div ref={containerRef} className={className}>
+    <ul ref={containerRef} className={className}>
       {items.map((item, i) => children(item, i === focusedIndex, i))}
-    </div>
+    </ul>
   );
 }
 
@@ -190,6 +193,8 @@ export function formatKey(shortcut: ShortcutDef): string {
   const keyMap: Record<string, string> = {
     Enter: isMac ? "\u23CE" : "Enter",
     Backspace: isMac ? "\u232B" : "Backspace",
+    Tab: isMac ? "\u21E5" : "Tab",
+    Escape: isMac ? "\u238B" : "Esc",
     "/": "/",
     "?": "?",
   };

@@ -1,7 +1,14 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { RunStatus } from "../types.ts";
 
-export const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+export const isMac = (() => {
+  if ("userAgentData" in navigator && (navigator as any).userAgentData?.platform) {
+    return /mac/i.test((navigator as any).userAgentData.platform);
+  }
+  return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+})();
+
+const originalFavicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.href ?? "";
 
 export function handleUnauthorized(res: Response): boolean {
   if (res.status === 401) {
@@ -12,7 +19,7 @@ export function handleUnauthorized(res: Response): boolean {
 }
 
 export function formatDurationMs(ms: number): string {
-  const s = Math.floor(ms / 1000);
+  const s = Math.floor(Math.max(0, ms) / 1000);
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
   return `${m}m ${s % 60}s`;
@@ -60,7 +67,7 @@ export function setFaviconStatus(status: RunStatus | null): void {
   const link = getFaviconLink();
 
   if (!status) {
-    link.href = "/favicon.ico";
+    link.href = originalFavicon;
     return;
   }
 
@@ -103,13 +110,13 @@ export const statusVerbs: Record<RunStatus, string> = {
   cancelled: "cancelled",
 };
 
-export function showRunNotification(pipelineName: string, status: RunStatus): void {
+export function showRunNotification(namespace: string, pipelineName: string, status: RunStatus): void {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
 
   const verb = statusVerbs[status] ?? "failed";
   const n = new Notification(`${pipelineName} ${verb}`, {
-    body: `Pipeline run finished with status: ${status}`,
-    tag: `run-${pipelineName}`,
+    body: `[${namespace}] Pipeline run finished with status: ${status}`,
+    tag: `run-${namespace}-${pipelineName}`,
   });
   n.onclick = () => {
     window.focus();
@@ -154,14 +161,17 @@ export function useLocalStorage(key: string, defaultValue: boolean): [boolean, (
     }
   });
 
-  const set = (v: boolean) => {
-    setValue(v);
-    try {
-      localStorage.setItem(key, String(v));
-    } catch {
-      // ignore
-    }
-  };
+  const set = useCallback(
+    (v: boolean) => {
+      setValue(v);
+      try {
+        localStorage.setItem(key, String(v));
+      } catch {
+        // ignore
+      }
+    },
+    [key],
+  );
 
   return [value, set];
 }
@@ -175,3 +185,18 @@ interface SidebarContextValue {
 
 export const SidebarContext = createContext<SidebarContextValue>({ collapsed: false, toggle: () => {} });
 export const useSidebar = () => useContext(SidebarContext);
+
+export function describeCron(cron: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return cron;
+  const [min, hour, dom, mon, dow] = parts;
+  if (min === "0" && hour !== "*" && dom === "*" && mon === "*" && dow === "*") return `Daily at ${hour}:00`;
+  if (min === "0" && hour !== "*" && dom === "*" && mon === "*" && dow === "1-5") return `Weekdays at ${hour}:00`;
+  if (min !== "*" && hour === "*" && dom === "*" && mon === "*" && dow === "*") return `Every hour at :${min!.padStart(2, "0")}`;
+  if (dom === "*" && mon === "*" && dow === "*") {
+    if (hour?.startsWith("*/")) return `Every ${hour.slice(2)}h`;
+    if (min?.startsWith("*/")) return `Every ${min.slice(2)}m`;
+    if (hour !== "*") return `Daily at ${hour}:${(min ?? "0").padStart(2, "0")}`;
+  }
+  return cron;
+}

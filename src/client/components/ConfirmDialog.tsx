@@ -1,7 +1,10 @@
 import { AlertTriangle } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./Button.tsx";
+
+// Ref-count open dialogs so we only clear overflow when the last one closes
+let openDialogCount = 0;
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -24,15 +27,46 @@ export function ConfirmDialog({
   variant = "default",
   loading,
 }: ConfirmDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
+    openDialogCount++;
     document.body.style.overflow = "hidden";
+    const dialog = dialogRef.current;
+
+    // Move focus into the dialog on open
+    requestAnimationFrame(() => {
+      const first = dialog?.querySelector<HTMLElement>("button:not([disabled]), [href], input:not([disabled])");
+      first?.focus();
+    });
+
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") {
+        onCancel();
+        return;
+      }
+      if (e.key === "Tab" && dialog) {
+        const focusable = dialog.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), [href], input:not([disabled]), select:not([disabled])",
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0]!;
+        const last = focusable[focusable.length - 1]!;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
+
     document.addEventListener("keydown", handler);
     return () => {
-      document.body.style.overflow = "";
+      openDialogCount--;
+      if (openDialogCount === 0) document.body.style.overflow = "";
       document.removeEventListener("keydown", handler);
     };
   }, [open, onCancel]);
@@ -43,6 +77,10 @@ export function ConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className="relative bg-neutral-900 border border-white/[0.08] rounded-lg p-5 max-w-md w-full mx-4 animate-scale-in shadow-2xl shadow-black/40"
         onClick={(e) => e.stopPropagation()}
       >

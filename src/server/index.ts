@@ -6,6 +6,7 @@ import { env } from "../env.ts";
 import { logger } from "../logger.ts";
 import { loadCustomActions } from "../pipeline/action-loader.ts";
 import { initBuiltinActions, recoverStaleRuns, shutdownAll } from "../pipeline/executor.ts";
+import { startScheduler, stopScheduler } from "../scheduler.ts";
 import { errorMessage } from "../types.ts";
 import { error, fetch, routes } from "./routes.ts";
 import { initWSGlobalSubscription, wsHandlers } from "./ws.ts";
@@ -50,11 +51,16 @@ export async function startServer(): Promise<void> {
   await loadCustomActions(env.ACTIONS_DIR);
   rebuildConfigSchema();
 
-  loadAllConfigs().catch((err) => {
-    logger.error({ error: errorMessage(err) }, "initial config load failed — pipelines may be unavailable until next refresh");
-  });
+  loadAllConfigs()
+    .then((configs) => startScheduler(configs))
+    .catch((err) => {
+      logger.error({ error: errorMessage(err) }, "initial config load failed — pipelines may be unavailable until next refresh");
+    });
 
   if (env.authEnabled) {
+    if (!env.OIDC_CLIENT_ID || !env.OIDC_CLIENT_SECRET) {
+      throw new Error("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are required when auth is enabled (OIDC_ISSUER is set)");
+    }
     try {
       await fetchOIDCConfig();
     } catch (err) {
@@ -77,7 +83,7 @@ export async function startServer(): Promise<void> {
   logger.info({ env: env.NODE_ENV, port: server.port, dataDir: env.DATA_DIR }, "server started");
 
   cleanupOldLogs();
-  setInterval(cleanupOldLogs, 24 * 60 * 60 * 1000);
+  const cleanupInterval = setInterval(cleanupOldLogs, 24 * 60 * 60 * 1000);
 
   let shuttingDown = false;
 
@@ -87,6 +93,8 @@ export async function startServer(): Promise<void> {
 
     logger.info("server shutting down");
 
+    stopScheduler();
+    clearInterval(cleanupInterval);
     server.stop();
     await shutdownAll();
 

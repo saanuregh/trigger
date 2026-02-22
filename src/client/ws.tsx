@@ -59,6 +59,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   function connect() {
     if (unmountedRef.current) return;
+    // Prevent duplicate connections from rapid reconnect cycles
+    clearTimeout(reconnectTimerRef.current);
+    wsRef.current?.close();
 
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${protocol}//${location.host}/ws`);

@@ -13,8 +13,9 @@ export interface RegisteredAction {
 const registry = new Map<string, RegisteredAction>();
 
 export function registerAction(action: RegisteredAction): void {
-  if (registry.has(action.name)) {
-    throw new Error(`Action "${action.name}" is already registered`);
+  const existing = registry.get(action.name);
+  if (existing) {
+    throw new Error(`Action "${action.name}" is already registered as a ${existing.builtin ? "builtin" : "custom"} action`);
   }
   registry.set(action.name, action);
   logger.info({ action: action.name, builtin: action.builtin }, "action registered");

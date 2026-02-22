@@ -16,15 +16,13 @@ function waitForRun(
   signal: AbortSignal,
   log: (msg: string, fields?: Record<string, JSONValue | undefined>) => void,
 ): Promise<RunStatus> {
-  const run = db.getRun(runId);
-  if (run && TERMINAL_STATUSES.has(run.status)) return Promise.resolve(run.status);
-
   return new Promise<RunStatus>((resolve, reject) => {
     const onAbort = () => {
       cleanup();
       reject(new Error("Cancelled"));
     };
 
+    // Subscribe first, then check — guarantees no events are missed
     const unsubscribe = subscribe(runId, (msg) => {
       if (msg.type === "run:status") {
         const status = msg.status;
@@ -47,10 +45,11 @@ function waitForRun(
 
     signal.addEventListener("abort", onAbort, { once: true });
 
-    const fresh = db.getRun(runId);
-    if (fresh && TERMINAL_STATUSES.has(fresh.status)) {
+    // Check after subscribing: if already terminal, we won't miss the event
+    const run = db.getRun(runId);
+    if (run && TERMINAL_STATUSES.has(run.status)) {
       cleanup();
-      resolve(fresh.status);
+      resolve(run.status);
     }
   });
 }

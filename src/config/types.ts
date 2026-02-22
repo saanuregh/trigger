@@ -16,6 +16,7 @@ export interface PipelineDef {
   confirm?: boolean;
   timeout?: number;
   concurrency?: number;
+  schedule?: string | Array<{ cron: string; params?: Record<string, string | boolean> }>;
   params?: ParamDef[];
   access?: AccessConfig;
   steps: StepDef[];
