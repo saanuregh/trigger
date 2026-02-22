@@ -16,15 +16,14 @@ Use Bun for everything. Bun auto-loads `.env`.
 
 ## Architecture
 
-- **CLI:** `index.ts` is the entry point (`start`, `validate` subcommands) using `util.parseArgs`. Server code lives in `src/server/`.
-- **Server:** Raw `Bun.serve()` with `routes` API (no framework). Server lifecycle in `src/server/index.ts`, route map in `src/server/routes.ts`, domain-based controllers in `src/server/controllers/`.
-- **Frontend:** Client-side React 19 SPA. No SSR — a single HTML shell (`public/index.html`) loads `src/client/app.tsx`, which uses a custom client-side router (`src/client/router.tsx`). Data fetched via SWR hooks hitting JSON APIs.
-- **Auth:** Opt-in OIDC SSO (`src/auth/`). When `OIDC_ISSUER` is set, auth code flow + HMAC-signed session cookies + group-based ACLs. Super admin bypass via `TRIGGER_ADMINS`.
-- **Logging:** Structured JSON logging via Pino (`src/logger.ts`).
+- **CLI:** `index.ts` entry point (`start`, `validate` subcommands) via `util.parseArgs`.
+- **Server:** Raw `Bun.serve()` with flat route map (no framework). Controllers in `src/server/controllers/`.
+- **Frontend:** React 19 SPA — `public/index.html` loads `src/client/app.tsx` with custom router. Data via `useFetch` hook (cache/dedup).
+- **Auth:** Opt-in OIDC SSO (`src/auth/`). HMAC-signed session cookies + group-based ACLs. Super admin bypass via `TRIGGER_ADMINS`.
 - **Database:** `bun:sqlite` with WAL mode. Schema in `src/db/index.ts`, queries in `src/db/queries.ts`.
-- **Real-time:** WebSocket via Bun's native `websocket` handler on server (`src/server/ws.ts`), React context + hooks on client (`src/client/ws.tsx`). In-memory pub/sub in `src/events.ts`. Single persistent connection per client — broadcasts system status and run lifecycle events to all clients, per-run log/step streaming via subscribe/unsubscribe messages. Browser notifications (Web Notifications API) fire on pipeline completion.
-- **Config:** Declarative YAML pipeline configs fetched from GitHub raw content API (single HTTP request per file). Local paths also supported. Validated at load time via Zod schemas (`src/config/schema.ts`) with cross-field template reference validation. Template strings resolved at execution time.
-- **Actions:** Unified `defineAction({ name, schema, handler })` API for both built-in and custom actions. Each action file is self-contained with its own Zod schema. Discovered via action registry at startup.
+- **Real-time:** Bun native WebSocket (`src/server/ws.ts`) + React hooks (`src/client/ws.tsx`). In-memory pub/sub (`src/events.ts`). Per-run log streaming via subscribe/unsubscribe messages. Browser notifications on completion.
+- **Config:** YAML pipeline configs fetched from GitHub or local paths. Zod-validated at load time with template cross-validation. Templates resolved at execution time.
+- **Actions:** `defineAction({ name, schema, handler })` API. Self-contained files with inline Zod schemas. Auto-discovered via action registry.
 
 ## File structure
 
@@ -47,16 +46,18 @@ src/
     index.ts                  # startServer(): Bun.serve lifecycle, startup, shutdown
     routes.ts                 # Route map (path → controller handler) + fetch/error/WS upgrade fallbacks
     ws.ts                     # WebSocket manager: connection tracking, broadcast, per-run subscriptions
+    validation.ts             # Zod schemas for request/query validation (triggerRun, listRuns, WS messages)
     controllers/
       helpers.ts              # Shared utilities: getConfigs, findNsConfig, access checks, types
       auth.ts                 # Auth flow handlers (login, callback, logout, me)
       pipelines.ts            # Pipeline CRUD + trigger + config listing
       runs.ts                 # Run listing, detail, logs, cancel, retry
-      config.ts               # Dynamic JSON Schema endpoint + config refresh
+      config.ts               # Dynamic JSON Schema endpoint
   types.ts                    # Shared types (imported by server + client)
   env.ts                      # Env var access
-  logger.ts                   # Pino structured logger
+  logger.ts                   # Custom Pino-style JSON logger (createLogger, child loggers)
   events.ts                   # In-memory pub/sub event bus
+  scheduler.ts                # Cron scheduler: tick loop, crash recovery, schedule map
   input.css                   # Tailwind CSS entry point
   auth/
     session.ts                # HMAC-signed session cookies (24h TTL)
@@ -67,7 +68,7 @@ src/
     types.ts                  # Re-exports from schema.ts + resolved action config types
     namespace.ts              # Env → namespace source resolution
     loader.ts                 # Fetch, parse, validate YAML configs + schema caching
-    template.ts               # {{param.X}}, {{vars.X}}, $switch resolution
+    template.ts               # {{param.X}}, {{vars.X}}, {{env.X}}, $switch resolution
   db/
     index.ts                  # SQLite init, migrations
     queries.ts                # Run/step CRUD operations
@@ -87,7 +88,8 @@ src/
     app.tsx                   # SPA root: React 19, WebSocket provider, route definitions
     router.tsx                # Custom client-side router (pattern matching, Link, navigate)
     ws.tsx                    # WebSocket context, useStatus, useSubscription, useGlobalEvents hooks
-    hooks.tsx                 # Data fetching hooks (useFetch, useConfigs, useUser)
+    hooks.tsx                 # Data fetching hooks (useFetch with cache/dedup, useConfigs, useUser)
+    keyboard.tsx              # Keyboard shortcut registry (ShortcutRegistryProvider, useKeyboard)
     home.tsx                  # Home page (namespace grid)
     namespace.tsx             # Namespace page (pipeline list)
     pipeline.tsx              # Pipeline page (param form + trigger)
@@ -95,7 +97,7 @@ src/
     config.tsx                # Pipeline config viewer
     login.tsx                 # SSO login page
     utils.ts                  # Client-side utilities
-    components/               # Reusable React components
+    components/               # Layout, CommandPalette, LogViewer, ParamForm, ConfirmDialog, Toast, StatusBadge, etc.
 examples/
   configs/                    # Example YAML pipeline config files
   custom-actions/             # Example custom action plugins
@@ -105,12 +107,9 @@ examples/
 
 - JSX uses `react-jsx` automatic runtime — no `import React` needed.
 - Shared types in `src/types.ts` — imported by both server and client. Client code must NOT import from `src/db/`, `src/pipeline/`, or `src/config/` (server-only modules).
-- Pipeline actions are in `src/pipeline/actions/`. Each is self-contained: defines its own Zod schema and default-exports `defineAction({ name, schema, handler })`.
 - `src/pipeline/types.ts` is the action API barrel — re-exports `z`, `defineAction`, `ActionContext`, and all template helpers. Both builtin actions and the SDK import from here.
 - AWS clients use lazy initialization (created on first use per region, not at module load).
-- Status types (`RunStatus`, `StepStatus`) are defined in `src/types.ts`.
-- SPA approach: single HTML shell (`public/index.html`) with client-side routing via `src/client/router.tsx`. Navigation via `<Link>` component.
-- One active run per pipeline (keyed on `namespace:pipelineId`). Concurrent trigger returns 409.
+- Concurrency: per-pipeline limit (default 1) + global `MAX_CONCURRENT_RUNS` (default 10). Exceeding either returns 409.
 - Unknown actions are handled gracefully: config validation skips them, executor marks their steps as skipped.
 
 ## Adding a new pipeline action
@@ -127,26 +126,30 @@ examples/
 ## Config format
 
 Pipeline configs are YAML files. Key features:
-- **Vars:** `vars` object for shared constants, referenced as `{{vars.name}}`.
+- **Vars:** `vars` object for shared constants, referenced as `{{vars.name}}`. Templates must be quoted in YAML (`{` is flow mapping syntax).
 - **Params:** `{{param.name}}` resolves to runtime parameter values. `{{param.name|default}}` provides a fallback.
-- **Quoting:** `{{...}}` template strings must be quoted in YAML (`{` is YAML flow mapping syntax).
+- **Env vars:** `{{env.name}}` resolves to environment variables (prefixed by `TRIGGER_ENV_PREFIX`, default `TRIGGER_ENV_`).
 - **Type preservation:** A full-string template like `"{{vars.subnets}}"` preserves the resolved type (array stays array).
 - **`$switch`:** Conditional config — `$switch: param_name` with `cases:` and `default:`.
-- **Schema:** Validated at load time via Zod (configs with templates skip per-action validation). Dynamic JSON Schema served at `/api/config/schema` with per-action `if/then` typing and `$switch` support.
-- **Template validation:** `{{vars.X}}` and `{{param.X}}` references are cross-validated at load time — typos caught immediately.
-- **Editor support:** Add `# yaml-language-server: $schema=http://localhost:3000/api/config/schema` to config files for autocompletion.
+- **Schema:** Validated at load time via Zod with cross-field template validation. Dynamic JSON Schema at `/api/config/schema` for editor support.
+- **Schedule:** Optional cron string or array of `{ cron, params }` objects. History tracked in `schedule_history` table.
 
 ## Environment
 
 - All config via env vars — see `.env.example`.
-- `GITHUB_TOKEN` — for fetching configs from private repos.
+- `TRIGGER_NAMESPACES` — **required**, comma-separated namespace list (e.g., `production,staging`).
 - `TRIGGER_{NS}_CONFIG` — a GitHub file URL (`https://github.com/owner/repo/blob/branch/path`) or a local file path.
+- `GITHUB_TOKEN` — for fetching configs from private repos.
 - `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ZONE_ID` — optional, only needed for `cloudflare-purge` actions.
 - `PORT` — server port (default `3000`).
 - `DATA_DIR` — SQLite database and log file directory (default `./data`).
 - `ACTIONS_DIR` — custom actions directory (default `./actions/`).
+- `MAX_CONCURRENT_RUNS` — global concurrency limit across all pipelines (default `10`).
+- `LOG_RETENTION_DAYS` — auto-cleanup threshold for old run log directories (default `30`).
+- `TRIGGER_ENV_PREFIX` — prefix for env var injection via `{{env.X}}` templates (default `TRIGGER_ENV_`).
 - `OIDC_ISSUER` — OIDC provider URL (set to enable auth).
 - `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` — OIDC client credentials.
+- `SESSION_SECRET` — optional override for session cookie signing key (falls back to `OIDC_CLIENT_SECRET`).
 - `TRIGGER_ADMINS` — comma-separated admin emails (bypass all ACLs).
 
 ## Testing

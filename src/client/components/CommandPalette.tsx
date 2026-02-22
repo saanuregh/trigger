@@ -112,6 +112,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="palette-results"
+            aria-activedescendant={filtered[selectedIndex] ? `palette-item-${selectedIndex}` : undefined}
+            aria-autocomplete="list"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -123,7 +128,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <kbd className="text-[11px] text-neutral-500 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.06]">ESC</kbd>
         </div>
 
-        <div className="max-h-72 overflow-y-auto py-2">
+        <div className="max-h-72 overflow-y-auto py-2" role="listbox" id="palette-results">
           {filtered.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-neutral-500">No results found</div>
           ) : (
@@ -139,6 +144,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   )}
                   <button
                     type="button"
+                    id={`palette-item-${i}`}
+                    role="option"
+                    aria-selected={i === selectedIndex}
                     onClick={() => handleSelect(item)}
                     onMouseEnter={() => setSelectedIndex(i)}
                     className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${

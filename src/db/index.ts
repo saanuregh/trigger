@@ -74,6 +74,29 @@ const migrations: Migration[] = [
     db.run("ALTER TABLE pipeline_runs ADD COLUMN triggered_by TEXT");
     db.run("CREATE INDEX IF NOT EXISTS idx_runs_ns_pipeline_started ON pipeline_runs(namespace, pipeline_id, started_at DESC)");
   },
+
+  // v3: add call_stack column for circular dependency detection on retry
+  (db) => {
+    db.run("ALTER TABLE pipeline_runs ADD COLUMN call_stack TEXT");
+  },
+
+  // v4: schedule history for cron scheduling
+  (db) => {
+    db.run(`
+      CREATE TABLE schedule_history (
+        id              TEXT PRIMARY KEY,
+        namespace       TEXT NOT NULL,
+        pipeline_id     TEXT NOT NULL,
+        schedule_index  INTEGER NOT NULL DEFAULT 0,
+        cron            TEXT NOT NULL,
+        fired_at        TEXT NOT NULL,
+        run_id          TEXT,
+        status          TEXT NOT NULL,
+        skip_reason     TEXT
+      )
+    `);
+    db.run("CREATE INDEX idx_schedule_history_lookup ON schedule_history(namespace, pipeline_id, fired_at DESC)");
+  },
 ];
 
 function detectExistingVersion(db: Database): number {
@@ -84,6 +107,7 @@ function detectExistingVersion(db: Database): number {
 
   const columns = db.query<{ name: string }, []>("PRAGMA table_info(pipeline_runs)").all();
   const colNames = new Set(columns.map((c) => c.name));
+  if (colNames.has("call_stack")) return 3; // has v3 columns
   if (colNames.has("triggered_by")) return 2; // has v2 columns
   return 1; // has tables but not v2 columns
 }

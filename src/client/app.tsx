@@ -8,6 +8,7 @@ import { Layout } from "./components/Layout.tsx";
 import { ToastProvider, useToast } from "./components/Toast.tsx";
 import { ConfigPage } from "./config.tsx";
 import { HomePage } from "./home.tsx";
+import { useConfigs } from "./hooks.tsx";
 import { ShortcutRegistryProvider, useKeyboard } from "./keyboard.tsx";
 import { LoginPage } from "./login.tsx";
 import { NamespacePage } from "./namespace.tsx";
@@ -27,6 +28,7 @@ const toastVariant: Record<RunStatus, "success" | "error" | "info"> = {
 
 function GlobalNotifications() {
   const { toast } = useToast();
+  const { data: configs } = useConfigs();
 
   useGlobalEvents((event) => {
     if (event.type === "run:started") {
@@ -35,8 +37,9 @@ function GlobalNotifications() {
     }
     if (event.type === "run:completed") {
       const verb = statusVerbs[event.status] ?? "failed";
-      toast(`${event.pipelineName} ${verb}`, toastVariant[event.status] ?? "error");
-      showRunNotification(event.pipelineName, event.status);
+      const nsLabel = configs?.find((c) => c.namespace === event.namespace)?.display_name ?? event.namespace;
+      toast(`[${nsLabel}] ${event.pipelineName} ${verb}`, toastVariant[event.status] ?? "error");
+      showRunNotification(nsLabel, event.pipelineName, event.status);
     }
   });
 

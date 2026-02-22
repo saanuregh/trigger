@@ -1,5 +1,5 @@
 import { CheckCircle2, Info, X, XCircle } from "lucide-react";
-import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useRef, useState } from "react";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -30,8 +30,12 @@ let nextId = 0;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timersRef = useRef(new Map<number, ReturnType<typeof setTimeout>>());
 
   const dismiss = useCallback((id: number) => {
+    const timer = timersRef.current.get(id);
+    if (timer) clearTimeout(timer);
+    timersRef.current.delete(id);
     setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, removing: true } : t)));
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -42,7 +46,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message: string, variant: ToastVariant = "info") => {
       const id = nextId++;
       setToasts((prev) => [...prev, { id, message, variant }]);
-      setTimeout(() => dismiss(id), 4000);
+      const timer = setTimeout(() => dismiss(id), variant === "error" ? 8000 : 4000);
+      timersRef.current.set(id, timer);
     },
     [dismiss],
   );

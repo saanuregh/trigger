@@ -2,6 +2,7 @@ import { authed, filterAccessibleConfigs } from "../../auth/access.ts";
 import { refreshNamespace } from "../../config/loader.ts";
 import { logger } from "../../logger.ts";
 import { executePipeline } from "../../pipeline/executor.ts";
+import { getScheduleInfo } from "../../scheduler.ts";
 import {
   type ErrorResponse,
   errorMessage,
@@ -37,6 +38,7 @@ export const getPipeline = authed(async (req, session) => {
     concurrency: pipeline.concurrency ?? 1,
     params: pipeline.params,
     steps: pipeline.steps.map(toStepSummary),
+    schedule: pipeline.schedule,
   } satisfies PipelineResponse);
 });
 
@@ -65,6 +67,9 @@ function validateParams(paramDefs: ParamDef[] | undefined, values: Record<string
     const val = values[def.name];
     if (def.type === "string" && def.required && (val === undefined || val === "")) {
       return `Required parameter "${def.label}" is missing`;
+    }
+    if (def.type === "boolean" && val !== undefined && typeof val !== "boolean") {
+      return `Parameter "${def.label}" must be a boolean`;
     }
     if (def.type === "select") {
       if (def.required && (val === undefined || val === "")) {
@@ -112,4 +117,13 @@ export const triggerPipeline = authed(async (req, session) => {
   } catch (err) {
     return handlePipelineError(err, { namespace: ns, pipelineId: id }, "trigger");
   }
+});
+
+export const getPipelineSchedule = authed(async (req, session) => {
+  const { ns, id } = req.params;
+  const result = await getPipelineWithAccess(session, ns!, id!);
+  if ("denied" in result) return result.denied;
+
+  const info = getScheduleInfo(ns!, id!);
+  return Response.json({ schedules: info ?? [] });
 });

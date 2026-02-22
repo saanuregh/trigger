@@ -1,7 +1,7 @@
 import type { RunRow, RunStatus, StepRow, StepStatus } from "../types.ts";
 import { getDb } from "./index.ts";
 
-function buildRunFilters(filters: { namespace?: string; pipeline_id?: string; status?: RunStatus }): {
+function buildRunFilters(filters: { namespace?: string; namespaces?: string[]; pipeline_id?: string; status?: RunStatus }): {
   where: string;
   values: string[];
 } {
@@ -11,6 +11,13 @@ function buildRunFilters(filters: { namespace?: string; pipeline_id?: string; st
   if (filters.namespace) {
     conditions.push("namespace = ?");
     values.push(filters.namespace);
+  } else if (filters.namespaces) {
+    if (filters.namespaces.length === 0) {
+      conditions.push("0"); // no accessible namespaces — match nothing
+    } else {
+      conditions.push(`namespace IN (${filters.namespaces.map(() => "?").join(",")})`);
+      values.push(...filters.namespaces);
+    }
   }
   if (filters.pipeline_id) {
     conditions.push("pipeline_id = ?");
@@ -29,18 +36,29 @@ export function createRun(
   run: Pick<RunRow, "id" | "namespace" | "pipeline_id" | "pipeline_name" | "params" | "started_at"> & {
     dry_run?: boolean;
     triggered_by?: string;
+    call_stack?: string[];
   },
 ): void {
   getDb().run(
-    `INSERT INTO pipeline_runs (id, namespace, pipeline_id, pipeline_name, status, params, started_at, dry_run, triggered_by)
-     VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-    [run.id, run.namespace, run.pipeline_id, run.pipeline_name, run.params, run.started_at, run.dry_run ? 1 : 0, run.triggered_by ?? null],
+    `INSERT INTO pipeline_runs (id, namespace, pipeline_id, pipeline_name, status, params, started_at, dry_run, triggered_by, call_stack)
+     VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+    [
+      run.id,
+      run.namespace,
+      run.pipeline_id,
+      run.pipeline_name,
+      run.params,
+      run.started_at,
+      run.dry_run ? 1 : 0,
+      run.triggered_by ?? null,
+      run.call_stack ? JSON.stringify(run.call_stack) : null,
+    ],
   );
 }
 
 export function updateRunStatus(id: string, status: RunStatus, error?: string): void {
   const finishedAt = status === "running" || status === "pending" ? null : new Date().toISOString();
-  getDb().run(`UPDATE pipeline_runs SET status = ?, finished_at = COALESCE(?, finished_at), error = COALESCE(?, error) WHERE id = ?`, [
+  getDb().run(`UPDATE pipeline_runs SET status = ?, finished_at = COALESCE(?, finished_at), error = ? WHERE id = ?`, [
     status,
     finishedAt,
     error ?? null,
@@ -54,6 +72,7 @@ export function getRun(id: string): RunRow | null {
 
 export function listRuns(filters: {
   namespace?: string;
+  namespaces?: string[];
   pipeline_id?: string;
   status?: RunStatus;
   limit?: number;
@@ -68,7 +87,7 @@ export function listRuns(filters: {
     .all(...values, limit, offset) as RunRow[];
 }
 
-export function countRuns(filters: { namespace?: string; pipeline_id?: string; status?: RunStatus }): number {
+export function countRuns(filters: { namespace?: string; namespaces?: string[]; pipeline_id?: string; status?: RunStatus }): number {
   const { where, values } = buildRunFilters(filters);
   return getDb()
     .query<{ count: number }, string[]>(`SELECT COUNT(*) as count FROM pipeline_runs ${where}`)
@@ -107,6 +126,7 @@ export function getStepsForRun(runId: string): StepRow[] {
 }
 
 export function resetStepsForRetry(runId: string, stepIds: string[]): void {
+  if (stepIds.length === 0) return;
   const placeholders = stepIds.map(() => "?").join(",");
   getDb().run(
     `UPDATE pipeline_steps SET
@@ -134,4 +154,54 @@ export function markStaleSteps(runId: string): void {
      WHERE run_id = ? AND status IN ('running', 'pending')`,
     [now, runId],
   );
+}
+
+// ── Schedule history ──────────────────────────────────────
+
+export interface ScheduleHistoryRow {
+  id: string;
+  namespace: string;
+  pipeline_id: string;
+  schedule_index: number;
+  cron: string;
+  fired_at: string;
+  run_id: string | null;
+  status: string;
+  skip_reason: string | null;
+}
+
+export function recordScheduleEvent(event: {
+  id: string;
+  namespace: string;
+  pipeline_id: string;
+  schedule_index: number;
+  cron: string;
+  fired_at: string;
+  run_id: string | null;
+  status: "fired" | "skipped" | "missed";
+  skip_reason?: string;
+}): void {
+  getDb().run(
+    `INSERT INTO schedule_history (id, namespace, pipeline_id, schedule_index, cron, fired_at, run_id, status, skip_reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      event.id,
+      event.namespace,
+      event.pipeline_id,
+      event.schedule_index,
+      event.cron,
+      event.fired_at,
+      event.run_id,
+      event.status,
+      event.skip_reason ?? null,
+    ],
+  );
+}
+
+export function getLastScheduleEvent(namespace: string, pipelineId: string, scheduleIndex: number): ScheduleHistoryRow | null {
+  return getDb()
+    .query<ScheduleHistoryRow, [string, string, number]>(
+      `SELECT * FROM schedule_history WHERE namespace = ? AND pipeline_id = ? AND schedule_index = ? ORDER BY fired_at DESC LIMIT 1`,
+    )
+    .get(namespace, pipelineId, scheduleIndex);
 }

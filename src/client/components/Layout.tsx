@@ -120,6 +120,7 @@ function SidebarToggle() {
       onClick={toggle}
       className="text-neutral-600 hover:text-neutral-400 transition-colors p-0.5 shrink-0"
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
     >
       {collapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
     </button>
@@ -131,6 +132,7 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
 
   return (
     <aside
+      aria-label="Sidebar"
       className={`${collapsed ? "w-14" : "w-52"} sidebar-transition bg-neutral-950/40 border-r border-white/[0.06] shrink-0 flex flex-col`}
     >
       {/* Brand */}
@@ -163,9 +165,13 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
             <SidebarToggle />
             <button
               type="button"
-              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }))}
+              onClick={() => {
+                (document.activeElement as HTMLElement)?.blur();
+                document.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }));
+              }}
               className="text-neutral-500 hover:text-neutral-300 transition-colors p-1.5"
               title="Search (/)"
+              aria-label="Search"
             >
               <Search size={14} />
             </button>
@@ -175,9 +181,13 @@ function SidebarContent({ sidebar }: { sidebar?: ReactNode }) {
           <>
             <button
               type="button"
-              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }))}
+              onClick={() => {
+                (document.activeElement as HTMLElement)?.blur();
+                document.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }));
+              }}
               className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1 transition-colors"
               title="Search (/)"
+              aria-label="Search"
             >
               <kbd className="text-xs">/</kbd>
             </button>
@@ -216,7 +226,7 @@ export function Layout({ children, sidebar, actions, breadcrumbs }: LayoutProps)
         </a>
         <SidebarContent sidebar={sidebar} />
 
-        <main id="main-content" className="flex-1 overflow-y-auto flex flex-col min-w-0">
+        <main id="main-content" className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Header bar: breadcrumbs (only when sidebar collapsed) + actions */}
           {(breadcrumbs?.length || actions) && (
             <div className="flex items-center justify-between gap-4 px-4 h-10 border-b border-white/[0.06] shrink-0">
@@ -225,7 +235,7 @@ export function Layout({ children, sidebar, actions, breadcrumbs }: LayoutProps)
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto p-4">
+          <div id="content" className="flex-1 overflow-y-auto p-4">
             <div className="max-w-7xl mx-auto animate-fade-in">{children}</div>
           </div>
         </main>

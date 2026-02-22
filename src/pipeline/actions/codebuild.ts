@@ -37,7 +37,11 @@ export default defineAction({
     const project_name = expectString(config.project_name, "project_name");
     ctx.log("starting codebuild project", { project: project_name });
 
-    const rawEnvVars = (config.env_vars ?? {}) as Record<
+    const rawEnvVarsValue = config.env_vars ?? {};
+    if (typeof rawEnvVarsValue !== "object" || Array.isArray(rawEnvVarsValue)) {
+      throw new Error(`env_vars must resolve to an object, got ${Array.isArray(rawEnvVarsValue) ? "array" : typeof rawEnvVarsValue}`);
+    }
+    const rawEnvVars = rawEnvVarsValue as Record<
       string,
       string | { value: string; type: "PLAINTEXT" | "PARAMETER_STORE" | "SECRETS_MANAGER" }
     >;

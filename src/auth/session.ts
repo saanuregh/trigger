@@ -29,13 +29,23 @@ function toBase64Url(b64: string): string {
 
 export function fromBase64Url(b64url: string): string {
   const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
-  return atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "="));
+  const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=");
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function getSigningKey(): string {
+  const key = env.SESSION_SECRET || env.OIDC_CLIENT_SECRET;
+  if (!key) throw new Error("Cannot sign session: SESSION_SECRET or OIDC_CLIENT_SECRET must be set");
+  return key;
 }
 
 function hmacSign(data: string): string {
-  if (!env.OIDC_CLIENT_SECRET) throw new Error("Cannot sign session: OIDC_CLIENT_SECRET not set");
-  return toBase64Url(new Bun.CryptoHasher("sha256", env.OIDC_CLIENT_SECRET).update(data).digest("base64"));
+  return toBase64Url(new Bun.CryptoHasher("sha256", getSigningKey()).update(data).digest("base64"));
 }
+
+export { hmacSign, hmacVerify };
 
 function hmacVerify(data: string, signature: string): boolean {
   const expected = hmacSign(data);
@@ -71,7 +81,7 @@ export function verifySession(cookie: string): AuthSession | null {
       email: payload.email,
       name: payload.name,
       groups: payload.groups,
-      isSuperAdmin: env.TRIGGER_ADMINS.includes(payload.email),
+      isSuperAdmin: env.TRIGGER_ADMINS.some((a) => a.toLowerCase() === payload.email.toLowerCase()),
     };
   } catch (err) {
     if (err instanceof SyntaxError) return null; // malformed base64/JSON cookie

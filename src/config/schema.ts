@@ -1,4 +1,6 @@
+import { Cron } from "croner";
 import { z } from "zod";
+import { env as appEnv } from "../env.ts";
 import { logger } from "../logger.ts";
 import { parseTemplateRef, TEMPLATE_RE, type TemplateRef } from "./template.ts";
 
@@ -16,6 +18,7 @@ const stringParam = z
     required: z.boolean().optional(),
     default: z.string().optional(),
     placeholder: z.string().optional(),
+    secret: z.boolean().optional(),
   })
   .strict();
 
@@ -36,6 +39,7 @@ const selectParam = z
     options: z.array(z.object({ label: z.string(), value: z.string() }).strict()),
     required: z.boolean().optional(),
     default: z.string().optional(),
+    secret: z.boolean().optional(),
   })
   .strict();
 
@@ -55,6 +59,27 @@ const accessConfig = z
   })
   .strict()
   .optional();
+
+const cronString = z.string().refine(
+  (s) => {
+    try {
+      new Cron(s);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: "Invalid cron expression" },
+);
+
+const scheduleEntry = z
+  .object({
+    cron: cronString,
+    params: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
+  })
+  .strict();
+
+const scheduleField = z.union([cronString, z.array(scheduleEntry).min(1)]);
 
 export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>) {
   const actionMap = new Map(actions.map((a) => [a.name, a.schema]));
@@ -88,9 +113,9 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
       const result = schema.safeParse(step.config);
       if (!result.success) {
         for (const issue of result.error.issues) {
-          // Skip errors for fields whose value contains template refs (resolved at runtime)
+          // Skip errors for fields whose value contains template refs or $switch (resolved at runtime)
           const val = getAtPath(step.config, issue.path as (string | number)[]);
-          if (hasTemplateRefs(val)) continue;
+          if (hasTemplateRefs(val) || hasSwitchConfig(val)) continue;
           ctx.addIssue({ ...issue, path: ["config", ...issue.path] });
         }
       }
@@ -104,6 +129,7 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
       confirm: z.boolean().optional(),
       timeout: z.number().optional(),
       concurrency: z.number().int().positive().optional(),
+      schedule: scheduleField.optional(),
       params: z.array(paramDef).optional(),
       access: accessConfig,
       steps: z.array(stepDef),
@@ -128,10 +154,48 @@ export function buildSchema(actions: Array<{ name: string; schema: z.ZodType }>)
         const pipeline = config.pipelines[pi]!;
         const paramNames = new Set((pipeline.params ?? []).map((p) => p.name));
 
+        const pipelineSchedule = pipeline.schedule;
+        if (pipelineSchedule) {
+          const entries = typeof pipelineSchedule === "string" ? [{ cron: pipelineSchedule }] : pipelineSchedule;
+          for (let ei = 0; ei < entries.length; ei++) {
+            const entry = entries[ei]!;
+            if ("params" in entry && entry.params) {
+              for (const paramName of Object.keys(entry.params)) {
+                if (!paramNames.has(paramName)) {
+                  ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["pipelines", pi, "schedule", ...(typeof pipelineSchedule === "string" ? [] : [ei, "params", paramName])],
+                    message: `Schedule references unknown parameter: "${paramName}"`,
+                  });
+                }
+                const paramDef = (pipeline.params ?? []).find((p) => p.name === paramName);
+                if (paramDef && "secret" in paramDef && paramDef.secret) {
+                  ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["pipelines", pi, "schedule", ...(typeof pipelineSchedule === "string" ? [] : [ei, "params", paramName])],
+                    message: `Secret parameter "${paramName}" cannot be set in schedule entries`,
+                  });
+                }
+              }
+            }
+          }
+        }
+
         for (let si = 0; si < pipeline.steps.length; si++) {
           const step = pipeline.steps[si]!;
           const knownNames = { vars: varNames, param: paramNames };
           for (const ref of extractTemplateRefs(step.config)) {
+            if (ref.type === "env") {
+              const envKey = `${appEnv.TRIGGER_ENV_PREFIX}${ref.name}`;
+              if (Bun.env[envKey] === undefined) {
+                ctx.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  path: ["pipelines", pi, "steps", si, "config"],
+                  message: `Missing environment variable for {{env.${ref.name}}}`,
+                });
+              }
+              continue;
+            }
             if (!knownNames[ref.type].has(ref.name)) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -167,6 +231,15 @@ function hasTemplateRefs(value: unknown): boolean {
   return false;
 }
 
+function hasSwitchConfig(value: unknown): boolean {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    if ("$switch" in (value as Record<string, unknown>)) return true;
+    return Object.values(value).some(hasSwitchConfig);
+  }
+  if (Array.isArray(value)) return value.some(hasSwitchConfig);
+  return false;
+}
+
 function extractTemplateRefs(value: unknown): TemplateRef[] {
   const refs: TemplateRef[] = [];
 
@@ -179,7 +252,12 @@ function extractTemplateRefs(value: unknown): TemplateRef[] {
     } else if (Array.isArray(v)) {
       v.forEach(walk);
     } else if (v !== null && typeof v === "object") {
-      Object.values(v).forEach(walk);
+      const obj = v as Record<string, unknown>;
+      // Extract $switch parameter references so they're validated against defined params
+      if ("$switch" in obj && typeof obj.$switch === "string") {
+        refs.push({ type: "param", name: obj.$switch });
+      }
+      Object.values(obj).forEach(walk);
     }
   }
 

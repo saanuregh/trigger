@@ -1,5 +1,5 @@
 # Build stage — install deps, type-check, and bundle
-FROM oven/bun:1 AS build
+FROM oven/bun:1.3 AS build
 WORKDIR /app
 
 COPY package.json bun.lock bunfig.toml tsconfig.json ./
@@ -9,12 +9,12 @@ COPY . .
 RUN bun run typecheck && bun run build
 
 # Production stage — compiled output + trigger-sdk for custom actions
-FROM oven/bun:1-slim
+FROM oven/bun:1.3-slim
 WORKDIR /app
 
 COPY --from=build /app/dist .
 COPY --from=build /app/node_modules/zod /app/node_modules/zod
-COPY --from=build /app/packages/trigger-sdk /app/node_modules/trigger-sdk
+COPY --from=build /app/dist/trigger-sdk /app/node_modules/trigger-sdk
 
 RUN mkdir -p /app/data /app/actions && chown -R bun:bun /app/data /app/actions
 

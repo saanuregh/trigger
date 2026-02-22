@@ -87,6 +87,7 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
 
   useEffect(() => {
     if (!url) return;
+    setError(undefined);
     const cached = cacheGet<T>(url);
     setIsLoading(cached === undefined);
     if (cached !== undefined) setData(cached);
@@ -105,12 +106,12 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions) {
       if (updater === undefined) return doFetch();
       if (typeof updater === "function") {
         const fn = updater as (prev: T | undefined) => T | undefined;
-        let next: T | undefined;
-        setData((prev) => {
-          next = fn(prev);
-          if (next !== undefined && urlRef.current) cacheSet(urlRef.current, next);
-          return next ?? prev;
-        });
+        const current = urlRef.current ? cacheGet<T>(urlRef.current) : undefined;
+        const next = fn(current);
+        if (next !== undefined) {
+          setData(next);
+          if (urlRef.current) cacheSet(urlRef.current, next);
+        }
         return next;
       }
       setData(updater);

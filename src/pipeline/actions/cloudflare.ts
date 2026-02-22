@@ -8,6 +8,9 @@ const schema = z
   })
   .strict();
 
+// Cloudflare API limits to 30 URLs per request
+const PURGE_BATCH_SIZE = 30;
+
 export default defineAction({
   name: "cloudflare-purge",
   schema,
@@ -18,39 +21,45 @@ export default defineAction({
 
     const purge_everything = config.purge_everything != null ? expectBoolean(config.purge_everything, "purge_everything") : false;
 
-    const body: Record<string, unknown> = {};
+    async function purgeCache(purgeBody: Record<string, unknown>) {
+      const resp = await fetch(`https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID}/purge_cache`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(purgeBody),
+        signal: ctx.signal,
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`Cloudflare purge failed: ${resp.status} ${text}`);
+      }
+
+      const result = (await resp.json()) as { success: boolean; errors?: { message: string }[] };
+      if (!result.success) {
+        throw new Error(result.errors?.map((e) => e.message).join(", ") ?? "cloudflare purge failed");
+      }
+    }
+
     if (purge_everything) {
-      body.purge_everything = true;
       ctx.log("purging all cached content");
+      await purgeCache({ purge_everything: true });
     } else if (config.urls != null) {
       const urls = expectStringArray(config.urls, "urls");
       if (urls.length === 0) {
         throw new Error("Cloudflare purge: urls array is empty");
       }
-      body.files = urls;
       ctx.log("purging urls", { urlCount: urls.length, urls });
+
+      for (let i = 0; i < urls.length; i += PURGE_BATCH_SIZE) {
+        const batch = urls.slice(i, i + PURGE_BATCH_SIZE);
+        await purgeCache({ files: batch });
+        if (urls.length > PURGE_BATCH_SIZE) ctx.log("batch purged", { batch: Math.floor(i / PURGE_BATCH_SIZE) + 1, urls: batch.length });
+      }
     } else {
       throw new Error("Cloudflare purge: must specify urls or purge_everything");
-    }
-
-    const resp = await fetch(`https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID}/purge_cache`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: ctx.signal,
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      throw new Error(`Cloudflare purge failed: ${resp.status} ${text}`);
-    }
-
-    const result = (await resp.json()) as { success: boolean; errors?: { message: string }[] };
-    if (!result.success) {
-      throw new Error(result.errors?.map((e) => e.message).join(", ") ?? "cloudflare purge failed");
     }
 
     ctx.log("cache purge completed");

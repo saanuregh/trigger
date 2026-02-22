@@ -3,7 +3,7 @@ import { parseArgs } from "util";
 const { positionals } = parseArgs({
   args: Bun.argv.slice(2),
   allowPositionals: true,
-  strict: false,
+  strict: true,
 });
 
 const command = positionals[0];

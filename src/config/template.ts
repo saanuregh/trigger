@@ -1,3 +1,4 @@
+import { env as appEnv } from "../env.ts";
 import type { ParamValues } from "../types.ts";
 
 export interface ResolveContext {
@@ -9,7 +10,7 @@ export const TEMPLATE_RE = /\{\{(.+?)\}\}/g;
 const FULL_TEMPLATE_RE = /^\{\{(.+?)\}\}$/;
 
 export interface TemplateRef {
-  type: "vars" | "param";
+  type: "vars" | "param" | "env";
   name: string;
   fallback?: string;
 }
@@ -27,13 +28,23 @@ export function parseTemplateRef(expr: string): TemplateRef | null {
     }
     return { type: "param", name: rest };
   }
+  if (trimmed.startsWith("env.")) {
+    return { type: "env", name: trimmed.slice(4) };
+  }
   return null;
 }
 
 function resolveExpression(expr: string, ctx: ResolveContext): unknown {
   const ref = parseTemplateRef(expr);
   if (!ref) {
-    throw new Error(`Invalid template expression: {{${expr.trim()}}} — must start with "vars." or "param."`);
+    throw new Error(`Invalid template expression: {{${expr.trim()}}} — must start with "vars.", "param.", or "env."`);
+  }
+
+  if (ref.type === "env") {
+    const envKey = `${appEnv.TRIGGER_ENV_PREFIX}${ref.name}`;
+    const value = Bun.env[envKey];
+    if (value === undefined) throw new Error(`Missing environment variable for {{env.${ref.name}}}`);
+    return value;
   }
 
   if (ref.type === "vars") {
@@ -69,7 +80,7 @@ export function resolveConfig(value: unknown, ctx: ResolveContext, depth = 0): u
       return value.replace(TEMPLATE_RE, (_, expr) => {
         const resolved = resolveExpression(expr, ctx);
         if (resolved == null) {
-          throw new Error(`Template {{${expr.trim()}}} resolved to ${String(resolved)} in a string interpolation context`);
+          return "";
         }
         if (typeof resolved === "object") {
           throw new Error(
@@ -92,7 +103,12 @@ export function resolveConfig(value: unknown, ctx: ResolveContext, depth = 0): u
 
     if ("$switch" in obj) {
       const paramName = String(obj.$switch);
-      const paramValue = String(ctx.params[paramName] ?? "");
+      const rawParam = ctx.params[paramName];
+      if (rawParam === undefined) {
+        if (obj.default !== undefined) return resolveConfig(obj.default, ctx, depth + 1);
+        throw new Error(`$switch on "${paramName}": parameter is not provided and no default case`);
+      }
+      const paramValue = String(rawParam);
       const cases = (obj.cases ?? {}) as Record<string, unknown>;
 
       const selected = cases[paramValue] ?? obj.default;

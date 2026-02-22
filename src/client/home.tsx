@@ -1,5 +1,5 @@
 import { AlertTriangle, FolderOpen, Loader2 } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { NamespaceConfigSummary, PaginatedResponse, RunRow } from "../types.ts";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { Layout } from "./components/Layout.tsx";
@@ -49,12 +49,19 @@ function NamespaceRow({
   );
 }
 
-function NamespaceErrorRow({ ns }: { ns: NamespaceConfigSummary }) {
+function ConfigErrors({ configs }: { configs: NamespaceConfigSummary[] }) {
+  if (configs.length === 0) return null;
   return (
-    <div className="flex items-center gap-3 px-3 py-1.5 opacity-50">
-      <AlertTriangle size={12} className="text-red-400 shrink-0" />
-      <span className="text-sm text-neutral-400">{ns.display_name}</span>
-      <span className="text-xs text-red-400/80 truncate">{ns.error}</span>
+    <div className="mb-4 space-y-2">
+      {configs.map((ns) => (
+        <div key={ns.namespace} className="flex items-start gap-2.5 bg-red-500/[0.08] border border-red-500/15 rounded-lg px-3 py-2">
+          <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <span className="text-sm text-red-300 font-medium">{ns.display_name ?? ns.namespace}</span>
+            <p className="text-xs text-red-400/80 mt-0.5 break-all">{ns.error}</p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -107,20 +114,30 @@ export function HomePage() {
 
   useGlobalEvents(debouncedMutate);
 
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, []);
+
   const validConfigs = useMemo(() => configs?.filter((c) => !c.error) ?? [], [configs]);
   const errorConfigs = useMemo(() => configs?.filter((c) => c.error) ?? [], [configs]);
 
   // Active runs per namespace from WebSocket status
-  const activeByNs = new Map<string, number>();
-  for (const p of status?.pipelines ?? []) {
-    activeByNs.set(p.namespace, (activeByNs.get(p.namespace) ?? 0) + p.runIds.length);
-  }
+  const activeByNs = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of status?.pipelines ?? []) {
+      map.set(p.namespace, (map.get(p.namespace) ?? 0) + p.runIds.length);
+    }
+    return map;
+  }, [status]);
 
   // Last run per namespace from recent runs
-  const lastRunByNs = new Map<string, RunRow>();
-  for (const run of recentData?.data ?? []) {
-    if (!lastRunByNs.has(run.namespace)) lastRunByNs.set(run.namespace, run);
-  }
+  const lastRunByNs = useMemo(() => {
+    const map = new Map<string, RunRow>();
+    for (const run of recentData?.data ?? []) {
+      if (!map.has(run.namespace)) map.set(run.namespace, run);
+    }
+    return map;
+  }, [recentData]);
 
   return (
     <Layout>
@@ -133,35 +150,35 @@ export function HomePage() {
           description="Add TRIGGER_{NS}_CONFIG environment variables to get started."
         />
       ) : (
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Namespaces — left column */}
-          <div className="w-full lg:w-80 lg:shrink-0">
-            <SectionHeader className="mb-2">Namespaces</SectionHeader>
-            <FocusList
-              items={validConfigs}
-              onSelect={(ns) => navigate(`/${ns.namespace}`)}
-              className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden divide-y divide-white/[0.04]"
-            >
-              {(ns, focused) => (
-                <NamespaceRow
-                  key={ns.namespace}
-                  ns={ns}
-                  focused={focused}
-                  activeRuns={activeByNs.get(ns.namespace) ?? 0}
-                  lastRun={lastRunByNs.get(ns.namespace) ?? null}
-                />
-              )}
-            </FocusList>
-            {errorConfigs.map((ns) => (
-              <NamespaceErrorRow key={ns.namespace} ns={ns} />
-            ))}
-          </div>
+        <>
+          <ConfigErrors configs={errorConfigs} />
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Namespaces — left column */}
+            <div className="w-full lg:w-80 lg:shrink-0">
+              <SectionHeader className="mb-2">Namespaces</SectionHeader>
+              <FocusList
+                items={validConfigs}
+                onSelect={(ns) => navigate(`/${ns.namespace}`)}
+                className="bg-neutral-900/50 border border-white/[0.06] rounded-lg overflow-hidden divide-y divide-white/[0.04]"
+              >
+                {(ns, focused) => (
+                  <NamespaceRow
+                    key={ns.namespace}
+                    ns={ns}
+                    focused={focused}
+                    activeRuns={activeByNs.get(ns.namespace) ?? 0}
+                    lastRun={lastRunByNs.get(ns.namespace) ?? null}
+                  />
+                )}
+              </FocusList>
+            </div>
 
-          {/* Activity — right column */}
-          <div className="flex-1 min-w-0">
-            <ActivityFeed runs={recentData?.data ?? []} />
+            {/* Activity — right column */}
+            <div className="flex-1 min-w-0">
+              <ActivityFeed runs={recentData?.data ?? []} />
+            </div>
           </div>
-        </div>
+        </>
       )}
     </Layout>
   );

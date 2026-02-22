@@ -35,9 +35,7 @@ pipelines:
           source_version: "{{param.branch}}"
           env_vars:
             DEPLOY_ENV: "{{param.branch}}"
-            DB_PASSWORD:
-              value: staging/db-password
-              type: SECRETS_MANAGER
+            DB_PASSWORD: "{{env.STAGING_DB_PASSWORD}}"
       - id: migrate
         name: "Run migration: bun run db:migrate"
         action: ecs-task
@@ -97,6 +95,10 @@ pipelines:
     name: Send Slack Notification
     description: Send a custom message to the team Slack channel.
     concurrency: 3
+    schedule:
+      - cron: "*/5 * * * *"
+        params:
+          message: "Scheduled health check ping"
     params:
       - name: message
         label: Message
@@ -126,3 +128,16 @@ pipelines:
           pipeline_id: deploy-api
           params:
             branch: main
+
+  # ── Scheduled cache purge ────────────────────────────────
+  - id: cache-purge
+    name: Scheduled Cache Purge
+    description: Automatically purge Cloudflare cache on a schedule.
+    schedule: "0 2 * * *"
+    concurrency: 1
+    steps:
+      - id: purge
+        name: Purge Cache
+        action: cloudflare-purge
+        config:
+          purge_everything: true

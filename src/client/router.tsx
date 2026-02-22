@@ -17,13 +17,19 @@ const RouteContext = createContext<RouteMatch>({
   params: {},
 });
 
+const routeCache = new Map<string, { regex: RegExp; paramNames: string[] }>();
+
 function compilePath(pattern: string): { regex: RegExp; paramNames: string[] } {
+  const cached = routeCache.get(pattern);
+  if (cached) return cached;
   const paramNames: string[] = [];
   const regexStr = pattern.replace(/:([^/]+)/g, (_, name) => {
     paramNames.push(name);
     return "([^/]+)";
   });
-  return { regex: new RegExp(`^${regexStr}$`), paramNames };
+  const result = { regex: new RegExp(`^${regexStr}$`), paramNames };
+  routeCache.set(pattern, result);
+  return result;
 }
 
 function matchRoutes(path: string, routes: Route[]): { route: Route; params: Record<string, string> } | null {
@@ -57,7 +63,7 @@ export function RouterProvider({ routes, fallback: Fallback }: { routes: Route[]
   }, []);
 
   useEffect(() => {
-    document.querySelector("main")?.scrollTo(0, 0);
+    document.getElementById("content")?.scrollTo(0, 0);
   }, [path]);
 
   const matched = matchRoutes(path, routes);

@@ -1,6 +1,6 @@
 import { authed } from "../../auth/access.ts";
 import { exchangeCode, getAuthUrl, getOIDCConfig } from "../../auth/oidc.ts";
-import { clearSessionCookie, getCookie, sessionCookieHeader, signSession } from "../../auth/session.ts";
+import { clearSessionCookie, getCookie, hmacSign, hmacVerify, sessionCookieHeader, signSession } from "../../auth/session.ts";
 import { env } from "../../env.ts";
 import { logger } from "../../logger.ts";
 import { type AuthInfoResponse, errorMessage, type OkResponse, type UserResponse } from "../../types.ts";
@@ -21,7 +21,8 @@ export const login = (req: RouteRequest) => {
 
   const url = new URL(req.url);
   const returnUrl = safeReturnUrl(url.searchParams.get("return") ?? "/");
-  const state = btoa(JSON.stringify({ returnUrl, nonce: crypto.randomUUID() }));
+  const stateData = btoa(JSON.stringify({ returnUrl, nonce: crypto.randomUUID() }));
+  const state = `${stateData}.${hmacSign(stateData)}`;
 
   const redirectUri = `${url.origin}/auth/callback`;
   const authUrl = getAuthUrl(state, redirectUri);
@@ -49,6 +50,12 @@ export const callback = async (req: RouteRequest) => {
     return new Response(null, { status: 302, headers: { Location: "/login?error=invalid_state" } });
   }
 
+  // Verify HMAC signature on the state to prevent tampering
+  const dotIdx = state.lastIndexOf(".");
+  if (dotIdx === -1 || !hmacVerify(state.slice(0, dotIdx), state.slice(dotIdx + 1))) {
+    return new Response(null, { status: 302, headers: { Location: "/login?error=invalid_state" } });
+  }
+
   try {
     const redirectUri = `${url.origin}/auth/callback`;
     const user = await exchangeCode(code, redirectUri);
@@ -56,7 +63,9 @@ export const callback = async (req: RouteRequest) => {
 
     let returnUrl = "/";
     try {
-      returnUrl = safeReturnUrl((JSON.parse(atob(state)).returnUrl as string) ?? "/");
+      const stateData = state.slice(0, state.lastIndexOf("."));
+      const parsed = JSON.parse(atob(stateData));
+      returnUrl = safeReturnUrl(typeof parsed.returnUrl === "string" ? parsed.returnUrl : "/");
     } catch {
       logger.warn("failed to parse returnUrl from OAuth state, defaulting to /");
     }

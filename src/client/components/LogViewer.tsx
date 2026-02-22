@@ -15,7 +15,7 @@ const levelColors: Record<LogLevel, string> = {
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }): ReactNode {
   if (value === null) return <span className="text-neutral-400">null</span>;
   if (typeof value === "boolean") return <span className="text-neutral-400">{String(value)}</span>;
-  if (typeof value === "number") return <span className="text-orange-300">{value}</span>;
+  if (typeof value === "number") return <span className="text-orange-400">{value}</span>;
   if (typeof value === "string") return <span className="text-green-400">"{value}"</span>;
 
   const indent = "  ".repeat(depth + 1);
@@ -167,6 +167,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
               <button
                 type="button"
                 onClick={() => setSearch("")}
+                aria-label="Clear search"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
               >
                 <X size={12} />
@@ -193,7 +194,7 @@ export function LogViewer({ lines, stepFilter, fullHeight }: LogViewerProps) {
                     className={`flex gap-2 px-3 py-1 border-l-2 hover:bg-white/[0.02] ${levelColors[entry.level] ?? "border-l-transparent"}`}
                   >
                     <span className="text-neutral-700 select-none shrink-0 text-right pt-0.5 tabular-nums">
-                      {new Date(entry.time).toLocaleTimeString("en", { hour12: false })}
+                      {entry.time ? new Date(entry.time).toLocaleTimeString("en", { hour12: false }) : "--:--:--"}
                     </span>
                     <div className="text-neutral-300 min-w-0 flex-1">
                       <JsonLine entry={entry} />

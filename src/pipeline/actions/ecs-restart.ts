@@ -49,6 +49,14 @@ export default defineAction({
         });
       },
       check(resp) {
+        if (resp.failures && resp.failures.length > 0) {
+          const reasons = resp.failures.map((f) => `${f.arn ?? "unknown"}: ${f.reason ?? "unknown"}`).join("; ");
+          return { error: `ECS DescribeServices failures: ${reasons}` };
+        }
+        if ((resp.services?.length ?? 0) < services.length) {
+          return { error: `Expected ${services.length} services but only ${resp.services?.length ?? 0} found` };
+        }
+
         const allStable = resp.services?.every((svc) => {
           const primary = svc.deployments?.find((d) => d.status === "PRIMARY");
           return primary && primary.runningCount === primary.desiredCount && svc.deployments?.length === 1;

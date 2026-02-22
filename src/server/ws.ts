@@ -12,6 +12,7 @@ import { wsClientMessageSchema } from "./validation.ts";
 export interface WSData {
   session: AuthSession | null;
   subscriptions: Map<string, () => void>;
+  closed?: boolean;
 }
 
 type WS = ServerWebSocket<WSData>;
@@ -66,13 +67,20 @@ async function handleSubscribe(ws: WS, topic: string) {
     return;
   }
 
-  if (env.authEnabled && ws.data.session) {
+  if (env.authEnabled) {
+    if (!ws.data.session) {
+      send(ws, { type: "error", message: "Unauthorized" });
+      return;
+    }
     const denied = await checkNamespaceAccess(ws.data.session, run.namespace);
     if (denied) {
       send(ws, { type: "error", message: "Forbidden" });
       return;
     }
   }
+
+  // Guard: socket may have closed during the async access check above
+  if (ws.data.closed) return;
 
   const unsubscribe = subscribe(runId, (message) => {
     if (message.type === "log") {
@@ -146,6 +154,7 @@ export const wsHandlers = {
   },
 
   close(ws: WS) {
+    ws.data.closed = true;
     for (const unsub of ws.data.subscriptions.values()) unsub();
     ws.data.subscriptions.clear();
     sockets.delete(ws);

@@ -76,6 +76,7 @@ export async function streamLogs(
         startFromHead: true,
         nextToken,
       }),
+      { abortSignal: ctx.signal },
     );
 
     for (const event of resp.events ?? []) {
