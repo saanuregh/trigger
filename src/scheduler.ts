@@ -148,7 +148,12 @@ function recoverMissedSchedules(): void {
           { namespace: entry.namespace, pipelineId: entry.pipelineId, cron: entry.cronExpr, missedAgoMs: missedAgo },
           "recovering missed schedule",
         );
-        fireEntry(entry, prev);
+        fireEntry(entry, prev).catch((err) => {
+          logger.error(
+            { namespace: entry.namespace, pipelineId: entry.pipelineId, error: errorMessage(err) },
+            "failed to recover missed schedule",
+          );
+        });
       } else {
         const eventId = Bun.randomUUIDv7();
         db.recordScheduleEvent({

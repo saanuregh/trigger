@@ -1,6 +1,6 @@
 import { ChevronsLeft, ChevronsRight, Loader2, LogOut, Search, Workflow } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
-import { useUser } from "../hooks.tsx";
+import { clearFetchCache, useUser } from "../hooks.tsx";
 import { Link } from "../router.tsx";
 import { SidebarContext, useLocalStorage, useSidebar } from "../utils.ts";
 import { useStatus } from "../ws.tsx";
@@ -22,6 +22,7 @@ function UserMenu() {
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
+    clearFetchCache();
     window.location.href = "/login";
   };
 

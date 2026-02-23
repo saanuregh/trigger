@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { isMac } from "./utils.ts";
 
 // --- Types ---
@@ -77,10 +77,16 @@ export function useKeyboard(shortcuts: ShortcutDef[]) {
   const shortcutsRef = useRef(shortcuts);
   shortcutsRef.current = shortcuts;
 
+  // Stable key based on shortcut definitions (keys, modifiers, when) — avoids re-registration on every render
+  const stableKey = useMemo(
+    () => JSON.stringify(shortcuts.map((s) => ({ key: s.key, meta: s.meta, shift: s.shift, when: s.when }))),
+    [shortcuts],
+  );
+
   useEffect(() => {
-    register(id, shortcuts);
+    register(id, shortcutsRef.current);
     return () => unregister(id);
-  }, [id, register, unregister, shortcuts]);
+  }, [id, register, unregister, stableKey]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
