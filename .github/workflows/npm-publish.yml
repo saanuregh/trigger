@@ -34,14 +34,13 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Install latest npm (for trusted publishing)
+        run: npm install -g npm@latest
+
       - name: Publish @saanuregh/trigger
         run: npm publish --provenance --access public
         working-directory: dist
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @saanuregh/trigger-sdk
         run: npm publish --provenance --access public
         working-directory: dist/@saanuregh/trigger-sdk
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
