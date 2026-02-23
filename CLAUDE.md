@@ -120,7 +120,7 @@ examples/
 
 ### Custom action (plugin)
 1. Create a `.ts` file in the custom actions directory (default `./actions/`, set via `ACTIONS_DIR` env var).
-2. Default-export `defineAction({ name, schema, handler })` — import from `"trigger-sdk"` (or by relative path to `packages/trigger-sdk/index.ts`). See `examples/custom-actions/` for reference.
+2. Default-export `defineAction({ name, schema, handler })` — import from `"@saanuregh/trigger-sdk"` (or by relative path to `packages/trigger-sdk/index.ts`). See `examples/custom-actions/` for reference.
 3. The action is auto-discovered at startup. JSON Schema at `/api/config/schema` updates automatically.
 
 ## Config format

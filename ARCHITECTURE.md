@@ -120,7 +120,7 @@ Each action default-exports `defineAction({ name, schema, handler })` with an in
 
 Handlers are long-running async functions that poll APIs, stream logs, and respect the abort signal. Unknown actions are skipped gracefully. `trigger-pipeline` is the exception — it imports app internals to orchestrate cross-pipeline execution with circular dependency detection.
 
-**SDK:** `packages/trigger-sdk/index.ts` re-exports from `src/pipeline/types.ts`. Custom plugins import `{ defineAction, z }` from `"trigger-sdk"`.
+**SDK:** `packages/trigger-sdk/index.ts` re-exports from `src/pipeline/types.ts`. Custom plugins import `{ defineAction, z }` from `"@saanuregh/trigger-sdk"`.
 
 **AWS clients:** Lazily created per region and cached in module-level `Map`s — avoids import-time failures when credentials aren't configured.
 

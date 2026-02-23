@@ -8,13 +8,13 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run typecheck && bun run build
 
-# Production stage — compiled output + trigger-sdk for custom actions
+# Production stage — compiled output + @saanuregh/trigger-sdk for custom actions
 FROM oven/bun:1.3-slim
 WORKDIR /app
 
 COPY --from=build /app/dist .
 COPY --from=build /app/node_modules/zod /app/node_modules/zod
-COPY --from=build /app/dist/trigger-sdk /app/node_modules/trigger-sdk
+COPY --from=build /app/dist/@saanuregh/trigger-sdk /app/node_modules/@saanuregh/trigger-sdk
 
 RUN mkdir -p /app/data /app/actions && chown -R bun:bun /app/data /app/actions
 

@@ -1,4 +1,4 @@
-// import { defineAction, z } from "trigger-sdk";
+// import { defineAction, z } from "@saanuregh/trigger-sdk";
 import { defineAction, z } from "../../packages/trigger-sdk/index.ts";
 
 const schema = z
