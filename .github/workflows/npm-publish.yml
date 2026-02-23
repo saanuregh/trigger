@@ -5,12 +5,13 @@ on:
     tags: ['*.*.*']
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
 
     steps:
       - name: Checkout repository
@@ -31,16 +32,13 @@ jobs:
       - name: Setup Node (for npm publish)
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install latest npm (for trusted publishing)
-        run: npm install -g npm@latest
-
       - name: Publish @saanuregh/trigger
-        run: npm publish --provenance --access public
+        run: npm publish --access public
         working-directory: dist
 
       - name: Publish @saanuregh/trigger-sdk
-        run: npm publish --provenance --access public
+        run: npm publish --access public
         working-directory: dist/@saanuregh/trigger-sdk
