@@ -74,7 +74,7 @@ await Bun.write(
     keywords: rootPkg.keywords,
     engines: rootPkg.engines,
     bin: { trigger: "index.js" },
-    files: ["index.js", "chunk-*", "public/", "README.md"],
+    files: ["index.js", "chunk-*.js", "chunk-*.css", "public/", "README.md"],
   }),
 );
 
