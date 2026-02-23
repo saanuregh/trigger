@@ -1,9 +1,11 @@
 {
-  "name": "trigger",
-  "version": "0.4.0",
+  "name": "@saanuregh/trigger",
+  "version": "0.5.0",
   "module": "index.ts",
   "type": "module",
-  "private": true,
+  "bin": {
+    "trigger": "index.ts"
+  },
   "scripts": {
     "dev": "bun --hot index.ts start",
     "typecheck": "bunx tsc --noEmit",

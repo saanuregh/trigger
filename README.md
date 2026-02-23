@@ -140,7 +140,7 @@ Key config features:
 Drop a `.ts` file into the actions directory (default `./actions/`, set via `ACTIONS_DIR`):
 
 ```ts
-import { defineAction, z } from "trigger-sdk";
+import { defineAction, z } from "@saanuregh/trigger-sdk";
 
 export default defineAction({
   name: "slack-notify",
