@@ -1,6 +1,6 @@
 {
   "name": "@saanuregh/trigger",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Trigger and monitor deployment pipelines with declarative YAML configs and a real-time web UI",
   "module": "index.ts",
   "type": "module",
