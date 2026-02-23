@@ -82,9 +82,10 @@ export function listRuns(filters: {
   const limit = filters.limit ?? 50;
   const offset = filters.offset ?? 0;
 
+  const params = [...values, String(limit), String(offset)];
   return getDb()
-    .query(`SELECT * FROM pipeline_runs ${where} ORDER BY started_at DESC LIMIT ? OFFSET ?`)
-    .all(...values, limit, offset) as RunRow[];
+    .query<RunRow, string[]>(`SELECT * FROM pipeline_runs ${where} ORDER BY started_at DESC LIMIT ? OFFSET ?`)
+    .all(...params);
 }
 
 export function countRuns(filters: { namespace?: string; namespaces?: string[]; pipeline_id?: string; status?: RunStatus }): number {

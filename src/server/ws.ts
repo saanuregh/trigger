@@ -17,6 +17,7 @@ export interface WSData {
 
 type WS = ServerWebSocket<WSData>;
 
+const MAX_WS_CONNECTIONS = 1000;
 const sockets = new Set<WS>();
 
 function buildStatus(): SystemStatus {
@@ -118,6 +119,11 @@ function handleUnsubscribe(ws: WS, topic: string) {
 
 export const wsHandlers = {
   open(ws: WS) {
+    if (sockets.size >= MAX_WS_CONNECTIONS) {
+      logger.warn({ current: sockets.size }, "ws connection limit reached, rejecting");
+      ws.close(1013, "Too many connections");
+      return;
+    }
     sockets.add(ws);
     send(ws, { type: "status", ...buildStatus() });
   },

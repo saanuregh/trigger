@@ -8,6 +8,10 @@ import { OAUTH_STATE_COOKIE, type RouteRequest } from "./helpers.ts";
 
 const SECURE_SUFFIX = env.development ? "" : "; Secure";
 
+function clearStateCookie(): string {
+  return `${OAUTH_STATE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${SECURE_SUFFIX}`;
+}
+
 function safeReturnUrl(url: string): string {
   return url.startsWith("/") && !url.startsWith("//") ? url : "/";
 }
@@ -42,18 +46,36 @@ export const callback = async (req: RouteRequest) => {
   const state = url.searchParams.get("state");
 
   if (!code || !state) {
-    return new Response(null, { status: 302, headers: { Location: "/login?error=missing_params" } });
+    return new Response(null, {
+      status: 302,
+      headers: [
+        ["Location", "/login?error=missing_params"],
+        ["Set-Cookie", clearStateCookie()],
+      ],
+    });
   }
 
   const savedState = getCookie(req, OAUTH_STATE_COOKIE);
   if (savedState !== state) {
-    return new Response(null, { status: 302, headers: { Location: "/login?error=invalid_state" } });
+    return new Response(null, {
+      status: 302,
+      headers: [
+        ["Location", "/login?error=invalid_state"],
+        ["Set-Cookie", clearStateCookie()],
+      ],
+    });
   }
 
   // Verify HMAC signature on the state to prevent tampering
   const dotIdx = state.lastIndexOf(".");
   if (dotIdx === -1 || !hmacVerify(state.slice(0, dotIdx), state.slice(dotIdx + 1))) {
-    return new Response(null, { status: 302, headers: { Location: "/login?error=invalid_state" } });
+    return new Response(null, {
+      status: 302,
+      headers: [
+        ["Location", "/login?error=invalid_state"],
+        ["Set-Cookie", clearStateCookie()],
+      ],
+    });
   }
 
   try {
@@ -77,12 +99,18 @@ export const callback = async (req: RouteRequest) => {
       headers: [
         ["Location", returnUrl],
         ["Set-Cookie", sessionCookieHeader(sessionCookie)],
-        ["Set-Cookie", `${OAUTH_STATE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${SECURE_SUFFIX}`],
+        ["Set-Cookie", clearStateCookie()],
       ],
     });
   } catch (err) {
     logger.error({ error: errorMessage(err) }, "auth callback failed");
-    return new Response(null, { status: 302, headers: { Location: "/login?error=auth_failed" } });
+    return new Response(null, {
+      status: 302,
+      headers: [
+        ["Location", "/login?error=auth_failed"],
+        ["Set-Cookie", clearStateCookie()],
+      ],
+    });
   }
 };
 

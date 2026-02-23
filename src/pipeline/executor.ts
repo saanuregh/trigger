@@ -302,10 +302,10 @@ function createStepLogger(runId: string, def: StepDef, logFile: string, stepInde
 
   return {
     stepLog,
-    flush() {
+    async flush() {
       try {
-        file.flush();
-        file.end();
+        await file.flush();
+        await file.end();
       } catch (err) {
         logger.warn({ runId, stepId: def.id, error: errorMessage(err) }, "failed to flush step log file");
       }
@@ -380,7 +380,7 @@ async function executeStep(opts: RunStepsOptions, dbId: string, def: StepDef, st
     publishStepStatus(runId, log, def, "failed");
     return { failed: msg };
   } finally {
-    sl.flush();
+    await sl.flush();
   }
 }
 

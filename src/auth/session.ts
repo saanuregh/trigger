@@ -5,7 +5,7 @@ import { logger } from "../logger.ts";
 import { errorMessage } from "../types.ts";
 
 const SESSION_TTL_S = 24 * 60 * 60; // 24 hours
-const COOKIE_NAME = "trigger_session";
+const COOKIE_NAME = env.development ? "trigger_session" : "__Host-trigger_session";
 
 const sessionPayloadSchema = z.object({
   email: z.string(),

@@ -27,6 +27,11 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const cache = new Map<string, { data: unknown; ts: number }>();
 const inflight = new Map<string, Promise<unknown>>();
 
+export function clearFetchCache() {
+  cache.clear();
+  inflight.clear();
+}
+
 function cacheGet<T>(key: string): T | undefined {
   const entry = cache.get(key);
   if (!entry) return undefined;
