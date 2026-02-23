@@ -1,6 +1,6 @@
 {
   "name": "@saanuregh/trigger-sdk",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "SDK for writing custom Trigger pipeline actions",
   "main": "index.ts",
   "types": "index.ts",
