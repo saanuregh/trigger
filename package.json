@@ -17,7 +17,7 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.989.0",
     "@aws-sdk/client-codebuild": "^3.989.0",
-    "@aws-sdk/client-ecs": "^3.989.0",
+    "@aws-sdk/client-ecs": "^3.995.0",
     "croner": "^10.0.1",
     "lucide-react": "^0.564.0",
     "react": "^19.2.4",
