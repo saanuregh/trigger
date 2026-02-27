@@ -2,6 +2,8 @@
 
 Trigger and monitor deployment pipelines. Declarative YAML pipeline configs fetched from GitHub repos at runtime, with a web UI for triggering runs and streaming logs in real time.
 
+![Trigger](docs/demo.webp)
+
 ## Stack
 
 - **Runtime:** [Bun](https://bun.sh) 1.3+
