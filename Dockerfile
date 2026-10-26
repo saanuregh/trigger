@@ -1,5 +1,5 @@
 # Build stage — install deps, type-check, and bundle
-FROM oven/bun:1.3 AS build
+FROM oven/bun:1.4 AS build
 WORKDIR /app
 
 COPY package.json bun.lock bunfig.toml tsconfig.json ./
@@ -9,7 +9,7 @@ COPY . .
 RUN bun run typecheck && bun run build
 
 # Production stage — compiled output + @saanuregh/trigger-sdk for custom actions
-FROM oven/bun:1.3-slim
+FROM oven/bun:1.4-slim
 WORKDIR /app
 
 COPY --from=build /app/dist .
